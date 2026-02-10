@@ -251,7 +251,8 @@
         "sparkle", "mlem", "yippee", "oops", "hush",
         "spin", "invert", "disco", "jelly", "grow",
         "shrink", "rainbow", "quake", "melt", "glitch",
-        "confetti", "bounce", "vortex", "nyan", "rave"
+        "confetti", "bounce", "vortex", "nyan", "rave",
+        "CRT", "90s", "DVD"
       ];
 
       const FILLER = [
@@ -558,10 +559,7 @@
         rave: { h:260, bg:'#0a0020', ink:'#c8b0ff', muted:'rgba(200,176,255,.6)', line:'rgba(200,176,255,.12)', cardBg:'rgba(40,10,90,.5)', navBg:'rgba(15,5,40,.88)' },
         nyan: { h:180, bg:'#f0faff', ink:'#104050', muted:'rgba(16,64,80,.6)', line:'rgba(16,64,80,.10)', cardBg:'rgba(220,248,255,.7)', navBg:'rgba(240,252,255,.85)' },
         invert: { h:40, bg:'#0b1020', ink:'#e8e0d0', muted:'rgba(232,224,208,.55)', line:'rgba(232,224,208,.10)', cardBg:'rgba(20,25,50,.6)', navBg:'rgba(11,16,32,.88)' },
-        sparkle: { h:45, bg:'#fffdf5', ink:'#3a2800', muted:'rgba(58,40,0,.55)', line:'rgba(58,40,0,.10)', cardBg:'rgba(255,250,230,.75)', navBg:'rgba(255,253,245,.85)' },
-        hehe: { h:330, bg:'#fff5fa', ink:'#4a1030', muted:'rgba(74,16,48,.55)', line:'rgba(74,16,48,.10)', cardBg:'rgba(255,240,248,.7)', navBg:'rgba(255,245,250,.85)' },
         zap: { h:190, bg:'#f0fcff', ink:'#0a3040', muted:'rgba(10,48,64,.55)', line:'rgba(10,48,64,.10)', cardBg:'rgba(230,250,255,.7)', navBg:'rgba(240,252,255,.85)' },
-        bonk: { h:15, bg:'#fff8f0', ink:'#401800', muted:'rgba(64,24,0,.55)', line:'rgba(64,24,0,.10)', cardBg:'rgba(255,245,235,.7)', navBg:'rgba(255,248,240,.85)' },
         glitch: { h:150, bg:'#0a1a10', ink:'#80ffb0', muted:'rgba(128,255,176,.5)', line:'rgba(128,255,176,.10)', cardBg:'rgba(15,40,25,.6)', navBg:'rgba(10,26,16,.88)' },
       };
 
@@ -576,14 +574,66 @@
         root.style.setProperty('--muted', theme.muted);
         root.style.setProperty('--line', theme.line);
 
-        // update cards, nav, panels
         document.querySelectorAll('.card, .aboutCard, .heroLeft').forEach(el => {
           el.style.background = theme.cardBg;
         });
         const nav = document.querySelector('.top');
         if (nav) nav.style.background = theme.navBg;
         document.querySelector('.heroRight').style.background = theme.cardBg;
+      }
 
+      // ===== PERSISTENT OVERLAY EFFECTS (layer on top of any theme) =====
+      let crtOverlay = null;
+      let ninetiesOverlay = null;
+      let dvdEl = null;
+      let dvdAnim = null;
+
+      function toggleCRT() {
+        if (crtOverlay) { crtOverlay.remove(); crtOverlay = null; siteBody.classList.remove('crt-active'); return; }
+        crtOverlay = document.createElement('div');
+        crtOverlay.className = 'crt-overlay';
+        crtOverlay.innerHTML = '<div class="crt-scanlines"></div><div class="crt-flicker"></div>';
+        siteBody.appendChild(crtOverlay);
+        siteBody.classList.add('crt-active');
+      }
+
+      function toggle90s() {
+        if (ninetiesOverlay) { ninetiesOverlay.remove(); ninetiesOverlay = null; siteBody.classList.remove('nineties-active'); return; }
+        ninetiesOverlay = document.createElement('div');
+        ninetiesOverlay.className = 'nineties-overlay';
+        // star-field bg
+        let stars = '';
+        for (let i = 0; i < 50; i++) {
+          stars += '<div class="nineties-star" style="left:'+r(0,100)+'%;top:'+r(0,100)+'%;animation-delay:'+r(0,3)+'s;font-size:'+r(8,18)+'px;">'+rand(['⭐','✦','★','·'])+'</div>';
+        }
+        ninetiesOverlay.innerHTML = stars;
+        siteBody.appendChild(ninetiesOverlay);
+        siteBody.classList.add('nineties-active');
+      }
+
+      function toggleDVD() {
+        if (dvdEl) { cancelAnimationFrame(dvdAnim); dvdEl.remove(); dvdEl = null; return; }
+        dvdEl = document.createElement('div');
+        dvdEl.className = 'dvd-logo';
+        dvdEl.textContent = 'DVD';
+        siteBody.appendChild(dvdEl);
+        let dx = 2.2, dy = 1.8;
+        let x = r(50, window.innerWidth - 150), y = r(50, window.innerHeight - 80);
+        let hue = 0;
+        function dvdLoop() {
+          x += dx; y += dy;
+          const w = dvdEl.offsetWidth || 80, h = dvdEl.offsetHeight || 36;
+          let bounced = false;
+          if (x <= 0) { x = 0; dx = Math.abs(dx); bounced = true; }
+          if (x + w >= window.innerWidth) { x = window.innerWidth - w; dx = -Math.abs(dx); bounced = true; }
+          if (y <= 0) { y = 0; dy = Math.abs(dy); bounced = true; }
+          if (y + h >= window.innerHeight) { y = window.innerHeight - h; dy = -Math.abs(dy); bounced = true; }
+          if (bounced) { hue = (hue + r(40,80)) % 360; dvdEl.style.color = 'hsl('+hue+' 90% 60%)'; }
+          dvdEl.style.left = x + 'px';
+          dvdEl.style.top = y + 'px';
+          dvdAnim = requestAnimationFrame(dvdLoop);
+        }
+        dvdLoop();
       }
 
       // Color takeover (non-theme, just accent hue shift)
@@ -607,8 +657,8 @@
         "smol": (e) => { smolAll(); randomizeBlobs("smol"); spawnParticles(e.clientX,e.clientY,{ count:r(10,16), sizeMin:8, sizeMax:18, durMin:520, durMax:920 }); beep("triangle", r(420,680), 0.13, 0.08); },
         ":3": (e) => { randomizeBlobs(":3"); flashOverlay(":3"); spawnParticles(e.clientX,e.clientY,{ count:r(14,22), shape:"hearts", sizeMin:12, sizeMax:26, durMin:680, durMax:1200 }); beep("triangle", r(380,680), 0.14, 0.09); },
         "wiggle": (e) => { randomizeBlobs("normal"); wiggle(900); spawnParticles(e.clientX,e.clientY,{ count:r(10,16), dxMax:120, dyUp:140, durMin:700, durMax:1200 }); beep("sine", r(360,560), 0.14, 0.08); },
-        "bonk": (e) => { randomizeBlobs("bonk"); flashOverlay("bonk"); spawnParticles(e.clientX,e.clientY,{ count:r(10,18), shape:"squares", sizeMin:12, sizeMax:30, durMin:360, durMax:640, dxMax:220, dyUp:260 }); beep("square", r(160,260), 0.10, 0.12); applySiteTheme('bonk'); },
-        "hehe": (e) => { randomizeBlobs("sparkle"); flashOverlay("sparkle"); spawnParticles(e.clientX,e.clientY,{ count:r(18,34), shape:"mixed", durMin:520, durMax:980 }); beep("triangle", r(520,900), 0.12, 0.10); wiggle(450); applySiteTheme('hehe'); },
+        "bonk": (e) => { randomizeBlobs("bonk"); flashOverlay("bonk"); spawnParticles(e.clientX,e.clientY,{ count:r(10,18), shape:"squares", sizeMin:12, sizeMax:30, durMin:360, durMax:640, dxMax:220, dyUp:260 }); beep("square", r(160,260), 0.10, 0.12); },
+        "hehe": (e) => { randomizeBlobs("sparkle"); flashOverlay("sparkle"); spawnParticles(e.clientX,e.clientY,{ count:r(18,34), shape:"mixed", durMin:520, durMax:980 }); beep("triangle", r(520,900), 0.12, 0.10); wiggle(450); },
 
         "zap": (e) => { randomizeBlobs("zap"); flashOverlay("zap"); spawnParticles(e.clientX,e.clientY,{ count:r(12,20), shape:"squares", sizeMin:10, sizeMax:22, durMin:420, durMax:780, dxMax:190, dyUp:260 }); beep("square", r(240,420), 0.09, 0.10); applySiteTheme('zap'); },
         "womp": (e) => { randomizeBlobs("womp"); womp(); spawnParticles(e.clientX,e.clientY,{ count:r(10,16), durMin:620, durMax:1100, dxMax:140 }); beep("triangle", r(180,320), 0.14, 0.07); },
@@ -616,7 +666,7 @@
         "zoom": (e) => { randomizeBlobs("normal"); zoomPulse(); spawnParticles(e.clientX,e.clientY,{ count:r(10,18), dxMax:260, dyUp:300, durMin:420, durMax:780 }); beep("sine", r(480,880), 0.12, 0.09); },
         "splat": (e) => { randomizeBlobs("normal"); splat(e); spawnParticles(e.clientX,e.clientY,{ count:r(8,14), durMin:620, durMax:1100, dxMax:120, dyUp:120 }); beep("square", r(180,300), 0.12, 0.09); },
 
-        "sparkle": (e) => { randomizeBlobs("sparkle"); flashOverlay("sparkle"); spawnParticles(e.clientX,e.clientY,{ count:r(16,28), shape:"mixed", durMin:620, durMax:1100 }); beep("sine", r(560,980), 0.14, 0.09); beep("triangle", r(620,1200), 0.10, 0.07); applySiteTheme('sparkle'); siteSparkle(); },
+        "sparkle": (e) => { randomizeBlobs("sparkle"); flashOverlay("sparkle"); spawnParticles(e.clientX,e.clientY,{ count:r(16,28), shape:"mixed", durMin:620, durMax:1100 }); beep("sine", r(560,980), 0.14, 0.09); beep("triangle", r(620,1200), 0.10, 0.07); siteSparkle(); },
         "mlem": (e) => { randomizeBlobs("normal"); splat(e); beep("sine", r(320,520), 0.15, 0.08); },
         "yippee": (e) => { randomizeBlobs("sparkle"); flashOverlay("yippee"); spawnParticles(e.clientX,e.clientY,{ count:r(16,28), shape:"hearts", sizeMin:10, sizeMax:22, durMin:560, durMax:980 }); wiggle(720); beep("triangle", r(620,980), 0.12, 0.09); beep("sine", r(740,1200), 0.10, 0.07); siteFall(rand(['💖','💕','✨','🌟'])); },
         "oops": (e) => { randomizeBlobs("womp"); flashOverlay("oops"); spawnParticles(e.clientX,e.clientY,{ count:r(14,22), durMin:520, durMax:940, dxMax:120, dyUp:80, dyDown:260 }); womp(); beep("triangle", r(220,360), 0.14, 0.08); },
@@ -637,6 +687,10 @@
         "vortex": (e) => { toyBox.style.transition="transform 1s cubic-bezier(.2,.8,.2,1)"; toyBox.style.transform="rotate(720deg) scale(0.9)"; setTimeout(()=>{toyBox.style.transform="rotate(0deg) scale(1)"; setTimeout(()=>toyBox.style.transition="",600);},1100); spawnParticles(e.clientX,e.clientY,{count:r(20,30),dxMax:100,dyUp:100,durMin:800,durMax:1400}); beep("sine",r(300,600),0.14,0.08); },
         "nyan": (e) => { let h=0; const iv=setInterval(()=>{h+=30; [b1,b2,b3].forEach((b,i)=>{b.style.background=`hsl(${(h+i*40)%360} 90% 65%)`;}); if(h>360){clearInterval(iv); randomizeBlobs("sparkle");}},70); spawnParticles(e.clientX,e.clientY,{count:r(18,28),shape:"mixed",durMin:600,durMax:1100}); beep("triangle",r(500,800),0.12,0.08); wiggle(500); applySiteTheme('nyan'); },
         "rave": (e) => { let i=0; const iv=setInterval(()=>{const on=i%2===0; toyBox.style.background=on?`hsl(${Math.random()*360} 90% 15%)`:""; toyBox.style.filter=on?"brightness(2) contrast(1.5)":""; [b1,b2,b3].forEach(b=>{b.style.background=`hsl(${Math.random()*360} 95% ${on?70:55}%)`;b.style.opacity=on?"1":"0.85";}); i++; if(i>16){clearInterval(iv); toyBox.style.background=""; toyBox.style.filter=""; randomizeBlobs("normal");}},90); spawnParticles(e.clientX,e.clientY,{count:r(24,36),shape:"mixed",durMin:300,durMax:700,dxMax:220,dyUp:280}); beep("square",r(200,500),0.08,0.10); beep("triangle",r(400,800),0.06,0.08); applySiteTheme('rave'); },
+
+        "CRT": (e) => { toggleCRT(); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"squares",sizeMin:6,sizeMax:14,durMin:300,durMax:600}); beep("square",r(80,200),0.10,0.12); },
+        "90s": (e) => { toggle90s(); spawnParticles(e.clientX,e.clientY,{count:r(16,24),shape:"mixed",durMin:500,durMax:1000}); beep("triangle",r(400,700),0.12,0.09); },
+        "DVD": (e) => { toggleDVD(); spawnParticles(e.clientX,e.clientY,{count:r(12,20),shape:"circles",durMin:400,durMax:800}); beep("sine",r(300,500),0.14,0.08); },
       };
 
       function isActionWord(w) {
@@ -693,6 +747,14 @@
         gravBall.style.top = (e.clientY - rect.top) + "px";
       }
 
+      // Pick a random word currently visible on screen
+      function getRandomVisibleWord() {
+        const visible = [];
+        stickers.forEach(s => { if (s.dataset.word) visible.push(s.dataset.word); });
+        corners.forEach(c => { if (!c.hidden && c.dataset.word) visible.push(c.dataset.word); });
+        return visible.length ? rand(visible) : rand(ACTION_WORDS);
+      }
+
       // init
       randomizeBlobs("normal");
       refreshTextAndPositions();
@@ -700,9 +762,7 @@
       toyBox.addEventListener('pointerdown', (e) => {
         const t = e.target;
         if (t && (t.matches?.('[data-sticker]') || t.matches?.('[data-corner]'))) return;
-        doGenericClick(e);
-        updateStats();
-        refreshTextAndPositions();
+        triggerWord(getRandomVisibleWord(), e);
       });
 
       stickers.forEach(s => {
@@ -724,9 +784,7 @@
           e.preventDefault();
           const rect = toyBox.getBoundingClientRect();
           const fake = { clientX: rect.left + rect.width * 0.5, clientY: rect.top + rect.height * 0.55 };
-          doGenericClick(fake);
-          updateStats();
-          refreshTextAndPositions();
+          triggerWord(getRandomVisibleWord(), fake);
         }
       });
 
