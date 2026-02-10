@@ -2689,3 +2689,158 @@ body.page-sidebar .wrap{
   40%{ opacity:1; }
   100%{ transform:translateX(0%) scaleY(1); opacity:.6; }
 }
+
+/* ===== NEW PERSISTENT TOGGLE EFFECTS ===== */
+
+/* bruh — permanent grayscale + desaturated */
+body.page-bruh{ filter: grayscale(1) brightness(0.95) !important; }
+
+/* rain — dark, moody */
+body.page-rain{
+  filter: brightness(0.88) contrast(1.05) saturate(0.8) !important;
+}
+body.page-rain::after{
+  content:'';
+  position:fixed;
+  inset:0;
+  z-index:9980;
+  pointer-events:none;
+  background:repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 8px,
+    rgba(150,180,220,.03) 8px,
+    rgba(150,180,220,.03) 9px
+  );
+  animation:rainLines 0.3s linear infinite;
+}
+@keyframes rainLines{
+  0%{ transform:translateY(0); }
+  100%{ transform:translateY(9px); }
+}
+
+/* lava — warm sepia glow */
+body.page-lava{
+  filter: sepia(0.4) saturate(1.8) !important;
+}
+body.page-lava .card, body.page-lava .aboutCard{
+  box-shadow: 0 0 20px rgba(255,80,0,.08) !important;
+}
+
+/* ocean — blue shift */
+body.page-ocean{
+  filter: hue-rotate(180deg) brightness(1.05) !important;
+}
+
+/* sheesh — oversaturated */
+body.page-sheesh{
+  filter: saturate(3) contrast(1.2) !important;
+}
+
+/* ===== FILLER WORD EFFECTS ===== */
+
+/* brain tickle — gentle pulsing glow on everything */
+body.page-braintickle .card, body.page-braintickle .aboutCard, body.page-braintickle .heroLeft{
+  animation: brainGlow 2s ease-in-out infinite alternate;
+}
+body.page-braintickle .card:nth-child(2n){ animation-delay:-.5s; }
+body.page-braintickle .card:nth-child(3n){ animation-delay:-1s; }
+@keyframes brainGlow{
+  0%{ box-shadow: 0 0 20px rgba(200,100,255,.05); }
+  100%{ box-shadow: 0 0 40px rgba(200,100,255,.15), 0 0 80px rgba(100,200,255,.08); }
+}
+body.page-braintickle h1{
+  animation: brainText 3s ease-in-out infinite alternate;
+}
+@keyframes brainText{
+  0%{ text-shadow: 0 0 10px rgba(200,100,255,.2); }
+  100%{ text-shadow: 0 0 30px rgba(200,100,255,.4), 0 0 60px rgba(100,200,255,.2); }
+}
+
+/* no thoughts — everything blurry and floaty, low contrast */
+body.page-nothoughts{
+  filter: blur(1px) brightness(1.05) contrast(0.85) !important;
+}
+body.page-nothoughts .hero, body.page-nothoughts .section{
+  animation: nothoughtsFloat 6s ease-in-out infinite;
+}
+@keyframes nothoughtsFloat{
+  0%,100%{ transform: translateY(0) rotate(0deg); }
+  25%{ transform: translateY(-5px) rotate(0.2deg); }
+  75%{ transform: translateY(5px) rotate(-0.2deg); }
+}
+body.page-nothoughts .cardTitle, body.page-nothoughts .cardDesc{
+  opacity: 0.5;
+}
+
+/* just vibes — gentle color cycling with floaty elements */
+body.page-justvibes{
+  animation: vibesCycle 10s ease-in-out infinite !important;
+}
+@keyframes vibesCycle{
+  0%{ filter: hue-rotate(0deg) brightness(1.02); }
+  33%{ filter: hue-rotate(30deg) brightness(1.05); }
+  66%{ filter: hue-rotate(-20deg) brightness(1.0); }
+  100%{ filter: hue-rotate(0deg) brightness(1.02); }
+}
+body.page-justvibes .card{
+  animation: vibesCard 4s ease-in-out infinite;
+}
+body.page-justvibes .card:nth-child(2n){ animation-delay:-1s; }
+body.page-justvibes .card:nth-child(3n){ animation-delay:-2s; }
+@keyframes vibesCard{
+  0%,100%{ transform: translateY(0) rotate(0deg); }
+  50%{ transform: translateY(-6px) rotate(0.5deg); }
+}
+
+/* based — bold, high contrast, golden glow */
+body.page-based{
+  filter: contrast(1.15) saturate(1.3) !important;
+}
+body.page-based h1, body.page-based .cardTitle{
+  text-shadow: 0 0 15px rgba(255,200,50,.3), 0 0 30px rgba(255,150,0,.15);
+  color: #ffd700 !important;
+}
+body.page-based .card{
+  border-color: rgba(255,200,50,.25) !important;
+  box-shadow: 0 0 20px rgba(255,200,50,.08) !important;
+}
+
+/* vibe-badge */
+.vibe-badge{
+  position:absolute;
+  bottom:8px;
+  right:8px;
+  background: linear-gradient(135deg, rgba(200,100,255,.15), rgba(100,200,255,.15));
+  border:1px solid rgba(200,100,255,.2);
+  color:var(--ink);
+  font-weight:800;
+  font-size:10px;
+  padding:4px 8px;
+  border-radius:999px;
+  z-index:3;
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+}
+
+/* why layer — persistent "why" text everywhere */
+.why-layer{
+  position:fixed;
+  inset:0;
+  z-index:9979;
+  pointer-events:none;
+  overflow:hidden;
+}
+.why-text{
+  position:absolute;
+  font-weight:900;
+  color:var(--muted);
+  font-family:serif;
+  animation:whyDrift 8s ease-in-out infinite alternate;
+  user-select:none;
+}
+.why-text:nth-child(2n){ animation-direction:alternate-reverse; animation-duration:6s; }
+@keyframes whyDrift{
+  0%{ transform:rotate(var(--r,0deg)) translate(0,0); }
+  100%{ transform:rotate(var(--r,0deg)) translate(5px,-5px); }
+}
