@@ -306,40 +306,87 @@
       let clickCount = 0;
       let totalCount = 0;
       let pendingClicks = 0;
+      let hasSharedStorage = false;
       const myClicksEl = document.getElementById('myClicks');
       const totalClicksEl = document.getElementById('totalClicks');
       const gravBall = document.getElementById('gravBall');
 
-      // Fallback if storage API isn't available
-      if (!window.storage) {
-        window.storage = {
-          async get(key) {
-            const v = localStorage.getItem(key);
-            return v !== null ? { value: v } : null;
-          },
-          async set(key, value) {
-            localStorage.setItem(key, value);
-            return { key, value };
+      // Detect if real shared storage is available
+      async function initStorage() {
+        if (window.storage && typeof window.storage.get === 'function') {
+          try {
+            // Test shared write+read roundtrip
+            await window.storage.set('uselessbox:ping', 'ok', true);
+            const test = await window.storage.get('uselessbox:ping', true);
+            if (test && test.value === 'ok') {
+              hasSharedStorage = true;
+              console.log('[useless box] shared storage: available');
+            }
+          } catch(e) {
+            console.log('[useless box] shared storage test failed:', e);
           }
-        };
-      }
-
-      async function refreshSharedTotal() {
-        try {
-          const totalData = await window.storage.get('uselessbox:total', true);
-          const remote = totalData ? parseInt(totalData.value, 10) || 0 : 0;
-          // Always trust remote + any pending local clicks not yet flushed
-          totalCount = remote + pendingClicks;
-        } catch(e) {
-          // Key doesn't exist yet — that's fine, keep local count
+        }
+        if (!hasSharedStorage) {
+          console.log('[useless box] shared storage: unavailable, using localStorage');
         }
       }
 
-      async function loadCounts() {
+      // Safe shared get — returns number or 0
+      async function getSharedTotal() {
+        if (!hasSharedStorage) {
+          const v = localStorage.getItem('uselessbox:total');
+          return v !== null ? parseInt(v, 10) || 0 : 0;
+        }
         try {
-          const myData = await window.storage.get('uselessbox:myclicks');
-          clickCount = myData ? parseInt(myData.value, 10) || 0 : 0;
-        } catch(e) { clickCount = 0; }
+          const result = await window.storage.get('uselessbox:total', true);
+          if (result && result.value != null) {
+            return parseInt(result.value, 10) || 0;
+          }
+          return 0;
+        } catch(e) {
+          // Key doesn't exist yet
+          return 0;
+        }
+      }
+
+      // Safe shared set
+      async function setSharedTotal(val) {
+        if (!hasSharedStorage) {
+          localStorage.setItem('uselessbox:total', String(val));
+          return;
+        }
+        await window.storage.set('uselessbox:total', String(val), true);
+      }
+
+      // Personal count (always per-user)
+      async function getMyClicks() {
+        if (hasSharedStorage) {
+          try {
+            const result = await window.storage.get('uselessbox:myclicks');
+            return result ? parseInt(result.value, 10) || 0 : 0;
+          } catch(e) { return 0; }
+        }
+        const v = localStorage.getItem('uselessbox:myclicks');
+        return v !== null ? parseInt(v, 10) || 0 : 0;
+      }
+
+      async function setMyClicks(val) {
+        if (hasSharedStorage) {
+          try { await window.storage.set('uselessbox:myclicks', String(val)); } catch(e) {}
+          return;
+        }
+        localStorage.setItem('uselessbox:myclicks', String(val));
+      }
+
+      async function refreshSharedTotal() {
+        const remote = await getSharedTotal();
+        // Remote is the source of truth; add any unflushed local clicks
+        totalCount = remote + pendingClicks;
+      }
+
+      async function loadCounts() {
+        await initStorage();
+        clickCount = await getMyClicks();
         await refreshSharedTotal();
         renderCounts();
       }
@@ -360,25 +407,17 @@
         const batch = pendingClicks;
         pendingClicks = 0;
         try {
-          // Read current shared total (may throw if key doesn't exist yet)
-          let current = 0;
-          try {
-            const totalData = await window.storage.get('uselessbox:total', true);
-            current = totalData ? parseInt(totalData.value, 10) || 0 : 0;
-          } catch(e) {
-            // Key doesn't exist yet — start from 0
-            current = 0;
-          }
+          const current = await getSharedTotal();
           const newTotal = current + batch;
-          await window.storage.set('uselessbox:total', String(newTotal), true);
+          await setSharedTotal(newTotal);
           totalCount = newTotal;
           renderCounts();
         } catch(e) {
-          // Write failed — put clicks back so we retry
+          // Write failed — put clicks back to retry
           pendingClicks += batch;
           scheduleFlush();
         }
-        try { await window.storage.set('uselessbox:myclicks', String(clickCount)); } catch(e) {}
+        await setMyClicks(clickCount);
       }
 
       function updateStats() {
@@ -391,8 +430,10 @@
 
       // Poll shared total every 3s for real-time updates from other users
       setInterval(async () => {
-        await refreshSharedTotal();
-        renderCounts();
+        try {
+          await refreshSharedTotal();
+          renderCounts();
+        } catch(e) {}
       }, 3000);
 
       loadCounts();
