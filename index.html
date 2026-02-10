@@ -4,23 +4,490 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>wildrabbet</title>
+  <meta name="description" content="wildrabbet — weird little web things made for fun" />
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
   <header class="top">
-    <div class="brand">wildrabbet</div>
+    <a class="logo" href="./" aria-label="wildrabbet home">
+      <span class="mark" aria-hidden="true">🐇</span>
+      <span class="word">wildrabbet</span>
+    </a>
+
     <nav class="nav">
-      <a href="./">Home</a>
+      <a href="#stuff">Stuff</a>
+      <a href="#about">About</a>
     </nav>
   </header>
 
   <main class="wrap">
-    <h1>wildrabbet</h1>
-    <p class="sub">Hello, World!</p>
+    <section class="hero">
+      <div class="heroLeft">
+        <h1>
+          weird little web things<br/>
+          made for fun
+        </h1>
+
+        <p class="lede">
+          click stuff. it does stuff. sometimes it’s a bad idea.
+        </p>
+
+        <div class="ctaRow">
+          <a class="btn primary" href="#stuff">Stuff</a>
+          <button class="btn" id="surpriseBtn" type="button">Surprise me</button>
+        </div>
+      </div>
+
+      <!-- ===== SILLY MINIGAME PANEL (NO UI) ===== -->
+      <div class="heroRight" id="toyBox" aria-label="Useless box playground" tabindex="0">
+        <div class="blob b1" id="b1"></div>
+        <div class="blob b2" id="b2"></div>
+        <div class="blob b3" id="b3"></div>
+
+        <div class="flash" id="flash" aria-hidden="true"></div>
+
+        <!-- corner words (each has 1/4 chance to appear) -->
+        <button class="corner tl" data-corner type="button"></button>
+        <button class="corner tr" data-corner type="button"></button>
+        <button class="corner bl" data-corner type="button"></button>
+        <button class="corner br" data-corner type="button"></button>
+
+        <!-- clickable stickers -->
+        <button class="sticker s1" data-sticker type="button">click</button>
+        <button class="sticker s2" data-sticker type="button">poke</button>
+        <button class="sticker s3" data-sticker type="button">boop</button>
+
+        <div class="spray" id="spray" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <section id="stuff" class="section">
+      <div class="sectionHead">
+        <h2>Stuff</h2>
+        <div class="muted">pick your poison</div>
+      </div>
+
+      <div class="grid" id="grid">
+        <a class="card c1" href="./games/jim-eats-the-neighbours/">
+          <div class="cardTop">
+            <div class="emoji">🍽️</div>
+            <div class="tag">social</div>
+          </div>
+          <div class="cardTitle">Jim Eats the Neighbours</div>
+          <div class="cardDesc">Jim is out and tonight he wants to eat the neighbours. Convince them to let him in!</div>
+        </a>
+
+        <a class="card c2" href="./games/minecrafnt/">
+          <div class="cardTop">
+            <div class="emoji">🧱</div>
+            <div class="tag">blocky</div>
+          </div>
+          <div class="cardTitle">Minecrafn't</div>
+          <div class="cardDesc">It's not Minecraft!</div>
+        </a>
+
+        <a class="card c3" href="./games/sogoding/">
+          <div class="cardTop">
+            <div class="emoji">⚙️</div>
+            <div class="tag">factory</div>
+          </div>
+          <div class="cardTitle">SoGoDing</div>
+          <div class="cardDesc">So, Go.. Ding!</div>
+        </a>
+
+        <a class="card c4" href="./games/infinite-retail/">
+          <div class="cardTop">
+            <div class="emoji">🛒</div>
+            <div class="tag">horror?</div>
+          </div>
+          <div class="cardTitle">Infinite Retail</div>
+          <div class="cardDesc">Explore a never ending Supermarket! But be careful when the lights go out.</div>
+        </a>
+
+        <a class="card c5" href="./games/datura-protocol/">
+          <div class="cardTop">
+            <div class="emoji">☠️</div>
+            <div class="tag">do not</div>
+          </div>
+          <div class="cardTitle">Datura Protocol</div>
+          <div class="cardDesc">Oh God, do NOT play this</div>
+        </a>
+
+        <a class="card c6" href="./games/codecrackers/">
+          <div class="cardTop">
+            <div class="emoji">🧩</div>
+            <div class="tag">puzzle</div>
+          </div>
+          <div class="cardTitle">CodeCrackers</div>
+          <div class="cardDesc">Create your own Crosswords and Code Crackers!</div>
+        </a>
+      </div>
+    </section>
+
+    <section id="about" class="section">
+      <div class="sectionHead">
+        <h2>About</h2>
+        <div class="muted">what is this place</div>
+      </div>
+
+      <div class="about">
+        <div class="aboutCard">
+          <div class="aboutTitle">wildrabbet</div>
+          <p>
+            A little cabinet of browser experiments and games. Small, weird, and intentionally unnecessary.
+          </p>
+        </div>
+
+        <div class="aboutCard">
+          <div class="aboutTitle">made by</div>
+          <p>
+            earthbotk
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <span>© <script>document.write(new Date().getFullYear())</script> wildrabbet</span>
+      <span class="dot">•</span>
+      <span class="muted">earthbotk</span>
+    </footer>
   </main>
 
-  <footer class="foot">
-    © <script>document.write(new Date().getFullYear())</script> wildrabbet
-  </footer>
+  <script>
+    // Random pastel accent per refresh
+    (function () {
+      const hues = [12, 38, 58, 110, 150, 190, 220, 260, 300, 330];
+      const h = hues[Math.floor(Math.random() * hues.length)];
+      document.documentElement.style.setProperty('--accent-h', h);
+    })();
+
+    // Surprise me -> picks a random tile in Stuff
+    (function () {
+      const btn = document.getElementById('surpriseBtn');
+      const cards = Array.from(document.querySelectorAll('#grid .card'));
+      btn.addEventListener('click', () => {
+        const pick = cards[Math.floor(Math.random() * cards.length)];
+        if (!pick) return;
+        window.location.href = pick.getAttribute('href');
+      });
+    })();
+
+    // ===== MINIGAME USELESS PANEL =====
+    (function () {
+      const toyBox = document.getElementById('toyBox');
+      const spray = document.getElementById('spray');
+      const flash = document.getElementById('flash');
+
+      const b1 = document.getElementById('b1');
+      const b2 = document.getElementById('b2');
+      const b3 = document.getElementById('b3');
+
+      const corners = Array.from(toyBox.querySelectorAll('[data-corner]'));
+      const stickers = Array.from(toyBox.querySelectorAll('[data-sticker]'));
+
+      const ACTION_WORDS = [
+        "hehe", "smol", ":3", "wiggle", "bonk",
+        "zap", "womp", "bloop", "zoom", "splat",
+        "sparkle", "mlem", "yippee", "oops", "hush"
+      ];
+
+      const FILLER = [
+        "beep", "boop", "bzzz", "yoink", "snack",
+        "brain tickle", "internet moment", "W behavior",
+        "tiny chaos", "unlicensed fun", "no thoughts", "just vibes",
+        "skrrt", "plonk", "wubble", "nya", "teehee", "bonk??"
+      ];
+
+      function rand(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
+      function r(min, max){ return min + Math.random() * (max - min); }
+
+      let audioCtx = null;
+      function beep(type = "triangle", base = 440, dur = 0.13, vol = 0.10) {
+        try {
+          audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+          const t0 = audioCtx.currentTime;
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(base, t0);
+          osc.frequency.exponentialRampToValueAtTime(base * r(1.12, 1.7), t0 + dur * 0.46);
+          gain.gain.setValueAtTime(0.0001, t0);
+          gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.start(t0);
+          osc.stop(t0 + dur + 0.02);
+        } catch (e) {}
+      }
+
+      function accentHue() {
+        return (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--accent-h')) || 220);
+      }
+
+      function spawnParticles(clientX, clientY, opts = {}) {
+        const rect = toyBox.getBoundingClientRect();
+        const ox = clientX - rect.left;
+        const oy = clientY - rect.top;
+
+        const count = Math.floor((opts.count ?? r(10, 18)));
+        const baseH = opts.hue ?? accentHue();
+        const shape = opts.shape ?? "mixed";
+        const sizeMin = opts.sizeMin ?? 10;
+        const sizeMax = opts.sizeMax ?? 26;
+        const dxMax = opts.dxMax ?? 170;
+        const dyUp = opts.dyUp ?? 230;
+        const dyDown = opts.dyDown ?? 130;
+        const durMin = opts.durMin ?? 520;
+        const durMax = opts.durMax ?? 900;
+
+        for (let i = 0; i < count; i++) {
+          const p = document.createElement('div');
+          p.className = 'particle';
+
+          const size = r(sizeMin, sizeMax);
+          const hue = baseH + r(-55, 85);
+          const light = r(48, 62);
+          const col = `hsl(${hue} 95% ${light}%)`;
+
+          let br = "14px";
+          if (shape === "circles") br = "999px";
+          else if (shape === "squares") br = "6px";
+          else {
+            const mode = Math.random();
+            br = mode < 0.33 ? "999px" : (mode < 0.66 ? "8px" : "16px");
+          }
+
+          p.style.width = size + "px";
+          p.style.height = size + "px";
+          p.style.borderRadius = br;
+          p.style.background = col;
+          p.style.left = ox + "px";
+          p.style.top = oy + "px";
+
+          if (shape === "hearts") {
+            p.style.width = Math.max(12, size * 1.15) + "px";
+            p.style.height = Math.max(12, size * 1.15) + "px";
+            p.style.borderRadius = "0px";
+            p.style.background = col;
+            p.style.clipPath = "path('M12 21s-7.5-4.6-10.2-9.2C-0.7 7.6 1.8 4.6 5 4.6c1.8 0 3.2.9 4 2 0.8-1.1 2.2-2 4-2 3.2 0 5.7 3 3.2 7.2C19.5 16.4 12 21 12 21z')";
+          }
+
+          spray.appendChild(p);
+
+          const dx = r(-dxMax, dxMax);
+          const dy = r(-dyUp, dyDown);
+          const rot0 = r(-40, 40);
+          const rot1 = rot0 + r(-260, 260);
+          const dur = Math.floor(r(durMin, durMax));
+
+          p.animate([
+            { transform: `translate(-50%,-50%) translate(0px,0px) rotate(${rot0}deg)`, opacity: 0.0 },
+            { transform: `translate(-50%,-50%) translate(${dx*0.35}px,${dy*0.35}px) rotate(${rot0}deg)`, opacity: 0.95, offset: 0.15 },
+            { transform: `translate(-50%,-50%) translate(${dx}px,${dy}px) rotate(${rot1}deg)`, opacity: 0.0 }
+          ], { duration: dur, easing: "cubic-bezier(.2,.8,.2,1)" }).onfinish = () => p.remove();
+        }
+      }
+
+      function setBlob(el, o) {
+        const base = accentHue();
+        const h = base + (o.hueShift ?? 0);
+        const a = (o.alpha ?? 0.85);
+        el.style.width = o.w + "px";
+        el.style.height = o.h + "px";
+        el.style.left = o.x + "px";
+        el.style.top = o.y + "px";
+        el.style.opacity = a;
+        el.style.background = `color-mix(in srgb, hsl(${h} 95% 55%) 35%, white)`;
+      }
+
+      function randomizeBlobs(mode = "normal") {
+        const rect = toyBox.getBoundingClientRect();
+        const W = Math.max(260, rect.width);
+        const H = Math.max(220, rect.height);
+
+        let s1 = r(200, 280), s2 = r(220, 310), s3 = r(180, 260);
+        let hs1 = r(-20, 40), hs2 = r(15, 70), hs3 = r(60, 120);
+
+        if (mode === "smol") { s1 *= 0.78; s2 *= 0.78; s3 *= 0.78; }
+        if (mode === "bonk") { s1 *= 1.1; s2 *= 1.1; }
+        if (mode === "womp") { hs1 += 160; hs2 += 160; hs3 += 160; }
+        if (mode === ":3")   { hs1 = 310; hs2 = 280; hs3 = 335; }
+        if (mode === "zap")  { hs1 = 190; hs2 = 220; hs3 = 160; }
+        if (mode === "sparkle") { hs1 = 38; hs2 = 58; hs3 = 110; }
+
+        setBlob(b1, { w: s1, h: s1, x: r(-90, 40), y: r(-90, 30), hueShift: hs1, alpha: 0.85 });
+        setBlob(b2, { w: s2, h: s2, x: r(W - 240, W - 120), y: r(-10, 60), hueShift: hs2, alpha: 0.82 });
+        setBlob(b3, { w: s3, h: s3, x: r(W*0.15, W*0.55), y: r(H - 180, H - 120), hueShift: hs3, alpha: 0.80 });
+      }
+
+      function flashOverlay(kind = "bonk") {
+        flash.classList.remove('on');
+        flash.dataset.kind = kind;
+        void flash.offsetWidth;
+        flash.classList.add('on');
+      }
+
+      function wiggle(ms = 650) {
+        toyBox.classList.add('wiggle');
+        setTimeout(() => toyBox.classList.remove('wiggle'), ms);
+      }
+      function zoomPulse() {
+        toyBox.classList.remove('zoomPulse');
+        void toyBox.offsetWidth;
+        toyBox.classList.add('zoomPulse');
+        setTimeout(() => toyBox.classList.remove('zoomPulse'), 520);
+      }
+      function hush() {
+        toyBox.classList.add('hush');
+        setTimeout(() => toyBox.classList.remove('hush'), 900);
+      }
+      function smolAll() {
+        toyBox.classList.add('smol');
+        setTimeout(() => toyBox.classList.remove('smol'), 820);
+      }
+      function womp() {
+        toyBox.classList.add('womp');
+        setTimeout(() => toyBox.classList.remove('womp'), 820);
+      }
+
+      function splat(e) {
+        const rect = toyBox.getBoundingClientRect();
+        const ox = e.clientX - rect.left;
+        const oy = e.clientY - rect.top;
+        const s = document.createElement('div');
+        s.className = 'splat';
+        const size = r(70, 120);
+        s.style.width = size + "px";
+        s.style.height = size + "px";
+        s.style.left = ox + "px";
+        s.style.top = oy + "px";
+        const hue = accentHue() + r(-40, 90);
+        s.style.background = `color-mix(in srgb, hsl(${hue} 95% 55%) 22%, white)`;
+        toyBox.appendChild(s);
+        s.animate([
+          { transform: "translate(-50%,-50%) scale(.6)", opacity: 0.0 },
+          { transform: "translate(-50%,-50%) scale(1)", opacity: 0.95, offset: 0.25 },
+          { transform: "translate(-50%,-50%) scale(1.02)", opacity: 0.0 }
+        ], { duration: 1050, easing: "cubic-bezier(.2,.8,.2,1)" }).onfinish = () => s.remove();
+      }
+
+      function doGenericClick(e) {
+        const types = ["sine","triangle","square"];
+        beep(rand(types), r(280, 740), 0.12, 0.08);
+        randomizeBlobs("normal");
+        spawnParticles(e.clientX, e.clientY, { count: r(10, 16) });
+      }
+
+      const ACTIONS = {
+        "smol": (e) => { smolAll(); randomizeBlobs("smol"); spawnParticles(e.clientX,e.clientY,{ count:r(10,16), sizeMin:8, sizeMax:18, durMin:520, durMax:920 }); beep("triangle", r(420,680), 0.13, 0.08); },
+        ":3": (e) => { randomizeBlobs(":3"); flashOverlay(":3"); spawnParticles(e.clientX,e.clientY,{ count:r(14,22), shape:"hearts", sizeMin:12, sizeMax:26, durMin:680, durMax:1200 }); beep("triangle", r(380,680), 0.14, 0.09); },
+        "wiggle": (e) => { randomizeBlobs("normal"); wiggle(900); spawnParticles(e.clientX,e.clientY,{ count:r(10,16), dxMax:120, dyUp:140, durMin:700, durMax:1200 }); beep("sine", r(360,560), 0.14, 0.08); },
+        "bonk": (e) => { randomizeBlobs("bonk"); flashOverlay("bonk"); spawnParticles(e.clientX,e.clientY,{ count:r(10,18), shape:"squares", sizeMin:12, sizeMax:30, durMin:360, durMax:640, dxMax:220, dyUp:260 }); beep("square", r(160,260), 0.10, 0.12); },
+        "hehe": (e) => { randomizeBlobs("sparkle"); flashOverlay("sparkle"); spawnParticles(e.clientX,e.clientY,{ count:r(18,34), shape:"mixed", durMin:520, durMax:980 }); beep("triangle", r(520,900), 0.12, 0.10); wiggle(450); },
+
+        "zap": (e) => { randomizeBlobs("zap"); flashOverlay("zap"); spawnParticles(e.clientX,e.clientY,{ count:r(12,20), shape:"squares", sizeMin:10, sizeMax:22, durMin:420, durMax:780, dxMax:190, dyUp:260 }); beep("square", r(240,420), 0.09, 0.10); },
+        "womp": (e) => { randomizeBlobs("womp"); womp(); spawnParticles(e.clientX,e.clientY,{ count:r(10,16), durMin:620, durMax:1100, dxMax:140 }); beep("triangle", r(180,320), 0.14, 0.07); },
+        "bloop": (e) => { toyBox.classList.add('bloop'); setTimeout(()=>toyBox.classList.remove('bloop'),720); randomizeBlobs("normal"); spawnParticles(e.clientX,e.clientY,{ count:r(10,16), shape:"circles", sizeMin:10, sizeMax:20, durMin:800, durMax:1300, dxMax:120, dyUp:140, dyDown:160 }); beep("sine", r(260,420), 0.16, 0.08); },
+        "zoom": (e) => { randomizeBlobs("normal"); zoomPulse(); spawnParticles(e.clientX,e.clientY,{ count:r(10,18), dxMax:260, dyUp:300, durMin:420, durMax:780 }); beep("sine", r(480,880), 0.12, 0.09); },
+        "splat": (e) => { randomizeBlobs("normal"); splat(e); spawnParticles(e.clientX,e.clientY,{ count:r(8,14), durMin:620, durMax:1100, dxMax:120, dyUp:120 }); beep("square", r(180,300), 0.12, 0.09); },
+
+        "sparkle": (e) => { randomizeBlobs("sparkle"); flashOverlay("sparkle"); spawnParticles(e.clientX,e.clientY,{ count:r(16,28), shape:"mixed", durMin:620, durMax:1100 }); beep("sine", r(560,980), 0.14, 0.09); beep("triangle", r(620,1200), 0.10, 0.07); },
+        "mlem": (e) => { randomizeBlobs("normal"); splat(e); beep("sine", r(320,520), 0.15, 0.08); },
+        "yippee": (e) => { randomizeBlobs("sparkle"); flashOverlay("yippee"); spawnParticles(e.clientX,e.clientY,{ count:r(16,28), shape:"hearts", sizeMin:10, sizeMax:22, durMin:560, durMax:980 }); wiggle(720); beep("triangle", r(620,980), 0.12, 0.09); beep("sine", r(740,1200), 0.10, 0.07); },
+        "oops": (e) => { randomizeBlobs("womp"); flashOverlay("oops"); spawnParticles(e.clientX,e.clientY,{ count:r(14,22), durMin:520, durMax:940, dxMax:120, dyUp:80, dyDown:260 }); womp(); beep("triangle", r(220,360), 0.14, 0.08); },
+        "hush": (e) => { hush(); randomizeBlobs("normal"); spawnParticles(e.clientX,e.clientY,{ count:r(8,12), durMin:900, durMax:1400, dxMax:90, dyUp:120 }); beep("sine", r(220,320), 0.20, 0.05); },
+      };
+
+      function isActionWord(w) {
+        return Object.prototype.hasOwnProperty.call(ACTIONS, w);
+      }
+
+      function maybeShowCorner(btn) {
+        if (Math.random() < 0.25) {
+          btn.hidden = false;
+          const pool = Math.random() < 0.60 ? ACTION_WORDS : ACTION_WORDS.concat(FILLER);
+          btn.textContent = rand(pool);
+          btn.dataset.word = btn.textContent.trim();
+          btn.classList.toggle('isAction', isActionWord(btn.dataset.word));
+        } else {
+          btn.hidden = true;
+          btn.textContent = "";
+          btn.dataset.word = "";
+          btn.classList.remove('isAction');
+        }
+      }
+
+      function positionSticker(el) {
+        const rect = toyBox.getBoundingClientRect();
+        const pad = 12;
+        const x = r(pad, Math.max(pad, rect.width - 84));
+        const y = r(pad + 18, Math.max(pad + 18, rect.height - 54));
+        el.style.left = x + "px";
+        el.style.top = y + "px";
+        el.style.setProperty('--r', `${Math.floor(r(-14, 14))}deg`);
+      }
+
+      function refreshTextAndPositions() {
+        corners.forEach(maybeShowCorner);
+        stickers.forEach(s => {
+          const pool = Math.random() < 0.80 ? ACTION_WORDS : ACTION_WORDS.concat(FILLER);
+          const word = rand(pool);
+          s.textContent = word;
+          s.dataset.word = word;
+          s.classList.toggle('isAction', isActionWord(word));
+          positionSticker(s);
+        });
+      }
+
+      function triggerWord(word, e) {
+        const w = (word || "").trim();
+        const action = ACTIONS[w];
+        if (action) action(e);
+        else doGenericClick(e);
+        refreshTextAndPositions();
+      }
+
+      // init
+      randomizeBlobs("normal");
+      refreshTextAndPositions();
+
+      toyBox.addEventListener('pointerdown', (e) => {
+        const t = e.target;
+        if (t && (t.matches?.('[data-sticker]') || t.matches?.('[data-corner]'))) return;
+        doGenericClick(e);
+        refreshTextAndPositions();
+      });
+
+      stickers.forEach(s => {
+        s.addEventListener('click', (e) => {
+          e.stopPropagation();
+          triggerWord(s.dataset.word, e);
+        });
+      });
+
+      corners.forEach(c => {
+        c.addEventListener('click', (e) => {
+          e.stopPropagation();
+          triggerWord(c.dataset.word, e);
+        });
+      });
+
+      toyBox.addEventListener('keydown', (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          const rect = toyBox.getBoundingClientRect();
+          const fake = { clientX: rect.left + rect.width * 0.5, clientY: rect.top + rect.height * 0.55 };
+          doGenericClick(fake);
+          refreshTextAndPositions();
+        }
+      });
+
+      window.addEventListener('resize', () => {
+        randomizeBlobs("normal");
+        stickers.forEach(positionSticker);
+      }, { passive: true });
+    })();
+  </script>
 </body>
 </html>
