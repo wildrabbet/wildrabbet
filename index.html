@@ -29,7 +29,7 @@
         </h1>
 
         <p class="lede">
-          click stuff. it does stuff.
+          click stuff. it does stuff. sometimes it’s a bad idea.
         </p>
 
         <div class="ctaRow">
@@ -44,6 +44,14 @@
       </div>
 
       <!-- ===== SILLY MINIGAME PANEL (NO UI) ===== -->
+      <div class="toyBoxWrap">
+        <div class="toyBoxTitle">
+          <span class="toyBoxLabel">Useless Box</span>
+          <div class="toyBoxStats">
+            <span class="statPill" id="myClicks">you: 0</span>
+            <span class="statPill totalPill" id="totalClicks">everyone: 0</span>
+          </div>
+        </div>
       <div class="heroRight" id="toyBox" aria-label="Useless box playground" tabindex="0">
         <div class="blob b1" id="b1"></div>
         <div class="blob b2" id="b2"></div>
@@ -63,6 +71,16 @@
         <button class="sticker s3" data-sticker type="button">boop</button>
 
         <div class="spray" id="spray" aria-hidden="true"></div>
+
+        <!-- floating emoji that drift around -->
+        <div class="floatingEmoji fe1" aria-hidden="true">✨</div>
+        <div class="floatingEmoji fe2" aria-hidden="true">🐇</div>
+        <div class="floatingEmoji fe3" aria-hidden="true">💫</div>
+        <div class="floatingEmoji fe4" aria-hidden="true">🫧</div>
+
+        <!-- gravity ball -->
+        <div class="gravBall" id="gravBall" aria-hidden="true"></div>
+      </div>
       </div>
     </section>
 
@@ -76,7 +94,7 @@
         <a class="card c1" href="./games/jim-eats-the-neighbours/">
           <div class="cardTop">
             <div class="emoji">🍽️</div>
-            <div class="tag">weird</div>
+            <div class="tag">social</div>
           </div>
           <div class="cardTitle">Jim Eats the Neighbours</div>
           <div class="cardDesc">Jim is out and tonight he wants to eat the neighbours. Convince them to let him in!</div>
@@ -85,7 +103,7 @@
         <a class="card c2" href="./games/mc/mc9.html">
           <div class="cardTop">
             <div class="emoji">🧱</div>
-            <div class="tag">plagiarism</div>
+            <div class="tag">blocky</div>
           </div>
           <div class="cardTitle">Minecrafn't</div>
           <div class="cardDesc">It's not Minecraft!</div>
@@ -130,7 +148,7 @@
         <a class="card c7" href="./games/true/true.html">
           <div class="cardTop">
             <div class="emoji">✅</div>
-            <div class="tag">words</div>
+            <div class="tag">wordgame</div>
           </div>
           <div class="cardTitle">True!</div>
           <div class="cardDesc">Remove words from false statements to make them true.</div>
@@ -148,7 +166,7 @@
         <div class="aboutCard">
           <div class="aboutTitle">wildrabbet</div>
           <p>
-            A little cabinet of the random shit I've made!
+            A little cabinet of browser experiments and games. Small, weird, and intentionally unnecessary.
           </p>
         </div>
 
@@ -230,15 +248,78 @@
       const ACTION_WORDS = [
         "hehe", "smol", ":3", "wiggle", "bonk",
         "zap", "womp", "bloop", "zoom", "splat",
-        "sparkle", "mlem", "yippee", "oops", "hush"
+        "sparkle", "mlem", "yippee", "oops", "hush",
+        "spin", "invert", "disco", "jelly", "grow",
+        "shrink", "rainbow", "quake", "melt", "glitch",
+        "confetti", "bounce", "vortex", "nyan", "rave"
       ];
 
       const FILLER = [
         "beep", "boop", "bzzz", "yoink", "snack",
         "brain tickle", "internet moment", "W behavior",
         "tiny chaos", "unlicensed fun", "no thoughts", "just vibes",
-        "skrrt", "plonk", "wubble", "nya", "teehee", "bonk??"
+        "skrrt", "plonk", "wubble", "nya", "teehee", "bonk??",
+        "why", "lol ok", "bruh", "slay", "based",
+        "certified moment", "oop—", "404 brain", "vibe check",
+        "smooth brain", "big mood", "sheesh", "ayo?", "rent free"
       ];
+
+      let clickCount = 0;
+      let totalCount = 0;
+      const myClicksEl = document.getElementById('myClicks');
+      const totalClicksEl = document.getElementById('totalClicks');
+      const gravBall = document.getElementById('gravBall');
+
+      // Load counts from persistent storage
+      async function loadCounts() {
+        try {
+          const myData = await window.storage.get('uselessbox:myclicks');
+          clickCount = myData ? parseInt(myData.value, 10) || 0 : 0;
+        } catch(e) { clickCount = 0; }
+        try {
+          const totalData = await window.storage.get('uselessbox:total', true);
+          totalCount = totalData ? parseInt(totalData.value, 10) || 0 : 0;
+        } catch(e) { totalCount = 0; }
+        renderCounts();
+      }
+
+      function renderCounts() {
+        myClicksEl.textContent = `you: ${clickCount.toLocaleString()}`;
+        totalClicksEl.textContent = `everyone: ${totalCount.toLocaleString()}`;
+      }
+
+      // Save with debounce so we don't hammer storage on rapid clicks
+      let saveTimeout = null;
+      function saveCounts() {
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(async () => {
+          try { await window.storage.set('uselessbox:myclicks', String(clickCount)); } catch(e) {}
+          try { await window.storage.set('uselessbox:total', String(totalCount), true); } catch(e) {}
+        }, 300);
+      }
+
+      function updateStats() {
+        clickCount++;
+        totalCount++;
+        renderCounts();
+        saveCounts();
+      }
+
+      // Fallback if storage API isn't available — just use localStorage
+      if (!window.storage) {
+        window.storage = {
+          async get(key) {
+            const v = localStorage.getItem(key);
+            return v !== null ? { value: v } : null;
+          },
+          async set(key, value) {
+            localStorage.setItem(key, value);
+            return { key, value };
+          }
+        };
+      }
+
+      loadCounts();
 
       function rand(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
       function r(min, max){ return min + Math.random() * (max - min); }
@@ -420,24 +501,142 @@
         spawnParticles(e.clientX, e.clientY, { count: r(10, 16) });
       }
 
+      // ===== SITE-WIDE EFFECTS =====
+      const siteBody = document.body;
+      let currentTheme = null;
+
+      function siteSparkle(duration) {
+        duration = duration || 3000;
+        const c = document.createElement('div');
+        c.className = 'site-effect-layer';
+        siteBody.appendChild(c);
+        for (let i = 0; i < 40; i++) {
+          const s = document.createElement('div');
+          s.className = 'site-sparkle';
+          s.textContent = rand(['✦','✧','⋆','✶','·','♦']);
+          s.style.left = r(2,98)+'%'; s.style.top = r(2,98)+'%';
+          s.style.animationDelay = r(0,1.5)+'s';
+          s.style.fontSize = r(10,24)+'px';
+          s.style.color = `hsl(${accentHue()+r(-40,80)} 90% ${r(60,85)}%)`;
+          c.appendChild(s);
+        }
+        setTimeout(() => { c.classList.add('fadeOut'); setTimeout(() => c.remove(), 600); }, duration);
+      }
+
+      function siteFall(emoji, duration) {
+        emoji = emoji || '✦'; duration = duration || 4000;
+        const c = document.createElement('div');
+        c.className = 'site-effect-layer';
+        siteBody.appendChild(c);
+        for (let i = 0; i < 35; i++) {
+          const s = document.createElement('div');
+          s.className = 'site-falling';
+          s.textContent = emoji;
+          s.style.left = r(0,100)+'%';
+          s.style.animationDelay = r(0,2.5)+'s';
+          s.style.animationDuration = r(2,4.5)+'s';
+          s.style.fontSize = r(12,26)+'px';
+          s.style.opacity = r(0.4,0.9);
+          c.appendChild(s);
+        }
+        setTimeout(() => { c.classList.add('fadeOut'); setTimeout(() => c.remove(), 600); }, duration);
+      }
+
+      function siteFlash(color, duration) {
+        color = color || 'rgba(255,255,255,0.3)'; duration = duration || 200;
+        const el = document.createElement('div');
+        el.className = 'site-flash';
+        el.style.background = color;
+        siteBody.appendChild(el);
+        requestAnimationFrame(() => el.classList.add('on'));
+        setTimeout(() => { el.classList.remove('on'); setTimeout(() => el.remove(), 400); }, duration);
+      }
+
+      // ===== PERSISTENT SITE THEMES =====
+      const SITE_THEMES = {
+        disco: { h:300, bg:'#1a0a1a', ink:'#f0d0ff', muted:'rgba(240,208,255,.6)', line:'rgba(240,208,255,.15)', cardBg:'rgba(60,20,80,.55)', navBg:'rgba(30,10,40,.85)' },
+        rave: { h:260, bg:'#0a0020', ink:'#c8b0ff', muted:'rgba(200,176,255,.6)', line:'rgba(200,176,255,.12)', cardBg:'rgba(40,10,90,.5)', navBg:'rgba(15,5,40,.88)' },
+        nyan: { h:180, bg:'#f0faff', ink:'#104050', muted:'rgba(16,64,80,.6)', line:'rgba(16,64,80,.10)', cardBg:'rgba(220,248,255,.7)', navBg:'rgba(240,252,255,.85)' },
+        invert: { h:40, bg:'#0b1020', ink:'#e8e0d0', muted:'rgba(232,224,208,.55)', line:'rgba(232,224,208,.10)', cardBg:'rgba(20,25,50,.6)', navBg:'rgba(11,16,32,.88)' },
+        sparkle: { h:45, bg:'#fffdf5', ink:'#3a2800', muted:'rgba(58,40,0,.55)', line:'rgba(58,40,0,.10)', cardBg:'rgba(255,250,230,.75)', navBg:'rgba(255,253,245,.85)' },
+        hehe: { h:330, bg:'#fff5fa', ink:'#4a1030', muted:'rgba(74,16,48,.55)', line:'rgba(74,16,48,.10)', cardBg:'rgba(255,240,248,.7)', navBg:'rgba(255,245,250,.85)' },
+        zap: { h:190, bg:'#f0fcff', ink:'#0a3040', muted:'rgba(10,48,64,.55)', line:'rgba(10,48,64,.10)', cardBg:'rgba(230,250,255,.7)', navBg:'rgba(240,252,255,.85)' },
+        bonk: { h:15, bg:'#fff8f0', ink:'#401800', muted:'rgba(64,24,0,.55)', line:'rgba(64,24,0,.10)', cardBg:'rgba(255,245,235,.7)', navBg:'rgba(255,248,240,.85)' },
+        glitch: { h:150, bg:'#0a1a10', ink:'#80ffb0', muted:'rgba(128,255,176,.5)', line:'rgba(128,255,176,.10)', cardBg:'rgba(15,40,25,.6)', navBg:'rgba(10,26,16,.88)' },
+      };
+
+      function applySiteTheme(name) {
+        const theme = SITE_THEMES[name];
+        if (!theme) return;
+        currentTheme = name;
+        const root = document.documentElement;
+        root.style.setProperty('--accent-h', theme.h);
+        root.style.setProperty('--bg', theme.bg);
+        root.style.setProperty('--ink', theme.ink);
+        root.style.setProperty('--muted', theme.muted);
+        root.style.setProperty('--line', theme.line);
+
+        // update cards, nav, panels
+        document.querySelectorAll('.card, .aboutCard, .heroLeft').forEach(el => {
+          el.style.background = theme.cardBg;
+        });
+        const nav = document.querySelector('.top');
+        if (nav) nav.style.background = theme.navBg;
+        document.querySelector('.heroRight').style.background = theme.cardBg;
+
+      }
+
+      // Color takeover (non-theme, just accent hue shift)
+      const COLOR_TAKEOVERS = [
+        { name:'red', h:0 }, { name:'blue', h:220 }, { name:'pink', h:330 },
+        { name:'green', h:140 }, { name:'orange', h:25 }, { name:'purple', h:275 },
+        { name:'cyan', h:185 }, { name:'gold', h:45 },
+      ];
+
+      function siteColorTakeover() {
+        const pick = rand(COLOR_TAKEOVERS);
+        document.documentElement.style.setProperty('--accent-h', pick.h);
+        siteFlash('hsla('+pick.h+',90%,60%,0.25)', 350);
+      }
+
+      function maybeColorTakeover() {
+        if (Math.random() < 0.08) siteColorTakeover();
+      }
+
       const ACTIONS = {
         "smol": (e) => { smolAll(); randomizeBlobs("smol"); spawnParticles(e.clientX,e.clientY,{ count:r(10,16), sizeMin:8, sizeMax:18, durMin:520, durMax:920 }); beep("triangle", r(420,680), 0.13, 0.08); },
         ":3": (e) => { randomizeBlobs(":3"); flashOverlay(":3"); spawnParticles(e.clientX,e.clientY,{ count:r(14,22), shape:"hearts", sizeMin:12, sizeMax:26, durMin:680, durMax:1200 }); beep("triangle", r(380,680), 0.14, 0.09); },
         "wiggle": (e) => { randomizeBlobs("normal"); wiggle(900); spawnParticles(e.clientX,e.clientY,{ count:r(10,16), dxMax:120, dyUp:140, durMin:700, durMax:1200 }); beep("sine", r(360,560), 0.14, 0.08); },
-        "bonk": (e) => { randomizeBlobs("bonk"); flashOverlay("bonk"); spawnParticles(e.clientX,e.clientY,{ count:r(10,18), shape:"squares", sizeMin:12, sizeMax:30, durMin:360, durMax:640, dxMax:220, dyUp:260 }); beep("square", r(160,260), 0.10, 0.12); },
-        "hehe": (e) => { randomizeBlobs("sparkle"); flashOverlay("sparkle"); spawnParticles(e.clientX,e.clientY,{ count:r(18,34), shape:"mixed", durMin:520, durMax:980 }); beep("triangle", r(520,900), 0.12, 0.10); wiggle(450); },
+        "bonk": (e) => { randomizeBlobs("bonk"); flashOverlay("bonk"); spawnParticles(e.clientX,e.clientY,{ count:r(10,18), shape:"squares", sizeMin:12, sizeMax:30, durMin:360, durMax:640, dxMax:220, dyUp:260 }); beep("square", r(160,260), 0.10, 0.12); applySiteTheme('bonk'); },
+        "hehe": (e) => { randomizeBlobs("sparkle"); flashOverlay("sparkle"); spawnParticles(e.clientX,e.clientY,{ count:r(18,34), shape:"mixed", durMin:520, durMax:980 }); beep("triangle", r(520,900), 0.12, 0.10); wiggle(450); applySiteTheme('hehe'); },
 
-        "zap": (e) => { randomizeBlobs("zap"); flashOverlay("zap"); spawnParticles(e.clientX,e.clientY,{ count:r(12,20), shape:"squares", sizeMin:10, sizeMax:22, durMin:420, durMax:780, dxMax:190, dyUp:260 }); beep("square", r(240,420), 0.09, 0.10); },
+        "zap": (e) => { randomizeBlobs("zap"); flashOverlay("zap"); spawnParticles(e.clientX,e.clientY,{ count:r(12,20), shape:"squares", sizeMin:10, sizeMax:22, durMin:420, durMax:780, dxMax:190, dyUp:260 }); beep("square", r(240,420), 0.09, 0.10); applySiteTheme('zap'); },
         "womp": (e) => { randomizeBlobs("womp"); womp(); spawnParticles(e.clientX,e.clientY,{ count:r(10,16), durMin:620, durMax:1100, dxMax:140 }); beep("triangle", r(180,320), 0.14, 0.07); },
         "bloop": (e) => { toyBox.classList.add('bloop'); setTimeout(()=>toyBox.classList.remove('bloop'),720); randomizeBlobs("normal"); spawnParticles(e.clientX,e.clientY,{ count:r(10,16), shape:"circles", sizeMin:10, sizeMax:20, durMin:800, durMax:1300, dxMax:120, dyUp:140, dyDown:160 }); beep("sine", r(260,420), 0.16, 0.08); },
         "zoom": (e) => { randomizeBlobs("normal"); zoomPulse(); spawnParticles(e.clientX,e.clientY,{ count:r(10,18), dxMax:260, dyUp:300, durMin:420, durMax:780 }); beep("sine", r(480,880), 0.12, 0.09); },
         "splat": (e) => { randomizeBlobs("normal"); splat(e); spawnParticles(e.clientX,e.clientY,{ count:r(8,14), durMin:620, durMax:1100, dxMax:120, dyUp:120 }); beep("square", r(180,300), 0.12, 0.09); },
 
-        "sparkle": (e) => { randomizeBlobs("sparkle"); flashOverlay("sparkle"); spawnParticles(e.clientX,e.clientY,{ count:r(16,28), shape:"mixed", durMin:620, durMax:1100 }); beep("sine", r(560,980), 0.14, 0.09); beep("triangle", r(620,1200), 0.10, 0.07); },
+        "sparkle": (e) => { randomizeBlobs("sparkle"); flashOverlay("sparkle"); spawnParticles(e.clientX,e.clientY,{ count:r(16,28), shape:"mixed", durMin:620, durMax:1100 }); beep("sine", r(560,980), 0.14, 0.09); beep("triangle", r(620,1200), 0.10, 0.07); applySiteTheme('sparkle'); siteSparkle(); },
         "mlem": (e) => { randomizeBlobs("normal"); splat(e); beep("sine", r(320,520), 0.15, 0.08); },
-        "yippee": (e) => { randomizeBlobs("sparkle"); flashOverlay("yippee"); spawnParticles(e.clientX,e.clientY,{ count:r(16,28), shape:"hearts", sizeMin:10, sizeMax:22, durMin:560, durMax:980 }); wiggle(720); beep("triangle", r(620,980), 0.12, 0.09); beep("sine", r(740,1200), 0.10, 0.07); },
+        "yippee": (e) => { randomizeBlobs("sparkle"); flashOverlay("yippee"); spawnParticles(e.clientX,e.clientY,{ count:r(16,28), shape:"hearts", sizeMin:10, sizeMax:22, durMin:560, durMax:980 }); wiggle(720); beep("triangle", r(620,980), 0.12, 0.09); beep("sine", r(740,1200), 0.10, 0.07); siteFall(rand(['💖','💕','✨','🌟'])); },
         "oops": (e) => { randomizeBlobs("womp"); flashOverlay("oops"); spawnParticles(e.clientX,e.clientY,{ count:r(14,22), durMin:520, durMax:940, dxMax:120, dyUp:80, dyDown:260 }); womp(); beep("triangle", r(220,360), 0.14, 0.08); },
         "hush": (e) => { hush(); randomizeBlobs("normal"); spawnParticles(e.clientX,e.clientY,{ count:r(8,12), durMin:900, durMax:1400, dxMax:90, dyUp:120 }); beep("sine", r(220,320), 0.20, 0.05); },
+
+        "spin": (e) => { toyBox.style.transition="transform .8s cubic-bezier(.2,.8,.2,1)"; toyBox.style.transform="rotate(360deg)"; setTimeout(()=>{toyBox.style.transition=""; toyBox.style.transform="";},850); randomizeBlobs("normal"); spawnParticles(e.clientX,e.clientY,{count:r(14,22),dxMax:200,dyUp:200}); beep("sine",r(400,800),0.16,0.09); },
+        "invert": (e) => { applySiteTheme('invert'); spawnParticles(e.clientX,e.clientY,{count:r(10,16),hue:180}); beep("square",r(200,400),0.12,0.10); },
+        "disco": (e) => { let i=0; const iv=setInterval(()=>{toyBox.style.background=`hsl(${Math.random()*360} 80% ${55+Math.random()*20}%)`; i++; if(i>12){clearInterval(iv); toyBox.style.background="";}},100); spawnParticles(e.clientX,e.clientY,{count:r(20,30),shape:"mixed",durMin:400,durMax:900}); beep("square",r(300,600),0.10,0.08); beep("triangle",r(500,900),0.08,0.06); applySiteTheme('disco'); },
+        "jelly": (e) => { toyBox.classList.add('jelly'); setTimeout(()=>toyBox.classList.remove('jelly'),1200); randomizeBlobs("normal"); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"circles",durMin:600,durMax:1100}); beep("sine",r(280,460),0.14,0.08); },
+        "grow": (e) => { toyBox.style.transition="transform .5s ease"; toyBox.style.transform="scale(1.08)"; setTimeout(()=>{toyBox.style.transform="scale(1)"; setTimeout(()=>toyBox.style.transition="",500);},600); spawnParticles(e.clientX,e.clientY,{count:r(8,14),sizeMin:18,sizeMax:36}); beep("triangle",r(180,320),0.16,0.09); },
+        "shrink": (e) => { toyBox.style.transition="transform .5s ease"; toyBox.style.transform="scale(0.88)"; setTimeout(()=>{toyBox.style.transform="scale(1)"; setTimeout(()=>toyBox.style.transition="",500);},600); spawnParticles(e.clientX,e.clientY,{count:r(8,14),sizeMin:4,sizeMax:12}); beep("triangle",r(600,1000),0.12,0.07); },
+        "rainbow": (e) => { let h=0; const iv=setInterval(()=>{h+=25; toyBox.style.borderColor=`hsl(${h} 90% 55%)`; document.documentElement.style.setProperty('--accent-h',h%360); if(h>360){clearInterval(iv);}},60); spawnParticles(e.clientX,e.clientY,{count:r(20,30),shape:"mixed",durMin:500,durMax:1000}); beep("sine",r(400,800),0.12,0.08); },
+        "quake": (e) => { toyBox.classList.add('quake'); setTimeout(()=>toyBox.classList.remove('quake'),800); randomizeBlobs("bonk"); flashOverlay("bonk"); spawnParticles(e.clientX,e.clientY,{count:r(16,24),shape:"squares",sizeMin:8,sizeMax:20,durMin:300,durMax:600,dxMax:250,dyUp:300}); beep("square",r(120,220),0.12,0.14); },
+        "melt": (e) => { toyBox.style.transition="border-radius 1s ease, transform 1s ease"; toyBox.style.borderRadius="40% 60% 70% 30% / 50% 40% 60% 50%"; toyBox.style.transform="scaleY(0.92)"; setTimeout(()=>{toyBox.style.borderRadius=""; toyBox.style.transform=""; setTimeout(()=>toyBox.style.transition="",500);},1200); spawnParticles(e.clientX,e.clientY,{count:r(8,14),durMin:800,durMax:1400,dyDown:200,dyUp:40}); beep("sine",r(160,280),0.18,0.07); },
+        "glitch": (e) => { let i=0; const iv=setInterval(()=>{toyBox.style.transform=`translate(${r(-4,4)}px,${r(-4,4)}px) skew(${r(-3,3)}deg)`; toyBox.style.filter=`hue-rotate(${r(-60,60)}deg) saturate(${r(1,3)})`; i++; if(i>14){clearInterval(iv); toyBox.style.transform=""; toyBox.style.filter="";}},50); spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"squares",durMin:200,durMax:500,dxMax:180}); beep("square",r(100,300),0.08,0.12); applySiteTheme('glitch'); },
+        "confetti": (e) => { for(let i=0;i<5;i++) setTimeout(()=>spawnParticles(e.clientX+r(-60,60),e.clientY+r(-60,60),{count:r(10,16),shape:"mixed",durMin:600,durMax:1200,dyUp:280,dxMax:200}),i*120); flashOverlay("yippee"); wiggle(600); beep("triangle",r(500,900),0.12,0.09); beep("sine",r(700,1100),0.10,0.07); siteFall(rand(['🎊','🎉','✦','⋆'])); },
+        "bounce": (e) => { toyBox.classList.add('bounce'); setTimeout(()=>toyBox.classList.remove('bounce'),1000); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"circles",durMin:500,durMax:900}); beep("triangle",r(400,700),0.14,0.09); },
+        "vortex": (e) => { toyBox.style.transition="transform 1s cubic-bezier(.2,.8,.2,1)"; toyBox.style.transform="rotate(720deg) scale(0.9)"; setTimeout(()=>{toyBox.style.transform="rotate(0deg) scale(1)"; setTimeout(()=>toyBox.style.transition="",600);},1100); spawnParticles(e.clientX,e.clientY,{count:r(20,30),dxMax:100,dyUp:100,durMin:800,durMax:1400}); beep("sine",r(300,600),0.14,0.08); },
+        "nyan": (e) => { let h=0; const iv=setInterval(()=>{h+=30; [b1,b2,b3].forEach((b,i)=>{b.style.background=`hsl(${(h+i*40)%360} 90% 65%)`;}); if(h>360){clearInterval(iv); randomizeBlobs("sparkle");}},70); spawnParticles(e.clientX,e.clientY,{count:r(18,28),shape:"mixed",durMin:600,durMax:1100}); beep("triangle",r(500,800),0.12,0.08); wiggle(500); applySiteTheme('nyan'); },
+        "rave": (e) => { let i=0; const iv=setInterval(()=>{const on=i%2===0; toyBox.style.background=on?`hsl(${Math.random()*360} 90% 15%)`:""; toyBox.style.filter=on?"brightness(2) contrast(1.5)":""; [b1,b2,b3].forEach(b=>{b.style.background=`hsl(${Math.random()*360} 95% ${on?70:55}%)`;b.style.opacity=on?"1":"0.85";}); i++; if(i>16){clearInterval(iv); toyBox.style.background=""; toyBox.style.filter=""; randomizeBlobs("normal");}},90); spawnParticles(e.clientX,e.clientY,{count:r(24,36),shape:"mixed",durMin:300,durMax:700,dxMax:220,dyUp:280}); beep("square",r(200,500),0.08,0.10); beep("triangle",r(400,800),0.06,0.08); applySiteTheme('rave'); },
       };
 
       function isActionWord(w) {
@@ -486,7 +685,12 @@
         const action = ACTIONS[w];
         if (action) action(e);
         else doGenericClick(e);
+        updateStats();
+        maybeColorTakeover();
         refreshTextAndPositions();
+        const rect = toyBox.getBoundingClientRect();
+        gravBall.style.left = (e.clientX - rect.left) + "px";
+        gravBall.style.top = (e.clientY - rect.top) + "px";
       }
 
       // init
@@ -497,6 +701,7 @@
         const t = e.target;
         if (t && (t.matches?.('[data-sticker]') || t.matches?.('[data-corner]'))) return;
         doGenericClick(e);
+        updateStats();
         refreshTextAndPositions();
       });
 
@@ -520,6 +725,7 @@
           const rect = toyBox.getBoundingClientRect();
           const fake = { clientX: rect.left + rect.width * 0.5, clientY: rect.top + rect.height * 0.55 };
           doGenericClick(fake);
+          updateStats();
           refreshTextAndPositions();
         }
       });
