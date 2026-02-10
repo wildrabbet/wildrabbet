@@ -36,6 +36,11 @@
           <a class="btn primary" href="#stuff">Stuff</a>
           <button class="btn" id="surpriseBtn" type="button">Surprise me</button>
         </div>
+
+        <!-- random gallery image -->
+        <div class="randomShot" aria-label="random gallery image">
+          <img id="galleryShot" alt="wildrabbet gallery random" loading="lazy" />
+        </div>
       </div>
 
       <!-- ===== SILLY MINIGAME PANEL (NO UI) ===== -->
@@ -77,7 +82,7 @@
           <div class="cardDesc">Jim is out and tonight he wants to eat the neighbours. Convince them to let him in!</div>
         </a>
 
-        <a class="card c2" href="./games/mc/mc9.html">
+        <a class="card c2" href="./games/minecrafnt/">
           <div class="cardTop">
             <div class="emoji">🧱</div>
             <div class="tag">blocky</div>
@@ -86,7 +91,7 @@
           <div class="cardDesc">It's not Minecraft!</div>
         </a>
 
-        <a class="card c3" href="./games/sogoding/SoGoDing.html">
+        <a class="card c3" href="./games/sogoding/">
           <div class="cardTop">
             <div class="emoji">⚙️</div>
             <div class="tag">factory</div>
@@ -160,6 +165,33 @@
       const hues = [12, 38, 58, 110, 150, 190, 220, 260, 300, 330];
       const h = hues[Math.floor(Math.random() * hues.length)];
       document.documentElement.style.setProperty('--accent-h', h);
+    })();
+
+    // Random gallery image (Gallery/1.jpg .. Gallery/5.jpg)
+    (function () {
+      const img = document.getElementById('galleryShot');
+      if (!img) return;
+
+      const MAX = 5;
+
+      function pick(exceptN) {
+        if (MAX <= 1) return 1;
+        let n = 1 + Math.floor(Math.random() * MAX);
+        if (typeof exceptN === "number") {
+          while (n === exceptN) n = 1 + Math.floor(Math.random() * MAX);
+        }
+        return n;
+      }
+
+      let current = pick();
+      img.src = `./Gallery/${current}.jpg`;
+      img.style.cursor = "pointer";
+      img.title = "click to reroll";
+
+      img.addEventListener("click", () => {
+        current = pick(current);
+        img.src = `./Gallery/${current}.jpg`;
+      });
     })();
 
     // Surprise me -> picks a random tile in Stuff
