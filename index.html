@@ -246,23 +246,32 @@
       const stickers = Array.from(toyBox.querySelectorAll('[data-sticker]'));
 
       const ACTION_WORDS = [
+        // OG
         "hehe", "smol", ":3", "wiggle", "bonk",
         "zap", "womp", "bloop", "zoom", "splat",
         "sparkle", "mlem", "yippee", "oops", "hush",
         "spin", "invert", "disco", "jelly", "grow",
         "shrink", "rainbow", "quake", "melt", "glitch",
         "confetti", "bounce", "vortex", "nyan", "rave",
-        "CRT", "90s", "DVD"
+        "CRT", "90s", "DVD",
+        // ex-filler now with effects
+        "beep", "boop", "bzzz", "yoink", "snack",
+        "nya", "teehee", "bonk??", "slay", "bruh",
+        "sheesh", "ayo?", "skrrt", "plonk", "wubble",
+        // new page effects
+        "tilt", "blur", "pixel", "mirror", "float",
+        "b&w", "vapor", "matrix", "comic", "tiny",
+        "HUGE", "upside down", "scramble", "typewriter", "party",
+        "snow", "rain", "bubbles", "lava", "ocean",
+        "earthquake", "slow-mo", "fast forward", "rewind", "static"
       ];
 
       const FILLER = [
-        "beep", "boop", "bzzz", "yoink", "snack",
         "brain tickle", "internet moment", "W behavior",
         "tiny chaos", "unlicensed fun", "no thoughts", "just vibes",
-        "skrrt", "plonk", "wubble", "nya", "teehee", "bonk??",
-        "why", "lol ok", "bruh", "slay", "based",
         "certified moment", "oop—", "404 brain", "vibe check",
-        "smooth brain", "big mood", "sheesh", "ayo?", "rent free"
+        "smooth brain", "big mood", "rent free",
+        "why", "lol ok", "based"
       ];
 
       let clickCount = 0;
@@ -691,7 +700,65 @@
         "CRT": (e) => { toggleCRT(); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"squares",sizeMin:6,sizeMax:14,durMin:300,durMax:600}); beep("square",r(80,200),0.10,0.12); },
         "90s": (e) => { toggle90s(); spawnParticles(e.clientX,e.clientY,{count:r(16,24),shape:"mixed",durMin:500,durMax:1000}); beep("triangle",r(400,700),0.12,0.09); },
         "DVD": (e) => { toggleDVD(); spawnParticles(e.clientX,e.clientY,{count:r(12,20),shape:"circles",durMin:400,durMax:800}); beep("sine",r(300,500),0.14,0.08); },
+
+        // ex-filler words — now they all do stuff
+        "beep": (e) => { beep("square",r(600,1200),0.08,0.12); beep("square",r(800,1400),0.06,0.10); spawnParticles(e.clientX,e.clientY,{count:r(6,10),shape:"squares",sizeMin:4,sizeMax:10,durMin:200,durMax:400}); siteBody.classList.add('page-pulse'); setTimeout(()=>siteBody.classList.remove('page-pulse'),400); },
+        "boop": (e) => { beep("sine",r(400,800),0.14,0.08); zoomPulse(); spawnParticles(e.clientX,e.clientY,{count:r(8,14),shape:"circles",durMin:400,durMax:700}); document.querySelectorAll('.card').forEach((c,i)=>{c.style.transition='transform .3s ease';c.style.transform='scale(0.96)';setTimeout(()=>c.style.transform='',300+i*50);}); },
+        "bzzz": (e) => { let i=0; const iv=setInterval(()=>{siteBody.style.transform=`translateX(${r(-2,2)}px)`;i++;if(i>20){clearInterval(iv);siteBody.style.transform='';}},30); beep("square",r(120,200),0.20,0.06); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"squares",durMin:150,durMax:350,dxMax:100}); },
+        "yoink": (e) => { beep("triangle",r(300,600),0.12,0.09); const cards=document.querySelectorAll('.card'); cards.forEach((c,i)=>{c.style.transition='transform .4s cubic-bezier(.2,.8,.2,1)';c.style.transform='translateX('+r(-20,20)+'px) rotate('+r(-3,3)+'deg)';setTimeout(()=>c.style.transform='',500+i*60);}); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "snack": (e) => { siteFall(rand(['🍕','🍩','🍪','🌮','🍔','🧁','🍟']),3500); beep("triangle",r(300,500),0.14,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "nya": (e) => { siteFall(rand(['🐱','😺','🐾','✨']),3000); beep("triangle",r(500,900),0.12,0.08); randomizeBlobs(":3"); flashOverlay(":3"); spawnParticles(e.clientX,e.clientY,{count:r(12,20),shape:"hearts"}); },
+        "teehee": (e) => { wiggle(800); siteSparkle(2000); beep("sine",r(600,1000),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"mixed"}); },
+        "bonk??": (e) => { randomizeBlobs("bonk"); flashOverlay("bonk"); quakeShake(); beep("square",r(100,200),0.12,0.14); beep("square",r(140,250),0.10,0.12); spawnParticles(e.clientX,e.clientY,{count:r(16,24),shape:"squares",dxMax:250,dyUp:300}); },
+        "slay": (e) => { siteFall(rand(['💅','✨','👑','💎']),3500); siteSparkle(2500); beep("triangle",r(500,900),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(18,28),shape:"mixed"}); },
+        "bruh": (e) => { siteBody.style.transition='filter .3s'; siteBody.style.filter='grayscale(1)'; setTimeout(()=>siteBody.style.filter='',1500); beep("sine",r(120,200),0.16,0.08); spawnParticles(e.clientX,e.clientY,{count:r(6,10),durMin:800,durMax:1400}); },
+        "sheesh": (e) => { siteBody.style.transition='filter .2s'; siteBody.style.filter='saturate(3) contrast(1.2)'; setTimeout(()=>siteBody.style.filter='',1200); beep("triangle",r(600,1100),0.10,0.08); siteSparkle(1500); spawnParticles(e.clientX,e.clientY,{count:r(14,22)}); },
+        "ayo?": (e) => { siteBody.style.transition='transform .4s cubic-bezier(.2,.8,.2,1)'; siteBody.style.transform='perspective(800px) rotateY(5deg)'; setTimeout(()=>siteBody.style.transform='',800); beep("triangle",r(400,700),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "skrrt": (e) => { siteBody.style.transition='transform .3s ease'; siteBody.style.transform='skewX(-4deg)'; setTimeout(()=>siteBody.style.transform='',500); beep("square",r(200,400),0.10,0.10); spawnParticles(e.clientX,e.clientY,{count:r(12,18),dxMax:250,dyUp:60,durMin:300,durMax:600}); },
+        "plonk": (e) => { splat(e); splat(e); beep("sine",r(150,300),0.16,0.10); spawnParticles(e.clientX,e.clientY,{count:r(8,14),durMin:600,durMax:1100}); },
+        "wubble": (e) => { toyBox.classList.add('jelly'); setTimeout(()=>toyBox.classList.remove('jelly'),1200); siteBody.style.transition='transform .6s ease'; siteBody.style.transform='scale(1.01)'; setTimeout(()=>siteBody.style.transform='',700); beep("sine",r(200,380),0.16,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"circles"}); },
+
+        // new page-level effects
+        "tilt": (e) => { togglePageClass('page-tilt'); beep("sine",r(300,500),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "blur": (e) => { togglePageClass('page-blur'); beep("sine",r(200,400),0.14,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,12),durMin:800,durMax:1400}); },
+        "pixel": (e) => { togglePageClass('page-pixel'); beep("square",r(100,300),0.10,0.12); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"squares",sizeMin:8,sizeMax:20}); },
+        "mirror": (e) => { togglePageClass('page-mirror'); beep("sine",r(400,700),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "float": (e) => { togglePageClass('page-float'); beep("triangle",r(400,800),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"circles",durMin:800,durMax:1400}); },
+        "b&w": (e) => { togglePageClass('page-bw'); beep("sine",r(200,350),0.14,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,12)}); },
+        "vapor": (e) => { togglePageClass('page-vapor'); beep("triangle",r(300,600),0.12,0.08); siteSparkle(2000); spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"mixed"}); },
+        "matrix": (e) => { togglePageClass('page-matrix'); beep("square",r(100,250),0.08,0.12); spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"squares",sizeMin:4,sizeMax:12,durMin:200,durMax:500}); },
+        "comic": (e) => { togglePageClass('page-comic'); beep("triangle",r(400,700),0.14,0.09); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"mixed"}); },
+        "tiny": (e) => { togglePageClass('page-tiny'); beep("triangle",r(700,1200),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,12),sizeMin:3,sizeMax:8}); },
+        "HUGE": (e) => { togglePageClass('page-huge'); beep("sine",r(100,200),0.16,0.10); spawnParticles(e.clientX,e.clientY,{count:r(10,16),sizeMin:20,sizeMax:40}); },
+        "upside down": (e) => { togglePageClass('page-upsidedown'); beep("sine",r(200,400),0.14,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18)}); },
+        "scramble": (e) => { document.querySelectorAll('.cardTitle').forEach(el=>{const t=el.textContent; el.textContent=t.split('').sort(()=>Math.random()-.5).join('');}); beep("square",r(200,500),0.10,0.10); spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"squares"}); setTimeout(()=>document.querySelectorAll('#grid .card').forEach((c,i)=>{const titles=['Jim Eats the Neighbours','Minecrafn\'t','SoGoDing','Infinite Retail','Datura Protocol','CodeCrackers','True!']; const t=c.querySelector('.cardTitle'); if(t&&titles[i]) t.textContent=titles[i];}),3000); },
+        "typewriter": (e) => { togglePageClass('page-typewriter'); beep("square",r(300,500),0.08,0.10); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
+        "party": (e) => { togglePageClass('page-party'); siteSparkle(3000); siteFall(rand(['🎉','🎊','🥳','🎈']),3500); beep("triangle",r(500,900),0.12,0.09); beep("sine",r(700,1100),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(20,30),shape:"mixed"}); },
+
+        // weather/environment
+        "snow": (e) => { siteFall(rand(['❄','❅','❆','·']),5000); beep("sine",r(400,700),0.10,0.06); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"circles",sizeMin:4,sizeMax:12}); },
+        "rain": (e) => { siteFall(rand(['💧','·','⸳','⋮']),4500); siteBody.style.transition='filter .5s'; siteBody.style.filter='brightness(0.92) contrast(1.05)'; setTimeout(()=>siteBody.style.filter='',5000); beep("sine",r(150,300),0.16,0.06); spawnParticles(e.clientX,e.clientY,{count:r(14,20),durMin:300,durMax:600,dyDown:300,dyUp:30}); },
+        "bubbles": (e) => { siteFall('🫧',4000); siteFall(rand(['○','◦','·']),4500); beep("sine",r(500,900),0.10,0.06); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"circles",sizeMin:8,sizeMax:22,durMin:800,durMax:1400}); },
+        "lava": (e) => { siteBody.style.transition='filter .5s'; siteBody.style.filter='sepia(0.4) saturate(1.8)'; setTimeout(()=>siteBody.style.filter='',4000); siteFall(rand(['🔥','🌋','✦']),3500); beep("sine",r(100,200),0.18,0.08); spawnParticles(e.clientX,e.clientY,{count:r(16,24),hue:15,durMin:400,durMax:900}); },
+        "ocean": (e) => { siteBody.style.transition='filter .5s'; siteBody.style.filter='hue-rotate(180deg) brightness(1.05)'; setTimeout(()=>siteBody.style.filter='',4000); siteFall(rand(['🌊','🐟','🐠','🫧']),4000); beep("sine",r(200,350),0.14,0.07); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"circles"}); },
+        "earthquake": (e) => { quakeShake(); toyBox.classList.add('quake'); setTimeout(()=>toyBox.classList.remove('quake'),800); beep("square",r(60,140),0.14,0.14); beep("square",r(80,160),0.12,0.12); spawnParticles(e.clientX,e.clientY,{count:r(20,30),shape:"squares",dxMax:250,dyUp:300,durMin:250,durMax:500}); },
+        "slow-mo": (e) => { togglePageClass('page-slowmo'); beep("sine",r(150,250),0.18,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,12),durMin:1500,durMax:2500,dxMax:80,dyUp:60}); },
+        "fast forward": (e) => { togglePageClass('page-fastfwd'); beep("triangle",r(800,1400),0.08,0.08); spawnParticles(e.clientX,e.clientY,{count:r(16,24),durMin:150,durMax:350,dxMax:300,dyUp:300}); },
+        "rewind": (e) => { siteBody.style.transition='transform .5s ease'; siteBody.style.transform='scaleX(-1)'; setTimeout(()=>siteBody.style.transform='',1500); beep("sine",r(500,300),0.14,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "static": (e) => { togglePageClass('page-static'); beep("square",r(50,150),0.12,0.14); spawnParticles(e.clientX,e.clientY,{count:r(18,26),shape:"squares",sizeMin:2,sizeMax:8,durMin:100,durMax:300,dxMax:200}); },
       };
+
+      // helper for page-level toggle classes
+      const PAGE_CLASSES = ['page-tilt','page-blur','page-pixel','page-mirror','page-float','page-bw','page-vapor','page-matrix','page-comic','page-tiny','page-huge','page-upsidedown','page-typewriter','page-party','page-slowmo','page-fastfwd','page-static'];
+      function togglePageClass(cls) {
+        siteBody.classList.toggle(cls);
+      }
+
+      // page-level quake
+      function quakeShake() {
+        siteBody.classList.add('page-quake');
+        setTimeout(()=>siteBody.classList.remove('page-quake'),800);
+      }
 
       function isActionWord(w) {
         return Object.prototype.hasOwnProperty.call(ACTIONS, w);
