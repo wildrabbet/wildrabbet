@@ -167,7 +167,7 @@
       document.documentElement.style.setProperty('--accent-h', h);
     })();
 
-    // Random gallery image (Gallery/1.jpg .. Gallery/5.jpg)
+    // Random gallery image (gallery/1.jpg .. gallery/5.jpg)
     (function () {
       const img = document.getElementById('galleryShot');
       if (!img) return;
@@ -184,13 +184,13 @@
       }
 
       let current = pick();
-      img.src = `./Gallery/${current}.jpg`;
+      img.src = `./gallery/${current}.jpg`;
       img.style.cursor = "pointer";
       img.title = "click to reroll";
 
       img.addEventListener("click", () => {
         current = pick(current);
-        img.src = `./Gallery/${current}.jpg`;
+        img.src = `./gallery/${current}.jpg`;
       });
     })();
 
