@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>True!</title>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1a1028;
+    --card-bg: #2a1f3d;
+    --card-border: #4a3366;
+    --accent: #ff6b9d;
+    --accent2: #c084fc;
+    --accent3: #fbbf24;
+    --success: #34d399;
+    --danger: #f87171;
+    --text: #f0e6ff;
+    --text-dim: #9b8ab8;
+    --removed: #ff6b9d;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Nunito', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(192, 132, 252, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(255, 107, 157, 0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 80%, rgba(251, 191, 36, 0.05) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 750px;
+    margin: 0 auto;
+    padding: 30px 20px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 10px;
+    animation: dropIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .header h1 {
+    font-family: 'Lilita One', cursive;
+    font-size: 3.2rem;
+    background: linear-gradient(135deg, var(--accent), var(--accent2), var(--accent3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -1px;
+    line-height: 1.1;
+  }
+
+  .header .subtitle {
+    color: var(--text-dim);
+    font-size: 1.05rem;
+    margin-top: 6px;
+    font-weight: 700;
+  }
+
+  .progress-area { margin: 20px 0 30px; animation: fadeUp 0.6s 0.2s both; }
+
+  .progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-weight: 700;
+    font-size: 0.9rem;
+  }
+
+  .progress-info .level { color: var(--accent2); font-size: 0.85rem; }
+
+  .progress-bar { width: 100%; height: 10px; background: rgba(255,255,255,0.06); border-radius: 99px; overflow: hidden; }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 99px;
+    transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+  }
+
+  .progress-fill::after {
+    content: ''; position: absolute; right: 0; top: 0; bottom: 0;
+    width: 20px; background: rgba(255,255,255,0.3); border-radius: 99px; filter: blur(4px);
+  }
+
+  .card {
+    background: var(--card-bg); border: 2px solid var(--card-border);
+    border-radius: 20px; padding: 36px 32px; position: relative;
+    overflow: hidden; animation: cardEnter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent3));
+  }
+
+  @keyframes cardEnter {
+    from { opacity: 0; transform: translateY(30px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .card-label {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.8rem; font-weight: 900; text-transform: uppercase;
+    letter-spacing: 2px; color: var(--accent);
+    background: rgba(255,107,157,0.1); padding: 5px 14px; border-radius: 99px;
+    margin-bottom: 20px;
+  }
+
+  .statement { font-size: 1.7rem; font-weight: 900; line-height: 1.6; margin-bottom: 28px; min-height: 80px; }
+
+  .word {
+    display: inline-block; cursor: pointer; padding: 3px 5px; margin: 2px 1px;
+    border-radius: 8px; transition: all 0.2s ease; position: relative;
+    user-select: none; -webkit-user-select: none;
+  }
+
+  .word:hover:not(.removed):not(.locked) { background: rgba(255,107,157,0.15); transform: translateY(-2px); }
+  .word:active:not(.removed):not(.locked) { transform: scale(0.95); }
+
+  .word.removed {
+    color: var(--removed); text-decoration: line-through; text-decoration-thickness: 3px;
+    opacity: 0.5; transform: scale(0.92); text-decoration-color: var(--removed);
+  }
+
+  .word.locked { cursor: default; }
+
+  @keyframes wrongShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+  }
+
+  .btn-row { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  .btn {
+    padding: 12px 28px; border: none; border-radius: 12px;
+    font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 1rem;
+    cursor: pointer; transition: all 0.2s ease;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+
+  .btn:hover { transform: translateY(-2px); }
+  .btn:active { transform: scale(0.97); }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: white; box-shadow: 0 4px 20px rgba(255,107,157,0.3);
+  }
+  .btn-primary:hover { box-shadow: 0 6px 28px rgba(255,107,157,0.45); }
+
+  .btn-ghost {
+    background: rgba(255,255,255,0.06); color: var(--text-dim);
+    border: 2px solid rgba(255,255,255,0.08);
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+
+  .btn-success {
+    background: linear-gradient(135deg, #34d399, #059669);
+    color: white; box-shadow: 0 4px 20px rgba(52,211,153,0.3);
+  }
+
+  .feedback {
+    position: fixed; top: 30px; left: 50%;
+    transform: translateX(-50%) translateY(-100px);
+    padding: 14px 28px; border-radius: 14px; font-weight: 900; font-size: 1.1rem;
+    z-index: 100; transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none; font-family: 'Nunito', sans-serif;
+  }
+
+  .feedback.show { transform: translateX(-50%) translateY(0); }
+  .feedback.correct { background: linear-gradient(135deg, #34d399, #059669); color: white; box-shadow: 0 8px 30px rgba(52,211,153,0.4); }
+  .feedback.wrong { background: linear-gradient(135deg, #f87171, #dc2626); color: white; box-shadow: 0 8px 30px rgba(248,113,113,0.4); }
+  .feedback.perfect { background: linear-gradient(135deg, var(--accent3), #f59e0b); color: #1a1028; box-shadow: 0 8px 30px rgba(251,191,36,0.4); }
+  .feedback.alsotrue { background: linear-gradient(135deg, var(--accent2), var(--accent)); color: white; box-shadow: 0 8px 30px rgba(192,132,252,0.4); }
+  .feedback.nottrue { background: linear-gradient(135deg, #fb923c, #ea580c); color: white; box-shadow: 0 8px 30px rgba(251,146,60,0.4); }
+
+  .truth-reveal {
+    margin-top: 20px; padding: 20px;
+    background: rgba(52,211,153,0.08); border: 1px solid rgba(52,211,153,0.2);
+    border-radius: 14px; animation: fadeUp 0.4s ease;
+  }
+  .truth-reveal .truth-label { font-weight: 900; color: var(--success); margin-bottom: 8px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.5px; }
+  .truth-reveal .truth-sentence { font-size: 1.3rem; font-weight: 900; color: var(--text); line-height: 1.5; margin-bottom: 12px; }
+  .truth-reveal .truth-detail { font-size: 0.95rem; color: #a7f3d0; line-height: 1.6; }
+
+  .nottrue-reveal {
+    margin-top: 20px; padding: 20px;
+    background: rgba(251,146,60,0.08); border: 1px solid rgba(251,146,60,0.25);
+    border-radius: 14px; animation: fadeUp 0.4s ease;
+  }
+  .nottrue-reveal .nottrue-label { font-weight: 900; color: #fb923c; margin-bottom: 8px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.5px; }
+  .nottrue-reveal .nottrue-sentence { font-size: 1.3rem; font-weight: 900; color: var(--text); line-height: 1.5; margin-bottom: 12px; }
+  .nottrue-reveal .nottrue-detail { font-size: 0.95rem; color: #fed7aa; line-height: 1.6; }
+
+  .result-screen { text-align: center; animation: fadeUp 0.6s ease; }
+
+  .result-screen h2 {
+    font-family: 'Lilita One', cursive; font-size: 2.4rem; margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--accent3), var(--accent));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+
+  .result-screen .final-score { font-size: 3.5rem; font-weight: 900; color: var(--accent3); margin: 16px 0; }
+  .result-screen .final-score span { color: var(--text-dim); font-size: 1.5rem; }
+
+  .ranking { margin: 20px 0; padding: 16px; background: rgba(255,255,255,0.04); border-radius: 14px; font-size: 1rem; }
+  .ranking .rank-title { color: var(--accent3); font-weight: 900; font-size: 1.2rem; }
+  .ranking .rank-desc { color: var(--text-dim); font-size: 0.9rem; margin-top: 4px; }
+
+  .intro { text-align: center; animation: fadeUp 0.6s ease; }
+
+  .intro .demo-area {
+    margin: 28px 0; padding: 20px;
+    background: rgba(255,255,255,0.03); border-radius: 16px; border: 2px dashed var(--card-border);
+  }
+  .intro .demo-text { font-size: 1.3rem; font-weight: 900; }
+  .intro .demo-text .fake { color: var(--removed); text-decoration: line-through; text-decoration-thickness: 3px; opacity: 0.5; }
+
+  .intro p { color: var(--text-dim); line-height: 1.7; margin-bottom: 12px; font-size: 1.05rem; }
+
+  .intro .rules { text-align: left; display: inline-block; margin: 16px auto; }
+  .intro .rules div { display: flex; align-items: center; gap: 10px; margin: 10px 0; font-weight: 700; font-size: 1rem; }
+  .intro .rules .rule-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; font-weight: 900; flex-shrink: 0;
+  }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes dropIn { from { opacity: 0; transform: translateY(-30px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes bounceIn { from { transform: scale(0); } to { transform: scale(1); } }
+
+  #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 200; }
+
+  @media (max-width: 600px) {
+    .header h1 { font-size: 2.2rem; }
+    .statement { font-size: 1.3rem; }
+    .card { padding: 24px 18px; }
+    .stat-row { gap: 16px; }
+    .result-screen h2 { font-size: 1.8rem; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="confetti"></canvas>
+<div class="feedback" id="feedback"></div>
+
+<div class="container">
+  <div class="header">
+    <h1>True!</h1>
+    <div class="subtitle">Click the false words to reveal the truth</div>
+  </div>
+
+  <div class="progress-area" id="progressArea" style="display:none;">
+    <div class="progress-info">
+      <span class="level" id="levelText">Myth 1 of 13</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+    </div>
+  </div>
+
+  <div id="gameArea"></div>
+</div>
+
+<script>
+// removeIndices = exact 0-based word positions to remove. No ambiguity with duplicates.
+// alsoTrue = [{indices:[...], msg:"..."}, ...] — alternate valid answers that let you move on
+// notTrue = [{indices:[...], msg:"..."}, ...] — funny wrong answers that get a special response but don't pass
+const PUZZLES = [
+  { words:["Goldfish","have","a","3-second","memory"], removeIndices:[3],
+    alsoTrue:[],
+    notTrue:[],
+    detail:"Goldfish can actually remember things for months apparently." },
+  { words:["An","octopus","has","ten","arms"], removeIndices:[3],
+    alsoTrue:[],
+    notTrue:[],
+    detail:"Octopuses do have arms, EIGHT of them in fact! It's in the name -'octo' means eight." },
+  { words:["Blood","is","blue","inside","your","body"], removeIndices:[2],
+    alsoTrue:[
+      {indices:[2,3,4,5], msg:"Yes it literally is. Hard to argue with this one."}
+    ],
+    notTrue:[],
+    detail:"It's there, and it isn't blue, unless you're some kind of alien." },
+  { words:["Water","drains","differently","in","each","hemisphere."], removeIndices:[2],
+    alsoTrue:[
+      {indices:[2,3,4,5], msg:"I mean... yeah. It does. Can't argue with that."}
+    ],
+    notTrue:[],
+    detail:"Water does not flow the other direction in Australia, stop asking." },
+  { words:["The","Great","Wall","of","China","is","visible","from","space"], removeIndices:[7,8],
+    alsoTrue:[
+      {indices:[0,1,2,3], msg:"Yes, China is in fact visible from space so I GUESS I'll give you this one."},
+      {indices:[6,7,8], msg:"It sure is! It exists! Can't argue with existence."}
+    ],
+    notTrue:[],
+    detail:"Astronauts confirm: you CANNOT see the Great Wall from space with the naked eye. It's long but too narrow." },
+  { words:["Vikings","wore","horned","helmets"], removeIndices:[2],
+    alsoTrue:[
+      {indices:[2,3], msg:"They did NOT!!"}
+    ],
+    notTrue:[],
+    detail:"No horns! Real Viking helmets were plain rounded metal or leather caps. The horned look was invented by costume designers in the 1800s for operas." },
+  { words:["You","only","use","10%","of","your","brain"], removeIndices:[1,3,4],
+    alsoTrue:[
+      {indices:[1,2,3,4,5,6], msg:"Okay."}
+    ],
+    notTrue:[],
+    detail:"Well I certainly know a few people who forget about this one." },
+  { words:["You","swallow","spiders","in","your","sleep","every","year."], removeIndices:[1,2,3,4],
+    alsoTrue:[
+      {indices:[0,1,3,4], msg:"They sure do, but it's weird that you went with SPIDERS instead of YOU sleep every year."},
+      {indices:[2,3,4,5], msg:"I mean the intention was you SLEEP every year, but hey it works."},
+      {indices:[1,2,3,4,6,7], msg:"I sleep."},
+      {indices:[0,1,3,4,6,7], msg:"Oh hey, yes, they do!"}
+    ],
+    notTrue:[],
+    detail:"Unless you're dead, I guess." },
+  { words:["Zero","is","not","a","number"], removeIndices:[2],
+    alsoTrue:[
+      {indices:[3,4], msg:"TRUE!!!!!!"}
+    ],
+    notTrue:[],
+    detail:"Zero is absolutely a number!" },
+  { words:["Mount","Everest","is","the","tallest","mountain","on","Earth"], removeIndices:[3,4,5],
+    alsoTrue:[
+      {indices:[3,4,6,7], msg:".................... Okay I mean I'll give it to you but the ACTUAL answer was Mount Everest is on Earth."}
+    ],
+    notTrue:[],
+    detail:"As of 2026 Mount Everest IS in fact currently on Planet Earth." },
+  { words:["Dropping","a","coin","off","a","skyscraper","could","kill","someone."], removeIndices:[1,2],
+    alsoTrue:[
+      {indices:[1,2,3,4,5], msg:"Oh come on, I mean yes that is certainly TRUE! but why'd you have to remove the skyscraper?"}
+    ],
+    notTrue:[
+      {indices:[3,4,5], msg:"Literally how??? I mean I guess if you dropped a MASSIVE one. But no, you're not getting that one."},
+      {indices:[1,2,3], msg:"I mean TECHNICALLY yes but??? No, I'm not giving you that one. How tf would one drop a skyscraper?"},
+      {indices:[2,3,4], msg:"I mean TECHNICALLY yes but??? No, I'm not giving you that one. How tf would one drop a skyscraper?"},
+      {indices:[0,3,4,5], msg:"I'm half tempted to actually make this TRUE!! but no, because technically they can't kill directly."}
+    ],
+    detail:"Unless you equip an Elytra first." },
+  { words:["Eating","before","swimming","causes","cramps","and","drowning."], removeIndices:[0,1,4,5],
+    alsoTrue:[],
+    notTrue:[],
+    detail:"Drowning = water = swimming = TRUE!!" },
+  { words:["Standing","under","a","tree","during","a","storm","is","safe."], removeIndices:[4,5,6],
+    alsoTrue:[
+      {indices:[7,8], msg:"That's not a statement, but grammatically it exists, so... fine."}
+    ],
+    notTrue:[],
+    detail:"Yep, it's safe! So long as it isn't the whomping willow." }
+];
+
+const puzzleOrder = PUZZLES;
+
+let state = { screen:'intro', puzzleIndex:0, removedWords:[], submitted:false, attempts:0, firstTryCount:0 };
+
+function wid(pi, wi) { return `w-${pi}-${wi}`; }
+
+function getTruth(p) { return p.words.filter((_,i) => !p.removeIndices.includes(i)).join(' '); }
+
+function renderIntro() {
+  startGame();
+}
+
+function startGame() {
+  state = { screen:'game', puzzleIndex:0, removedWords:[], submitted:false, attempts:0, firstTryCount:0 };
+  document.getElementById('progressArea').style.display = 'block';
+  renderPuzzle();
+}
+
+function renderPuzzle() {
+  const p = puzzleOrder[state.puzzleIndex];
+  state.removedWords = []; state.submitted = false; state.attempts = 0;
+  updateProgress();
+  const html = p.words.map((w,i) => `<span class="word" id="${wid(state.puzzleIndex,i)}" onclick="toggle(${i})">${w}</span>`).join(' ');
+  document.getElementById('gameArea').innerHTML = `
+    <div class="card" id="puzzleCard">
+      <div class="card-label">Myth #${state.puzzleIndex+1}</div>
+      <div class="statement">${html}</div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="submitBtn" onclick="submit()">Submit</button>
+        <button class="btn btn-ghost" id="resetBtn" onclick="resetSel()">Undo All</button>
+      </div>
+      <div id="factArea"></div>
+    </div>`;
+}
+
+function toggle(i) {
+  if (state.submitted) return;
+  const el = document.getElementById(wid(state.puzzleIndex, i));
+  if (state.removedWords.includes(i)) {
+    state.removedWords = state.removedWords.filter(x => x !== i);
+    el.classList.remove('removed');
+  } else {
+    state.removedWords.push(i);
+    el.classList.add('removed');
+    el.style.transform = 'scale(0.85)';
+    setTimeout(() => { el.style.transform = ''; }, 150);
+  }
+}
+
+function resetSel() {
+  if (state.submitted) return;
+  puzzleOrder[state.puzzleIndex].words.forEach((_,i) => {
+    document.getElementById(wid(state.puzzleIndex, i)).classList.remove('removed');
+  });
+  state.removedWords = [];
+}
+
+function submit() {
+  if (state.submitted) return;
+  if (state.removedWords.length === 0) { showFeedback("Pick some words first!", "wrong"); return; }
+
+  state.submitted = true;
+  const p = puzzleOrder[state.puzzleIndex];
+  const playerSet = new Set(state.removedWords);
+  const correctSet = new Set(p.removeIndices);
+  const isPerfect = playerSet.size === correctSet.size && [...playerSet].every(i => correctSet.has(i));
+
+  // Check alsoTrue alternatives
+  let alsoTrueMatch = null;
+  if (!isPerfect && p.alsoTrue && p.alsoTrue.length > 0) {
+    for (const alt of p.alsoTrue) {
+      const altSet = new Set(alt.indices);
+      if (playerSet.size === altSet.size && [...playerSet].every(i => altSet.has(i))) {
+        alsoTrueMatch = alt;
+        break;
+      }
+    }
+  }
+
+  // Check notTrue special wrong answers
+  let notTrueMatch = null;
+  if (!isPerfect && !alsoTrueMatch && p.notTrue && p.notTrue.length > 0) {
+    for (const nt of p.notTrue) {
+      const ntSet = new Set(nt.indices);
+      if (playerSet.size === ntSet.size && [...playerSet].every(i => ntSet.has(i))) {
+        notTrueMatch = nt;
+        break;
+      }
+    }
+  }
+
+  state.attempts++;
+
+  if (isPerfect || alsoTrueMatch) {
+    p.words.forEach((_,i) => document.getElementById(wid(state.puzzleIndex,i)).classList.add('locked'));
+
+    if (state.attempts === 1) state.firstTryCount++;
+
+    const removedSet = isPerfect ? correctSet : new Set(alsoTrueMatch.indices);
+    const resultSentence = p.words.filter((_,i) => !removedSet.has(i)).join(' ');
+
+    if (isPerfect) {
+      showFeedback("True!", "perfect");
+    } else {
+      showFeedback("Also true!", "alsotrue");
+    }
+    launchConfetti();
+
+    updateProgress();
+
+    setTimeout(() => {
+      document.getElementById('factArea').innerHTML = `
+        <div class="truth-reveal">
+          <div class="truth-label">${isPerfect ? 'The Truth' : 'Also True!'}</div>
+          <div class="truth-sentence">"${resultSentence}"</div>
+          <div class="truth-detail">${isPerfect ? p.detail : alsoTrueMatch.msg}</div>
+        </div>
+        <div style="margin-top:18px;">
+          <button class="btn ${state.puzzleIndex < puzzleOrder.length-1 ? 'btn-primary' : 'btn-success'}" onclick="nextPuzzle()">
+            ${state.puzzleIndex < puzzleOrder.length-1 ? 'Next Myth' : 'See Results'}
+          </button>
+        </div>`;
+      document.getElementById('submitBtn').style.display = 'none';
+      document.getElementById('resetBtn').style.display = 'none';
+    }, 400);
+
+  } else if (notTrueMatch) {
+    // Special "NOT TRUE!" response — show the message but don't advance
+    showFeedback("NOT TRUE!", "nottrue");
+
+    const ntSentence = p.words.filter((_,i) => !playerSet.has(i)).join(' ');
+
+    document.getElementById('factArea').innerHTML = `
+      <div class="nottrue-reveal">
+        <div class="nottrue-label">NOT TRUE!</div>
+        <div class="nottrue-sentence">"${ntSentence}"</div>
+        <div class="nottrue-detail">${notTrueMatch.msg}</div>
+      </div>`;
+
+    setTimeout(() => {
+      state.submitted = false;
+    }, 800);
+
+  } else {
+    showFeedback("False! Try again.", "wrong");
+
+    const card = document.getElementById('puzzleCard');
+    card.style.animation = 'none'; card.offsetHeight;
+    card.style.animation = 'wrongShake 0.4s ease';
+
+    setTimeout(() => {
+      state.submitted = false;
+      card.style.animation = '';
+    }, 1000);
+  }
+}
+
+function nextPuzzle() {
+  state.puzzleIndex++;
+  if (state.puzzleIndex >= puzzleOrder.length) renderResults();
+  else renderPuzzle();
+}
+
+function updateProgress() {
+  const t = puzzleOrder.length, c = state.puzzleIndex+1;
+  document.getElementById('levelText').textContent = `Myth ${c} of ${t}`;
+  document.getElementById('progressFill').style.width = `${(state.puzzleIndex/t)*100}%`;
+}
+
+function renderResults() {
+  document.getElementById('progressArea').style.display = 'none';
+  launchConfetti();
+
+  const total = puzzleOrder.length;
+  const ft = state.firstTryCount;
+  let rank, desc;
+  if (ft === total) { rank="Myth Annihilator"; desc="You destroyed every single lie. Absolutely flawless."; }
+  else if (ft >= 10) { rank="Truth Surgeon"; desc="Precise, clinical, devastating. The lies didn't stand a chance."; }
+  else if (ft >= 7) { rank="Fact Detective"; desc="You've got a nose for the truth — most myths can't fool you!"; }
+  else if (ft >= 4) { rank="Myth Apprentice"; desc="You're learning! Some myths still tricked you though."; }
+  else { rank="Gullible Goose"; desc="The myths won this round... but now you know the truth!"; }
+
+  document.getElementById('gameArea').innerHTML = `
+    <div class="card">
+      <div class="result-screen">
+        <h2>${rank}</h2>
+        <div class="final-score">${ft} <span>/ ${total} first try</span></div>
+        <div class="ranking">
+          <div class="rank-title">${rank}</div>
+          <div class="rank-desc">${desc}</div>
+        </div>
+        <div style="margin-top:20px;">
+          <button class="btn btn-primary" onclick="startGame()" style="font-size:1.1rem; padding:14px 40px;">Play Again</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function showFeedback(msg, type) {
+  const el = document.getElementById('feedback');
+  el.textContent = msg;
+  el.className = 'feedback ' + type + ' show';
+  setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+function launchConfetti() {
+  const c = document.getElementById('confetti'), ctx = c.getContext('2d');
+  c.width = innerWidth; c.height = innerHeight;
+  const colors = ['#ff6b9d','#c084fc','#fbbf24','#34d399','#60a5fa','#f472b6'];
+  const ps = [];
+  for (let i = 0; i < 80; i++) ps.push({
+    x: c.width/2+(Math.random()-0.5)*200, y: c.height/2,
+    vx: (Math.random()-0.5)*16, vy: -Math.random()*18-4,
+    color: colors[Math.floor(Math.random()*colors.length)],
+    size: Math.random()*8+4, rot: Math.random()*360,
+    rs: (Math.random()-0.5)*10, g: 0.4, life: 1
+  });
+  let f = 0;
+  (function anim() {
+    ctx.clearRect(0,0,c.width,c.height);
+    let alive = false;
+    ps.forEach(p => {
+      if (p.life <= 0) return; alive = true;
+      p.x += p.vx; p.vy += p.g; p.y += p.vy;
+      p.rot += p.rs; p.life -= 0.012; p.vx *= 0.99;
+      ctx.save(); ctx.translate(p.x,p.y);
+      ctx.rotate(p.rot*Math.PI/180); ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size/2,-p.size/4,p.size,p.size/2);
+      ctx.restore();
+    });
+    if (alive && f++ < 200) requestAnimationFrame(anim);
+    else ctx.clearRect(0,0,c.width,c.height);
+  })();
+}
+
+addEventListener('resize', () => { const c = document.getElementById('confetti'); c.width = innerWidth; c.height = innerHeight; });
+
+renderIntro();
+</script>
+</body>
+</html>
