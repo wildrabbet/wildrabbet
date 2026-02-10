@@ -617,6 +617,111 @@ h2{ margin: 0; font-size: 20px; letter-spacing: .2px; }
 }
 .site-flash.on{ opacity:1; }
 
+/* ===== CRT OVERLAY ===== */
+.crt-overlay{
+  position:fixed;
+  inset:0;
+  z-index:9990;
+  pointer-events:none;
+  overflow:hidden;
+}
+.crt-scanlines{
+  position:absolute;
+  inset:0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,.08) 2px,
+    rgba(0,0,0,.08) 4px
+  );
+}
+.crt-flicker{
+  position:absolute;
+  inset:0;
+  background: transparent;
+  animation: crtFlicker 0.08s infinite;
+  opacity:.03;
+}
+@keyframes crtFlicker{
+  0%{ background: rgba(120,255,120,.04); }
+  50%{ background: transparent; }
+  100%{ background: rgba(120,255,120,.02); }
+}
+.crt-active{
+  border-radius:0 !important;
+}
+.crt-active *{
+  /* subtle green tint to all text */
+}
+body.crt-active{
+  text-shadow: 0 0 2px rgba(100,255,100,.15);
+}
+body.crt-active .card,
+body.crt-active .aboutCard,
+body.crt-active .heroLeft,
+body.crt-active .heroRight{
+  border-radius: 4px !important;
+  box-shadow: 0 0 12px rgba(100,255,100,.06), var(--shadow);
+}
+
+/* ===== 90s OVERLAY ===== */
+.nineties-overlay{
+  position:fixed;
+  inset:0;
+  z-index:9989;
+  pointer-events:none;
+  overflow:hidden;
+}
+.nineties-star{
+  position:absolute;
+  animation: ninetyTwinkle 2s ease-in-out infinite;
+  opacity:.5;
+  color: gold;
+}
+@keyframes ninetyTwinkle{
+  0%,100%{ opacity:.3; transform:scale(.8); }
+  50%{ opacity:.8; transform:scale(1.2); }
+}
+body.nineties-active{
+  font-family: 'Comic Sans MS', 'Chalkboard SE', cursive !important;
+}
+body.nineties-active .top{
+  border-bottom: 3px dashed var(--accent) !important;
+}
+body.nineties-active .card,
+body.nineties-active .aboutCard{
+  border: 2px solid var(--accent) !important;
+  border-radius: 0 !important;
+  box-shadow: 4px 4px 0 var(--accent) !important;
+}
+body.nineties-active h1,
+body.nineties-active h2{
+  text-shadow: 2px 2px 0 var(--accent);
+}
+body.nineties-active .btn{
+  border-radius: 0 !important;
+  border: 2px outset var(--accent) !important;
+  box-shadow: 2px 2px 0 rgba(0,0,0,.3);
+}
+
+/* ===== DVD LOGO ===== */
+.dvd-logo{
+  position:fixed;
+  z-index:9991;
+  font-weight:900;
+  font-size:28px;
+  letter-spacing:4px;
+  padding:6px 16px;
+  border-radius:6px;
+  color: hsl(280 90% 60%);
+  text-shadow: 0 0 12px currentColor;
+  pointer-events:none;
+  user-select:none;
+  font-style:italic;
+  opacity:.85;
+}
+
 /* Theme transition smoothness */
 body{
   transition: background .6s ease, color .4s ease;
