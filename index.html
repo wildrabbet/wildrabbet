@@ -307,90 +307,54 @@
 
       let clickCount = 0;
       let totalCount = 0;
-      let pendingClicks = 0;
-      let hasSharedStorage = false;
       const myClicksEl = document.getElementById('myClicks');
       const totalClicksEl = document.getElementById('totalClicks');
       const gravBall = document.getElementById('gravBall');
 
-      // Detect if real shared storage is available
-      async function initStorage() {
-        if (window.storage && typeof window.storage.get === 'function') {
-          try {
-            // Test shared write+read roundtrip
-            await window.storage.set('uselessbox:ping', 'ok', true);
-            const test = await window.storage.get('uselessbox:ping', true);
-            if (test && test.value === 'ok') {
-              hasSharedStorage = true;
-              console.log('[useless box] shared storage: available');
-            }
-          } catch(e) {
-            console.log('[useless box] shared storage test failed:', e);
-          }
-        }
-        if (!hasSharedStorage) {
-          console.log('[useless box] shared storage: unavailable, using localStorage');
-        }
-      }
+      // ===== GLOBAL COUNTER via Abacus (free, no auth, CORS, works from any site) =====
+      // API: abacus.jasoncameron.dev  — GET /hit/NAMESPACE/KEY  increments +1 and returns { value }
+      //                                  GET /get/NAMESPACE/KEY  reads current value
+      // Fallback: localStorage only (per-browser)
 
-      // Safe shared get — returns number or 0
-      async function getSharedTotal() {
-        if (!hasSharedStorage) {
-          const v = localStorage.getItem('uselessbox:total');
-          return v !== null ? parseInt(v, 10) || 0 : 0;
-        }
+      const COUNTER_NS = 'rabbit.lol';
+      const COUNTER_KEY = 'uselessbox-total';
+      const ABACUS = 'https://abacus.jasoncameron.dev';
+      let apiAvailable = null; // null = untested, true/false after first attempt
+
+      // Hit the counter API (increment +1, returns new value)
+      async function apiHit() {
         try {
-          const result = await window.storage.get('uselessbox:total', true);
-          if (result && result.value != null) {
-            return parseInt(result.value, 10) || 0;
-          }
-          return 0;
+          const res = await fetch(`${ABACUS}/hit/${COUNTER_NS}/${COUNTER_KEY}`);
+          if (!res.ok) throw new Error('not ok: ' + res.status);
+          const data = await res.json();
+          const val = parseInt(data.value, 10);
+          if (isNaN(val)) throw new Error('bad value');
+          apiAvailable = true;
+          return val;
         } catch(e) {
-          // Key doesn't exist yet
-          return 0;
+          apiAvailable = false;
+          console.warn('[useless box] counter API hit failed:', e.message);
+          return null;
         }
       }
 
-      // Safe shared set
-      async function setSharedTotal(val) {
-        if (!hasSharedStorage) {
-          localStorage.setItem('uselessbox:total', String(val));
-          return;
+      // Read current counter value without incrementing
+      async function apiGet() {
+        try {
+          const res = await fetch(`${ABACUS}/get/${COUNTER_NS}/${COUNTER_KEY}`);
+          if (!res.ok) {
+            if (res.status === 404) { apiAvailable = true; return 0; }
+            throw new Error('not ok: ' + res.status);
+          }
+          const data = await res.json();
+          const val = parseInt(data.value, 10);
+          apiAvailable = true;
+          return isNaN(val) ? 0 : val;
+        } catch(e) {
+          apiAvailable = false;
+          console.warn('[useless box] counter API get failed:', e.message);
+          return null;
         }
-        await window.storage.set('uselessbox:total', String(val), true);
-      }
-
-      // Personal count (always per-user)
-      async function getMyClicks() {
-        if (hasSharedStorage) {
-          try {
-            const result = await window.storage.get('uselessbox:myclicks');
-            return result ? parseInt(result.value, 10) || 0 : 0;
-          } catch(e) { return 0; }
-        }
-        const v = localStorage.getItem('uselessbox:myclicks');
-        return v !== null ? parseInt(v, 10) || 0 : 0;
-      }
-
-      async function setMyClicks(val) {
-        if (hasSharedStorage) {
-          try { await window.storage.set('uselessbox:myclicks', String(val)); } catch(e) {}
-          return;
-        }
-        localStorage.setItem('uselessbox:myclicks', String(val));
-      }
-
-      async function refreshSharedTotal() {
-        const remote = await getSharedTotal();
-        // Remote is the source of truth; add any unflushed local clicks
-        totalCount = remote + pendingClicks;
-      }
-
-      async function loadCounts() {
-        await initStorage();
-        clickCount = await getMyClicks();
-        await refreshSharedTotal();
-        renderCounts();
       }
 
       function renderCounts() {
@@ -398,47 +362,76 @@
         totalClicksEl.textContent = `everyone: ${totalCount.toLocaleString()}`;
       }
 
-      let flushTimeout = null;
-      function scheduleFlush() {
-        clearTimeout(flushTimeout);
-        flushTimeout = setTimeout(flushClicks, 300);
+      // Load personal clicks from localStorage (always per-browser)
+      clickCount = parseInt(localStorage.getItem('uselessbox:myclicks') || '0', 10) || 0;
+
+      // On page load: fetch the global total
+      (async function loadCounts() {
+        // Show cached value immediately so it's never 0 for returning users
+        totalCount = parseInt(localStorage.getItem('uselessbox:total') || '0', 10) || 0;
+        renderCounts();
+
+        // Try to fetch the real global count
+        const remote = await apiGet();
+        if (remote !== null) {
+          // If remote is 0 and we have a cached value, the key might not exist yet
+          // Use whichever is higher
+          totalCount = Math.max(remote, totalCount);
+          localStorage.setItem('uselessbox:total', String(totalCount));
+          console.log('[useless box] global counter loaded:', totalCount);
+        } else {
+          console.log('[useless box] counter API unavailable, using cached value:', totalCount);
+        }
+        renderCounts();
+      })();
+
+      // Drain queue: accumulate clicks, send them 1-at-a-time on a steady timer
+      // ~3 hits/sec = well under the 30/10s rate limit
+      let pendingHits = 0;
+      let drainInterval = null;
+
+      async function drainOne() {
+        if (pendingHits <= 0) {
+          // Nothing left to send — stop the timer
+          clearInterval(drainInterval);
+          drainInterval = null;
+          return;
+        }
+        pendingHits--;
+        const v = await apiHit();
+        if (v !== null) {
+          // Sync to the real global value from the API
+          totalCount = Math.max(totalCount, v);
+          localStorage.setItem('uselessbox:total', String(totalCount));
+          renderCounts();
+        }
+        // Save personal count on each drain tick
+        localStorage.setItem('uselessbox:myclicks', String(clickCount));
       }
 
-      async function flushClicks() {
-        if (pendingClicks === 0) return;
-        const batch = pendingClicks;
-        pendingClicks = 0;
-        try {
-          const current = await getSharedTotal();
-          const newTotal = current + batch;
-          await setSharedTotal(newTotal);
-          totalCount = newTotal;
-          renderCounts();
-        } catch(e) {
-          // Write failed — put clicks back to retry
-          pendingClicks += batch;
-          scheduleFlush();
-        }
-        await setMyClicks(clickCount);
+      function startDrain() {
+        if (drainInterval) return; // already running
+        drainInterval = setInterval(drainOne, 350);
       }
 
       function updateStats() {
         clickCount++;
-        totalCount++;
-        pendingClicks++;
+        totalCount++; // optimistic UI update
+        pendingHits++;
         renderCounts();
-        scheduleFlush();
+        startDrain();
       }
 
-      // Poll shared total every 3s for real-time updates from other users
+      // Poll global total every 20s to show other users' clicks
       setInterval(async () => {
-        try {
-          await refreshSharedTotal();
+        if (apiAvailable === false) return;
+        const remote = await apiGet();
+        if (remote !== null && remote > totalCount) {
+          totalCount = remote;
+          localStorage.setItem('uselessbox:total', String(totalCount));
           renderCounts();
-        } catch(e) {}
-      }, 3000);
-
-      loadCounts();
+        }
+      }, 12000);
 
       function rand(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
       function r(min, max){ return min + Math.random() * (max - min); }
@@ -687,17 +680,23 @@
         currentTheme = name;
         const root = document.documentElement;
         root.style.setProperty('--accent-h', theme.h);
-        root.style.setProperty('--bg', theme.bg);
-        root.style.setProperty('--ink', theme.ink);
-        root.style.setProperty('--muted', theme.muted);
-        root.style.setProperty('--line', theme.line);
 
-        document.querySelectorAll('.card, .aboutCard, .heroLeft').forEach(el => {
-          el.style.background = theme.cardBg;
-        });
-        const nav = document.querySelector('.top');
-        if (nav) nav.style.background = theme.navBg;
-        document.querySelector('.heroRight').style.background = theme.cardBg;
+        // Only override colors if no page-level color themes are active
+        const hasColorTheme = [...activeThemes].some(t => COLOR_THEMES[t]);
+        if (!hasColorTheme) {
+          root.style.setProperty('--bg', theme.bg);
+          root.style.setProperty('--ink', theme.ink);
+          root.style.setProperty('--muted', theme.muted);
+          root.style.setProperty('--line', theme.line);
+          document.querySelectorAll('.card, .aboutCard, .heroLeft').forEach(el => {
+            el.style.background = theme.cardBg;
+          });
+          const nav = document.querySelector('.top');
+          if (nav) nav.style.background = theme.navBg;
+          document.querySelector('.heroRight').style.background = theme.cardBg;
+        }
+        // Always flash to show something happened
+        siteFlash(`hsla(${theme.h},80%,50%,.2)`, 250);
       }
 
       // ===== PERSISTENT OVERLAY EFFECTS (layer on top of any theme) =====
@@ -1231,8 +1230,143 @@
 
       // helper for page-level toggle classes
       const PAGE_CLASSES = ['page-tilt','page-blur','page-pixel','page-mirror','page-float','page-bw','page-vapor','page-matrix','page-comic','page-tiny','page-huge','page-upsidedown','page-typewriter','page-party','page-slowmo','page-fastfwd','page-static','page-moo','page-pirate','page-cursed','page-uwu','page-loading','page-hack','page-ghosted','page-thicc','page-smear','page-oldtv','page-windows','page-acid','page-orbit','page-wave','page-neon','page-sunset','page-aurora','page-underwater','page-retro','page-newspaper','page-bubblegum','page-moss','page-midnight','page-cozy','page-broken','page-dizzy','page-stretch','page-squish','page-wobble','page-breathe','page-gradient','page-spotlight','page-velvet','page-fog','page-dream','page-rainbow','page-galaxy','page-campfire','page-glass','page-chalk','page-blueprint','page-casino','page-jungle','page-candy','page-xray','page-thermal','page-emboss','page-paper','page-hologram','page-warp','page-marquee','page-rubbery','page-negative','page-elastic','page-drunk','page-ascii','page-heartbeat','page-cinema','page-oilspill','page-dialup','page-fisheye','page-marqueetext','page-sidebar'];
+      // ===== ENHANCED THEME SYSTEM =====
+      // Tracks all active page-level themes and blends colors
+      const activeThemes = new Set();
+
+      // Color theme definitions — these set CSS variables + inline styles
+      // Themes that primarily change colors (bg, text, card colors)
+      const COLOR_THEMES = {
+        'page-neon':       { bg:'#0a0a14', ink:'#e0e0ff', card:'rgba(10,10,30,.7)', nav:'rgba(10,10,25,.9)', muted:'rgba(200,190,255,.5)', accent:280, filter:'' },
+        'page-sunset':     { bg:'#4a1942', ink:'#fff5e0', card:'rgba(0,0,0,.25)', nav:'rgba(26,10,46,.85)', muted:'rgba(255,240,200,.5)', accent:20, filter:'' },
+        'page-aurora':     { bg:'#0d2137', ink:'#c8e6ff', card:'rgba(10,22,40,.5)', nav:'rgba(10,18,32,.9)', muted:'rgba(160,210,240,.5)', accent:160, filter:'' },
+        'page-underwater': { bg:'#0c5a7a', ink:'#d0f0ff', card:'rgba(0,40,70,.35)', nav:'rgba(8,50,75,.9)', muted:'rgba(150,220,255,.5)', accent:190, filter:'' },
+        'page-midnight':   { bg:'#0a0e1a', ink:'#b0b8d0', card:'rgba(18,22,42,.6)', nav:'rgba(10,14,26,.92)', muted:'rgba(140,150,180,.5)', accent:240, filter:'' },
+        'page-campfire':   { bg:'#2a1508', ink:'#f0d0a0', card:'rgba(40,20,5,.5)', nav:'rgba(26,14,5,.92)', muted:'rgba(220,170,110,.5)', accent:25, filter:'' },
+        'page-galaxy':     { bg:'#0d0d2b', ink:'#c8c0e8', card:'rgba(13,13,43,.5)', nav:'rgba(3,3,18,.92)', muted:'rgba(160,150,200,.5)', accent:260, filter:'' },
+        'page-velvet':     { bg:'#2a1028', ink:'#e0c8d8', card:'rgba(60,20,50,.4)', nav:'rgba(26,10,30,.92)', muted:'rgba(200,170,190,.5)', accent:310, filter:'' },
+        'page-casino':     { bg:'#1a2a1a', ink:'#f0e8c8', card:'rgba(20,40,20,.6)', nav:'rgba(20,8,8,.95)', muted:'rgba(200,190,150,.45)', accent:45, filter:'' },
+        'page-jungle':     { bg:'#143020', ink:'#c0e8c0', card:'rgba(20,50,30,.5)', nav:'rgba(10,32,16,.92)', muted:'rgba(140,200,140,.5)', accent:130, filter:'' },
+        'page-hack':       { bg:'#000800', ink:'#00ff41', card:'rgba(0,20,0,.7)', nav:'rgba(0,10,0,.9)', muted:'rgba(0,255,65,.5)', accent:130, filter:'' },
+        'page-oilspill':   { bg:'#1a1a2e', ink:'#d0d0e0', card:'rgba(20,20,40,.5)', nav:'rgba(15,15,30,.9)', muted:'rgba(180,180,210,.45)', accent:230, filter:'' },
+        'page-dream':      { bg:'#e0d0ff', ink:'#4a3060', card:'rgba(255,255,255,.45)', nav:'rgba(240,230,255,.85)', muted:'rgba(74,48,96,.4)', accent:270, filter:'' },
+        'page-moss':       { bg:'#d4e4c8', ink:'#2d3a20', card:'rgba(220,235,200,.7)', nav:'rgba(230,240,218,.9)', muted:'rgba(45,58,32,.5)', accent:110, filter:'' },
+        'page-cozy':       { bg:'#fdf6ec', ink:'#4a3520', card:'rgba(255,248,235,.85)', nav:'rgba(253,246,236,.92)', muted:'rgba(74,53,32,.45)', accent:35, filter:'' },
+        'page-candy':      { bg:'#ffe0f0', ink:'#5a2040', card:'rgba(255,255,255,.7)', nav:'rgba(255,255,255,.85)', muted:'rgba(90,32,64,.5)', accent:330, filter:'' },
+        'page-bubblegum':  { bg:'#ffd0e8', ink:'#6a1040', card:'rgba(255,255,255,.6)', nav:'rgba(255,224,240,.9)', muted:'rgba(106,16,64,.5)', accent:340, filter:'' },
+        'page-blueprint':  { bg:'#1a3a6a', ink:'#c0d8ff', card:'rgba(26,58,106,.6)', nav:'rgba(15,30,60,.95)', muted:'rgba(150,180,220,.5)', accent:215, filter:'' },
+        'page-chalk':      { bg:'#2a3a2a', ink:'#e8e8d8', card:'rgba(42,58,42,.6)', nav:'rgba(34,48,34,.95)', muted:'rgba(220,220,200,.45)', accent:100, filter:'' },
+        'page-spotlight':  { bg:'#0a0a0a', ink:'#d0d0d0', card:'rgba(20,20,20,.6)', nav:'rgba(10,10,10,.95)', muted:'rgba(180,180,180,.4)', accent:0, filter:'' },
+        'page-retro':      { bg:'#f4e8c1', ink:'#3d2b1f', card:'rgba(244,230,190,.8)', nav:'rgba(244,230,190,.9)', muted:'rgba(61,43,31,.5)', accent:35, filter:'' },
+        'page-newspaper':  { bg:'#f2efe6', ink:'#1a1a1a', card:'transparent', nav:'rgba(242,239,230,.95)', muted:'rgba(0,0,0,.45)', accent:0, filter:'' },
+      };
+
+      // Filter-based themes (apply via CSS filter — these blend by default!)
+      const FILTER_THEMES = ['page-bw','page-bruh','page-sheesh','page-lava','page-ocean','page-rain','page-negative','page-acid'];
+
+      // Parse a hex/rgb color to [r,g,b]
+      function parseColor(c) {
+        if (c.startsWith('#')) {
+          const hex = c.slice(1);
+          if (hex.length === 3) return [parseInt(hex[0]+hex[0],16),parseInt(hex[1]+hex[1],16),parseInt(hex[2]+hex[2],16)];
+          return [parseInt(hex.slice(0,2),16),parseInt(hex.slice(2,4),16),parseInt(hex.slice(4,6),16)];
+        }
+        const m = c.match(/(\d+)/g);
+        return m ? [+m[0],+m[1],+m[2]] : [0,0,0];
+      }
+
+      // Mix two colors
+      function mixColors(c1, c2, ratio) {
+        const a = parseColor(c1), b = parseColor(c2);
+        return `rgb(${Math.round(a[0]*(1-ratio)+b[0]*ratio)},${Math.round(a[1]*(1-ratio)+b[1]*ratio)},${Math.round(a[2]*(1-ratio)+b[2]*ratio)})`;
+      }
+
+      // Apply blended color theme inline (always wins over CSS classes)
+      function applyBlendedTheme() {
+        // Find all active color themes
+        const activeColorThemes = [...activeThemes].filter(t => COLOR_THEMES[t]).map(t => COLOR_THEMES[t]);
+
+        if (activeColorThemes.length === 0) {
+          // No color themes active — clear inline overrides, let default CSS work
+          siteBody.style.background = '';
+          siteBody.style.color = '';
+          document.querySelectorAll('.card,.aboutCard,.heroLeft').forEach(el => el.style.background = '');
+          const nav = document.querySelector('.top');
+          if (nav) { nav.style.background = ''; nav.style.color = ''; }
+          document.querySelector('.heroRight').style.background = '';
+          return;
+        }
+
+        // Blend all active color themes together
+        let bg = activeColorThemes[0].bg;
+        let ink = activeColorThemes[0].ink;
+        let card = activeColorThemes[0].card;
+        let navBg = activeColorThemes[0].nav;
+        let accent = activeColorThemes[0].accent;
+
+        for (let i = 1; i < activeColorThemes.length; i++) {
+          const t = activeColorThemes[i];
+          const ratio = 0.5; // equal blend
+          bg = mixColors(bg, t.bg, ratio);
+          ink = mixColors(ink, t.ink, ratio);
+          accent = Math.round((accent + t.accent) / 2);
+        }
+
+        // Apply blended colors as inline styles (beats !important CSS)
+        siteBody.style.setProperty('background', bg, 'important');
+        siteBody.style.setProperty('color', ink, 'important');
+        document.documentElement.style.setProperty('--accent-h', accent);
+        document.documentElement.style.setProperty('--bg', bg);
+        document.documentElement.style.setProperty('--ink', ink);
+
+        // Blend card backgrounds
+        const cardBgs = activeColorThemes.map(t => t.card);
+        let blendedCard = cardBgs[0];
+        for (let i = 1; i < cardBgs.length; i++) {
+          // For rgba values, just use the latest one (blending rgba strings is complex)
+          blendedCard = cardBgs[i];
+        }
+
+        document.querySelectorAll('.card,.aboutCard,.heroLeft').forEach(el => {
+          el.style.setProperty('background', blendedCard, 'important');
+        });
+        document.querySelector('.heroRight').style.setProperty('background', blendedCard, 'important');
+
+        const navBgs = activeColorThemes.map(t => t.nav);
+        const nav = document.querySelector('.top');
+        if (nav) nav.style.setProperty('background', navBgs[navBgs.length-1], 'important');
+
+        // Set muted color
+        const muteds = activeColorThemes.map(t => t.muted);
+        document.documentElement.style.setProperty('--muted', muteds[muteds.length-1]);
+      }
+
+      // Visual impact kick — fires every time any theme is toggled
+      function themeKick(e, isAdding) {
+        // Big flash
+        siteFlash(isAdding ? 'rgba(255,255,255,.25)' : 'rgba(0,0,0,.15)', 200);
+
+        // Page-level pulse animation
+        siteBody.classList.remove('theme-kick');
+        void siteBody.offsetWidth;
+        siteBody.classList.add('theme-kick');
+        setTimeout(() => siteBody.classList.remove('theme-kick'), 500);
+      }
+
       function togglePageClass(cls) {
+        const isAdding = !siteBody.classList.contains(cls);
         siteBody.classList.toggle(cls);
+
+        if (isAdding) {
+          activeThemes.add(cls);
+        } else {
+          activeThemes.delete(cls);
+        }
+
+        // If it's a color theme, recompute blended inline styles
+        if (COLOR_THEMES[cls]) {
+          applyBlendedTheme();
+        }
       }
 
       // page-level quake
