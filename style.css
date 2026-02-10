@@ -143,6 +143,24 @@ h1{
     );
 }
 
+/* random gallery image */
+.randomShot{
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255,255,255,.65);
+  box-shadow: 0 12px 28px rgba(0,0,0,.08);
+}
+
+.randomShot img{
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
 /* ===== SECTIONS ===== */
 .section{ padding: 18px 0 0; }
 .sectionHead{
