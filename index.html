@@ -333,11 +333,7 @@
 
       function renderCounts() {
         myClicksEl.textContent = `you: ${clickCount.toLocaleString()}`;
-        if (pending > 0) {
-          totalClicksEl.textContent = `everyone: ${totalCount.toLocaleString()} (syncing ${pending}...)`;
-        } else {
-          totalClicksEl.textContent = `everyone: ${totalCount.toLocaleString()}`;
-        }
+        totalClicksEl.textContent = `everyone: ${totalCount.toLocaleString()}`;
       }
 
       function saveLocal() {
