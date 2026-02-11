@@ -6,6 +6,7 @@
   <title>wildrabbet</title>
   <meta name="description" content="wildrabbet — weird little web things made for fun" />
   <link rel="stylesheet" href="./style.css" />
+  <link rel="icon" href="data:," />
 </head>
 <body>
   <header class="top">
@@ -312,10 +313,9 @@
       const gravBall = document.getElementById('gravBall');
 
       // ===== GLOBAL COUNTER via Abacus API =====
-      // abacus.jasoncameron.dev — the API IS the single source of truth.
-      // /hit/ns/key → increments +1, returns { value: N }
-      // /get/ns/key → returns current { value: N }
-      // "you" count lives in localStorage. "everyone" count lives on the API.
+      // /hit/ns/key → +1, returns { value }
+      // /get/ns/key → returns { value }
+      // Rate limit: 30 requests per 10 seconds per IP
 
       const ABACUS = 'https://abacus.jasoncameron.dev';
       const NS = 'rabbit.lol';
@@ -326,74 +326,54 @@
         totalClicksEl.textContent = `everyone: ${totalCount.toLocaleString()}`;
       }
 
-      // Load personal count from localStorage
+      // Load personal count
       clickCount = parseInt(localStorage.getItem('ub:my') || '0', 10) || 0;
+      renderCounts();
 
-      // On page load: fetch global total from API
-      (async function() {
-        renderCounts();
-        try {
-          const res = await fetch(`${ABACUS}/get/${NS}/${KEY}`);
-          if (res.ok) {
-            const data = await res.json();
-            totalCount = parseInt(data.value, 10) || 0;
-          }
-        } catch(e) {
-          console.warn('[useless box] could not load global count:', e.message);
-        }
-        renderCounts();
-      })();
+      // Fetch global total on load (single request)
+      fetch(`${ABACUS}/get/${NS}/${KEY}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d && d.value) { totalCount = parseInt(d.value,10)||0; renderCounts(); } })
+        .catch(() => {});
 
-      // Drain queue — clicks accumulate, get sent one at a time every 350ms
+      // Click queue — drain 1 per second (safe: max 6 hits per 10s from drain alone)
       let pending = 0;
       let draining = null;
 
       async function drain() {
-        if (pending <= 0) {
-          clearInterval(draining);
-          draining = null;
-          return;
-        }
+        if (pending <= 0) { clearInterval(draining); draining = null; return; }
         pending--;
         try {
           const res = await fetch(`${ABACUS}/hit/${NS}/${KEY}`);
           if (res.ok) {
-            const data = await res.json();
-            const remote = parseInt(data.value, 10);
-            if (!isNaN(remote)) {
-              // API value is always the truth — update to it
-              totalCount = remote;
-            }
+            const d = await res.json();
+            const v = parseInt(d.value, 10);
+            if (!isNaN(v)) totalCount = v;
           }
-        } catch(e) {
-          // Failed — the optimistic +1 stays in the UI, will correct on next poll
-        }
+        } catch(e) {}
         localStorage.setItem('ub:my', String(clickCount));
         renderCounts();
       }
 
       function updateStats() {
         clickCount++;
-        totalCount++;   // optimistic — will be corrected by API response
+        totalCount++;
         pending++;
         renderCounts();
-        if (!draining) draining = setInterval(drain, 350);
+        if (!draining) draining = setInterval(drain, 1000);
       }
 
-      // Poll every 15s to pick up other users' clicks
+      // Poll every 30s for other users' clicks
       setInterval(async () => {
         try {
           const res = await fetch(`${ABACUS}/get/${NS}/${KEY}`);
           if (res.ok) {
-            const data = await res.json();
-            const remote = parseInt(data.value, 10);
-            if (!isNaN(remote) && remote > totalCount) {
-              totalCount = remote;
-              renderCounts();
-            }
+            const d = await res.json();
+            const v = parseInt(d.value, 10);
+            if (!isNaN(v) && v > totalCount) { totalCount = v; renderCounts(); }
           }
         } catch(e) {}
-      }, 15000);
+      }, 30000);
 
       function rand(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
       function r(min, max){ return min + Math.random() * (max - min); }
