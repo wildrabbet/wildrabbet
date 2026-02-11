@@ -311,127 +311,89 @@
       const totalClicksEl = document.getElementById('totalClicks');
       const gravBall = document.getElementById('gravBall');
 
-      // ===== GLOBAL COUNTER via Abacus (free, no auth, CORS, works from any site) =====
-      // API: abacus.jasoncameron.dev  — GET /hit/NAMESPACE/KEY  increments +1 and returns { value }
-      //                                  GET /get/NAMESPACE/KEY  reads current value
-      // Fallback: localStorage only (per-browser)
+      // ===== GLOBAL COUNTER via Abacus API =====
+      // abacus.jasoncameron.dev — the API IS the single source of truth.
+      // /hit/ns/key → increments +1, returns { value: N }
+      // /get/ns/key → returns current { value: N }
+      // "you" count lives in localStorage. "everyone" count lives on the API.
 
-      const COUNTER_NS = 'rabbit.lol';
-      const COUNTER_KEY = 'uselessbox-total';
       const ABACUS = 'https://abacus.jasoncameron.dev';
-      let apiAvailable = null; // null = untested, true/false after first attempt
-
-      // Hit the counter API (increment +1, returns new value)
-      async function apiHit() {
-        try {
-          const res = await fetch(`${ABACUS}/hit/${COUNTER_NS}/${COUNTER_KEY}`);
-          if (!res.ok) throw new Error('not ok: ' + res.status);
-          const data = await res.json();
-          const val = parseInt(data.value, 10);
-          if (isNaN(val)) throw new Error('bad value');
-          apiAvailable = true;
-          return val;
-        } catch(e) {
-          apiAvailable = false;
-          console.warn('[useless box] counter API hit failed:', e.message);
-          return null;
-        }
-      }
-
-      // Read current counter value without incrementing
-      async function apiGet() {
-        try {
-          const res = await fetch(`${ABACUS}/get/${COUNTER_NS}/${COUNTER_KEY}`);
-          if (!res.ok) {
-            if (res.status === 404) { apiAvailable = true; return 0; }
-            throw new Error('not ok: ' + res.status);
-          }
-          const data = await res.json();
-          const val = parseInt(data.value, 10);
-          apiAvailable = true;
-          return isNaN(val) ? 0 : val;
-        } catch(e) {
-          apiAvailable = false;
-          console.warn('[useless box] counter API get failed:', e.message);
-          return null;
-        }
-      }
+      const NS = 'rabbit.lol';
+      const KEY = 'uselessbox-clicks';
 
       function renderCounts() {
         myClicksEl.textContent = `you: ${clickCount.toLocaleString()}`;
         totalClicksEl.textContent = `everyone: ${totalCount.toLocaleString()}`;
       }
 
-      // Load personal clicks from localStorage (always per-browser)
-      clickCount = parseInt(localStorage.getItem('uselessbox:myclicks') || '0', 10) || 0;
+      // Load personal count from localStorage
+      clickCount = parseInt(localStorage.getItem('ub:my') || '0', 10) || 0;
 
-      // On page load: fetch the global total
-      (async function loadCounts() {
-        // Show cached value immediately so it's never 0 for returning users
-        totalCount = parseInt(localStorage.getItem('uselessbox:total') || '0', 10) || 0;
+      // On page load: fetch global total from API
+      (async function() {
         renderCounts();
-
-        // Try to fetch the real global count
-        const remote = await apiGet();
-        if (remote !== null) {
-          // If remote is 0 and we have a cached value, the key might not exist yet
-          // Use whichever is higher
-          totalCount = Math.max(remote, totalCount);
-          localStorage.setItem('uselessbox:total', String(totalCount));
-          console.log('[useless box] global counter loaded:', totalCount);
-        } else {
-          console.log('[useless box] counter API unavailable, using cached value:', totalCount);
+        try {
+          const res = await fetch(`${ABACUS}/get/${NS}/${KEY}`);
+          if (res.ok) {
+            const data = await res.json();
+            totalCount = parseInt(data.value, 10) || 0;
+          }
+        } catch(e) {
+          console.warn('[useless box] could not load global count:', e.message);
         }
         renderCounts();
       })();
 
-      // Drain queue: accumulate clicks, send them 1-at-a-time on a steady timer
-      // ~3 hits/sec = well under the 30/10s rate limit
-      let pendingHits = 0;
-      let drainInterval = null;
+      // Drain queue — clicks accumulate, get sent one at a time every 350ms
+      let pending = 0;
+      let draining = null;
 
-      async function drainOne() {
-        if (pendingHits <= 0) {
-          // Nothing left to send — stop the timer
-          clearInterval(drainInterval);
-          drainInterval = null;
+      async function drain() {
+        if (pending <= 0) {
+          clearInterval(draining);
+          draining = null;
           return;
         }
-        pendingHits--;
-        const v = await apiHit();
-        if (v !== null) {
-          // Sync to the real global value from the API
-          totalCount = Math.max(totalCount, v);
-          localStorage.setItem('uselessbox:total', String(totalCount));
-          renderCounts();
+        pending--;
+        try {
+          const res = await fetch(`${ABACUS}/hit/${NS}/${KEY}`);
+          if (res.ok) {
+            const data = await res.json();
+            const remote = parseInt(data.value, 10);
+            if (!isNaN(remote)) {
+              // API value is always the truth — update to it
+              totalCount = remote;
+            }
+          }
+        } catch(e) {
+          // Failed — the optimistic +1 stays in the UI, will correct on next poll
         }
-        // Save personal count on each drain tick
-        localStorage.setItem('uselessbox:myclicks', String(clickCount));
-      }
-
-      function startDrain() {
-        if (drainInterval) return; // already running
-        drainInterval = setInterval(drainOne, 350);
+        localStorage.setItem('ub:my', String(clickCount));
+        renderCounts();
       }
 
       function updateStats() {
         clickCount++;
-        totalCount++; // optimistic UI update
-        pendingHits++;
+        totalCount++;   // optimistic — will be corrected by API response
+        pending++;
         renderCounts();
-        startDrain();
+        if (!draining) draining = setInterval(drain, 350);
       }
 
-      // Poll global total every 20s to show other users' clicks
+      // Poll every 15s to pick up other users' clicks
       setInterval(async () => {
-        if (apiAvailable === false) return;
-        const remote = await apiGet();
-        if (remote !== null && remote > totalCount) {
-          totalCount = remote;
-          localStorage.setItem('uselessbox:total', String(totalCount));
-          renderCounts();
-        }
-      }, 12000);
+        try {
+          const res = await fetch(`${ABACUS}/get/${NS}/${KEY}`);
+          if (res.ok) {
+            const data = await res.json();
+            const remote = parseInt(data.value, 10);
+            if (!isNaN(remote) && remote > totalCount) {
+              totalCount = remote;
+              renderCounts();
+            }
+          }
+        } catch(e) {}
+      }, 15000);
 
       function rand(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
       function r(min, max){ return min + Math.random() * (max - min); }
