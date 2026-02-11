@@ -2844,3 +2844,14 @@ body.page-based .card{
   0%{ transform:rotate(var(--r,0deg)) translate(0,0); }
   100%{ transform:rotate(var(--r,0deg)) translate(5px,-5px); }
 }
+
+/* ===== THEME KICK — visual impact on every theme toggle ===== */
+.theme-kick{
+  animation: themeKickPulse .5s ease-out !important;
+}
+@keyframes themeKickPulse{
+  0%{ transform: scale(1); }
+  15%{ transform: scale(1.006); filter: brightness(1.15); }
+  40%{ transform: scale(0.998); filter: brightness(0.95); }
+  100%{ transform: scale(1); filter: brightness(1); }
+}
