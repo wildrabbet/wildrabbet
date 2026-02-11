@@ -315,7 +315,9 @@
       // ===== GLOBAL COUNTER via Abacus API =====
       // /hit/ns/key → +1, returns { value }
       // /get/ns/key → returns { value }
-      // Rate limit: 30 requests per 10 seconds per IP
+      // Rate limit: 30 req / 10 sec per IP
+      // Strategy: persist pending clicks to localStorage so none are lost on refresh.
+      // Drain at 500ms intervals (= max 2/sec = 20/10s, safe margin under 30).
 
       const ABACUS = 'https://abacus.jasoncameron.dev';
       const NS = 'rabbit.lol';
@@ -326,51 +328,96 @@
         totalClicksEl.textContent = `everyone: ${totalCount.toLocaleString()}`;
       }
 
-      // Load personal count
+      // ── Load from localStorage immediately (never shows 0) ──
       clickCount = parseInt(localStorage.getItem('ub:my') || '0', 10) || 0;
+      totalCount = parseInt(localStorage.getItem('ub:total') || '0', 10) || 0;
+      let pending = parseInt(localStorage.getItem('ub:pending') || '0', 10) || 0;
       renderCounts();
 
-      // Fetch global total on load (single request)
+      function saveLocal() {
+        localStorage.setItem('ub:my', String(clickCount));
+        localStorage.setItem('ub:total', String(totalCount));
+        localStorage.setItem('ub:pending', String(pending));
+      }
+
+      // ── Fetch real global total on load ──
       fetch(`${ABACUS}/get/${NS}/${KEY}`)
         .then(r => r.ok ? r.json() : null)
-        .then(d => { if (d && d.value) { totalCount = parseInt(d.value,10)||0; renderCounts(); } })
+        .then(d => {
+          if (d && d.value != null) {
+            const remote = parseInt(d.value, 10) || 0;
+            // Remote + our unsent pending clicks = best estimate
+            totalCount = remote + pending;
+            saveLocal();
+            renderCounts();
+          }
+        })
         .catch(() => {});
 
-      // Click queue — drain 1 per second (safe: max 6 hits per 10s from drain alone)
-      let pending = 0;
+      // ── Drain: send pending clicks one at a time, 500ms apart ──
       let draining = null;
 
       async function drain() {
-        if (pending <= 0) { clearInterval(draining); draining = null; return; }
-        pending--;
+        if (pending <= 0) {
+          clearInterval(draining);
+          draining = null;
+          saveLocal();
+          return;
+        }
+
         try {
           const res = await fetch(`${ABACUS}/hit/${NS}/${KEY}`);
           if (res.ok) {
             const d = await res.json();
             const v = parseInt(d.value, 10);
-            if (!isNaN(v)) totalCount = v;
+            pending--;  // only decrement after successful send
+            if (!isNaN(v)) {
+              // The API value already includes this hit.
+              // True total = API value + remaining pending clicks
+              totalCount = v + pending;
+            }
+            saveLocal();
+            renderCounts();
           }
-        } catch(e) {}
-        localStorage.setItem('ub:my', String(clickCount));
-        renderCounts();
+          // If not ok (429 etc), don't decrement pending — will retry next tick
+        } catch(e) {
+          // Network error — don't decrement, will retry
+        }
+      }
+
+      function startDrain() {
+        if (!draining && pending > 0) {
+          draining = setInterval(drain, 500);
+        }
       }
 
       function updateStats() {
         clickCount++;
         totalCount++;
         pending++;
+        saveLocal();
         renderCounts();
-        if (!draining) draining = setInterval(drain, 1000);
+        startDrain();
       }
 
-      // Poll every 30s for other users' clicks
+      // Resume draining any leftover pending from previous page load
+      startDrain();
+
+      // ── Poll every 30s for other users' clicks ──
       setInterval(async () => {
         try {
           const res = await fetch(`${ABACUS}/get/${NS}/${KEY}`);
           if (res.ok) {
             const d = await res.json();
             const v = parseInt(d.value, 10);
-            if (!isNaN(v) && v > totalCount) { totalCount = v; renderCounts(); }
+            if (!isNaN(v)) {
+              const estimate = v + pending;
+              if (estimate > totalCount) {
+                totalCount = estimate;
+                saveLocal();
+                renderCounts();
+              }
+            }
           }
         } catch(e) {}
       }, 30000);
