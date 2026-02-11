@@ -299,7 +299,12 @@
         "tiny chaos", "unlicensed fun", "no thoughts", "just vibes",
         "certified moment", "oop—", "404 brain", "vibe check",
         "smooth brain", "big mood", "rent free",
-        "why", "lol ok", "based"
+        "why", "lol ok", "based",
+        // text styling effects (persistent)
+        "serif", "mono", "cursive", "smol text", "thicc text",
+        "italic", "bold", "strikethrough", "uppercase", "lowercase",
+        "rainbow text", "cyber text", "blood text", "gold text", "pastel text",
+        "every other", "wavy text", "spaced out", "shadow text", "outline text"
       ];
 
       const FILLER = [
@@ -313,19 +318,32 @@
       const gravBall = document.getElementById('gravBall');
 
       // ===== GLOBAL COUNTER via Abacus API =====
-      // /hit/ns/key → +1, returns { value }
-      // /get/ns/key → returns { value }
       // Rate limit: 30 req / 10 sec per IP
-      // Strategy: persist pending clicks to localStorage so none are lost on refresh.
-      // Drain at 500ms intervals (= max 2/sec = 20/10s, safe margin under 30).
+      // Strategy: PARALLEL BURST
+      //   1. Clicks accumulate instantly (localStorage)
+      //   2. After 1s of no clicking → fire ALL pending as parallel /hit calls
+      //      (up to 25 at once, leaving 5 headroom in the 30/10s limit)
+      //   3. All 25 parallel requests finish in ~one RTT (~200ms)
+      //   4. If any 429, wait and retry remainder
 
       const ABACUS = 'https://abacus.jasoncameron.dev';
       const NS = 'rabbit.lol';
-      const KEY = 'uselessbox-clicks';
+      const KEY = 'uselessbox-v2';
+      const BURST_MAX = 25; // max parallel hits per burst (30 limit - 5 headroom)
 
       function renderCounts() {
         myClicksEl.textContent = `you: ${clickCount.toLocaleString()}`;
-        totalClicksEl.textContent = `everyone: ${totalCount.toLocaleString()}`;
+        if (pending > 0) {
+          totalClicksEl.textContent = `everyone: ${totalCount.toLocaleString()} (syncing ${pending}...)`;
+        } else {
+          totalClicksEl.textContent = `everyone: ${totalCount.toLocaleString()}`;
+        }
+      }
+
+      function saveLocal() {
+        localStorage.setItem('ub:my', String(clickCount));
+        localStorage.setItem('ub:total', String(totalCount));
+        localStorage.setItem('ub:pending', String(pending));
       }
 
       // ── Load from localStorage immediately (never shows 0) ──
@@ -334,61 +352,80 @@
       let pending = parseInt(localStorage.getItem('ub:pending') || '0', 10) || 0;
       renderCounts();
 
-      function saveLocal() {
-        localStorage.setItem('ub:my', String(clickCount));
-        localStorage.setItem('ub:total', String(totalCount));
-        localStorage.setItem('ub:pending', String(pending));
-      }
-
       // ── Fetch real global total on load ──
       fetch(`${ABACUS}/get/${NS}/${KEY}`)
         .then(r => r.ok ? r.json() : null)
         .then(d => {
           if (d && d.value != null) {
             const remote = parseInt(d.value, 10) || 0;
-            // Remote + our unsent pending clicks = best estimate
-            totalCount = remote + pending;
+            totalCount = Math.max(totalCount, remote + pending);
             saveLocal();
             renderCounts();
           }
         })
         .catch(() => {});
 
-      // ── Drain: send pending clicks one at a time, 500ms apart ──
-      let draining = null;
+      // ── Burst flush system ──
+      let flushTimer = null;
+      let flushing = false;
 
-      async function drain() {
-        if (pending <= 0) {
-          clearInterval(draining);
-          draining = null;
-          saveLocal();
-          return;
-        }
+      async function flushPending() {
+        if (flushing || pending <= 0) return;
+        flushing = true;
 
-        try {
-          const res = await fetch(`${ABACUS}/hit/${NS}/${KEY}`);
-          if (res.ok) {
-            const d = await res.json();
-            const v = parseInt(d.value, 10);
-            pending--;  // only decrement after successful send
-            if (!isNaN(v)) {
-              // The API value already includes this hit.
-              // True total = API value + remaining pending clicks
-              totalCount = v + pending;
-            }
-            saveLocal();
-            renderCounts();
+        while (pending > 0) {
+          const batch = Math.min(pending, BURST_MAX);
+          // Fire all hits in parallel
+          const promises = [];
+          for (let i = 0; i < batch; i++) {
+            promises.push(
+              fetch(`${ABACUS}/hit/${NS}/${KEY}`)
+                .then(r => {
+                  if (r.ok) return r.json().then(d => ({ ok: true, value: parseInt(d.value, 10) }));
+                  if (r.status === 429) {
+                    const ra = r.headers.get('Retry-After');
+                    return { ok: false, retryAfter: parseInt(ra || '3000', 10) };
+                  }
+                  return { ok: false };
+                })
+                .catch(() => ({ ok: false }))
+            );
           }
-          // If not ok (429 etc), don't decrement pending — will retry next tick
-        } catch(e) {
-          // Network error — don't decrement, will retry
-        }
-      }
 
-      function startDrain() {
-        if (!draining && pending > 0) {
-          draining = setInterval(drain, 500);
+          const results = await Promise.all(promises);
+          let succeeded = 0;
+          let maxValue = 0;
+          let needWait = 0;
+
+          for (const res of results) {
+            if (res.ok) {
+              succeeded++;
+              if (res.value > maxValue) maxValue = res.value;
+            } else if (res.retryAfter) {
+              needWait = Math.max(needWait, res.retryAfter);
+            }
+          }
+
+          pending -= succeeded;
+          if (maxValue > 0) totalCount = maxValue + pending;
+          saveLocal();
+          renderCounts();
+
+          console.log(`[useless box] burst: ${succeeded}/${batch} succeeded, ${pending} remaining`);
+
+          // If we got rate limited, wait before next batch
+          if (pending > 0 && needWait > 0) {
+            const waitMs = Math.max(needWait, 2000);
+            console.log(`[useless box] rate limited, waiting ${waitMs}ms`);
+            await new Promise(r => setTimeout(r, waitMs));
+          } else if (pending > 0 && succeeded === 0) {
+            // All failed but no retry-after — back off 5s
+            await new Promise(r => setTimeout(r, 5000));
+          }
+          // If whole batch succeeded and more pending, loop immediately
         }
+
+        flushing = false;
       }
 
       function updateStats() {
@@ -397,26 +434,26 @@
         pending++;
         saveLocal();
         renderCounts();
-        startDrain();
+
+        // Debounce: wait 1s after last click, then burst-flush everything
+        clearTimeout(flushTimer);
+        flushTimer = setTimeout(flushPending, 1000);
       }
 
-      // Resume draining any leftover pending from previous page load
-      startDrain();
+      // Resume flushing leftover pending from previous page load
+      if (pending > 0) setTimeout(flushPending, 500);
 
       // ── Poll every 30s for other users' clicks ──
       setInterval(async () => {
+        if (flushing) return;
         try {
           const res = await fetch(`${ABACUS}/get/${NS}/${KEY}`);
           if (res.ok) {
             const d = await res.json();
             const v = parseInt(d.value, 10);
             if (!isNaN(v)) {
-              const estimate = v + pending;
-              if (estimate > totalCount) {
-                totalCount = estimate;
-                saveLocal();
-                renderCounts();
-              }
+              const est = v + pending;
+              if (est > totalCount) { totalCount = est; saveLocal(); renderCounts(); }
             }
           }
         } catch(e) {}
@@ -1215,10 +1252,110 @@
         "why": (e) => { const whyLayer=document.createElement('div');whyLayer.className='why-layer';for(let i=0;i<60;i++){const w=document.createElement('div');w.className='why-text';w.textContent='why';w.style.left=r(0,100)+'%';w.style.top=r(0,100)+'%';w.style.fontSize=r(10,40)+'px';w.style.opacity=r(0.1,0.5);w.style.transform='rotate('+r(-30,30)+'deg)';whyLayer.appendChild(w);}siteBody.appendChild(whyLayer); beep("sine",r(150,300),0.16,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
         "lol ok": (e) => { document.querySelectorAll('.card').forEach((c,i)=>{c.style.transition='all .6s ease';c.style.transform='perspective(400px) rotateX('+r(-15,15)+'deg) rotateY('+r(-15,15)+'deg) translate('+r(-30,30)+'px,'+r(-20,20)+'px)';c.style.filter='hue-rotate('+r(0,360)+'deg)';}); beep("triangle",r(300,600),0.10,0.09); spawnParticles(e.clientX,e.clientY,{count:r(14,22)}); },
         "based": (e) => { togglePageClass('page-based'); siteFall(rand(['👑','💪','🗿','⚡']),3500); siteSparkle(2500); beep("triangle",r(400,700),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(18,28),shape:"mixed"}); },
+
+        // ===== TEXT STYLING EFFECTS (persistent until overwritten or refresh) =====
+        "serif": (e) => { setTextStyle('fontFamily', '"Georgia","Times New Roman",serif'); beep("sine",r(250,400),0.12,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
+        "mono": (e) => { setTextStyle('fontFamily', '"Courier New",monospace'); beep("square",r(300,500),0.10,0.10); spawnParticles(e.clientX,e.clientY,{count:r(8,14),shape:"squares"}); },
+        "cursive": (e) => { setTextStyle('fontFamily', '"Segoe Script","Comic Sans MS","Brush Script MT",cursive'); beep("sine",r(400,700),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "smol text": (e) => { setTextStyle('fontSize', '0.75em'); beep("triangle",r(600,1000),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,12),sizeMin:3,sizeMax:8}); },
+        "thicc text": (e) => { setTextStyle('fontSize', '1.2em'); setTextStyle('fontWeight', '950'); beep("sine",r(150,280),0.16,0.09); spawnParticles(e.clientX,e.clientY,{count:r(10,16),sizeMin:16,sizeMax:32}); },
+        "italic": (e) => { setTextStyle('fontStyle', 'italic'); beep("sine",r(350,550),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
+        "bold": (e) => { setTextStyle('fontWeight', '950'); beep("square",r(200,400),0.14,0.10); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "strikethrough": (e) => { setTextStyle('textDecoration', 'line-through'); beep("square",r(200,400),0.10,0.10); spawnParticles(e.clientX,e.clientY,{count:r(8,14),shape:"squares"}); },
+        "uppercase": (e) => { setTextStyle('textTransform', 'uppercase'); setTextStyle('letterSpacing', '3px'); beep("square",r(300,500),0.12,0.10); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "lowercase": (e) => { setTextStyle('textTransform', 'lowercase'); beep("sine",r(200,350),0.12,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
+        "rainbow text": (e) => { applyRainbowText(); beep("triangle",r(400,800),0.12,0.08); siteSparkle(2000); spawnParticles(e.clientX,e.clientY,{count:r(16,24),shape:"mixed"}); },
+        "cyber text": (e) => { applyCyberText(); beep("square",r(80,200),0.10,0.12); beep("square",r(100,250),0.08,0.10); spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"squares",sizeMin:3,sizeMax:10}); },
+        "blood text": (e) => { applyThemedText({ color:'#cc1100', textShadow:'0 0 8px rgba(200,0,0,.4), 0 2px 4px rgba(100,0,0,.3)', fontFamily:'"Georgia",serif', fontWeight:'900' }); beep("sine",r(80,160),0.18,0.10); spawnParticles(e.clientX,e.clientY,{count:r(12,18),hue:0}); },
+        "gold text": (e) => { applyThemedText({ color:'#d4a017', textShadow:'0 1px 0 #c09010, 0 2px 0 #a07808, 0 0 12px rgba(212,160,23,.3)', fontWeight:'900' }); siteSparkle(2000); beep("triangle",r(400,600),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18)}); },
+        "pastel text": (e) => { applyPastelText(); beep("sine",r(400,700),0.10,0.06); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"circles"}); },
+        "every other": (e) => { applyEveryOther(); beep("triangle",r(300,600),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "wavy text": (e) => { togglePageClass('page-wavytext'); beep("sine",r(250,450),0.12,0.07); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"circles"}); },
+        "spaced out": (e) => { setTextStyle('letterSpacing', '6px'); setTextStyle('wordSpacing', '12px'); beep("sine",r(200,400),0.14,0.06); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
+        "shadow text": (e) => { applyThemedText({ textShadow:'3px 3px 0 rgba(0,0,0,.3), 6px 6px 0 rgba(0,0,0,.1)' }); beep("sine",r(200,350),0.14,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "outline text": (e) => { applyThemedText({ color:'transparent', webkitTextStroke:'1.5px var(--ink)', textStroke:'1.5px var(--ink)' }); beep("sine",r(300,500),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
       };
 
+      // ===== TEXT STYLING HELPERS =====
+      const TEXT_TARGETS = 'h1, h2, p, .lede, .cardTitle, .cardDesc, .aboutTitle, .aboutCard p, .muted, .nav a, .word, .tag, .btn:not(.sticker):not(.corner), .foot span, .toyBoxLabel';
+
+      // Set a single CSS property on all text elements (persistent)
+      function setTextStyle(prop, value) {
+        document.querySelectorAll(TEXT_TARGETS).forEach(el => {
+          if (el.closest('.error-dialog') || el.closest('.heroRight')) return;
+          el.style[prop] = value;
+        });
+        siteFlash('rgba(255,255,255,.15)', 150);
+      }
+
+      // Apply multiple style properties as a theme (persistent)
+      function applyThemedText(styles) {
+        document.querySelectorAll(TEXT_TARGETS).forEach(el => {
+          if (el.closest('.error-dialog') || el.closest('.heroRight')) return;
+          for (const [prop, val] of Object.entries(styles)) {
+            if (prop === 'webkitTextStroke') { el.style.webkitTextStroke = val; }
+            else { el.style[prop] = val; }
+          }
+        });
+        siteFlash('rgba(255,255,255,.15)', 150);
+      }
+
+      // Rainbow text — each text element gets a random hue
+      function applyRainbowText() {
+        document.querySelectorAll(TEXT_TARGETS).forEach(el => {
+          if (el.closest('.error-dialog') || el.closest('.heroRight')) return;
+          const hue = Math.floor(Math.random() * 360);
+          el.style.color = `hsl(${hue} 85% 50%)`;
+          el.style.textShadow = `0 0 8px hsla(${hue}, 85%, 50%, .3)`;
+        });
+        siteFlash('rgba(255,255,255,.15)', 150);
+      }
+
+      // Cyber text — green monospace hacker aesthetic
+      function applyCyberText() {
+        document.querySelectorAll(TEXT_TARGETS).forEach(el => {
+          if (el.closest('.error-dialog') || el.closest('.heroRight')) return;
+          el.style.color = '#00ff41';
+          el.style.fontFamily = '"Courier New", monospace';
+          el.style.textShadow = '0 0 6px rgba(0,255,65,.5), 0 0 20px rgba(0,255,65,.2)';
+          el.style.letterSpacing = '1px';
+        });
+        // Also darken the background for contrast
+        siteBody.style.transition = 'background .5s';
+        siteBody.style.background = '#000800';
+        siteFlash('rgba(0,255,65,.15)', 200);
+      }
+
+      // Pastel text — each element a soft pastel color
+      function applyPastelText() {
+        const pastels = ['#ffb3ba','#bae1ff','#baffc9','#ffffba','#e8baff','#ffd9ba','#c9baff','#baffee'];
+        document.querySelectorAll(TEXT_TARGETS).forEach(el => {
+          if (el.closest('.error-dialog') || el.closest('.heroRight')) return;
+          el.style.color = rand(pastels);
+        });
+        siteFlash('rgba(255,200,255,.15)', 150);
+      }
+
+      // Every other word bold/italic alternating
+      function applyEveryOther() {
+        document.querySelectorAll(TEXT_TARGETS).forEach(el => {
+          if (el.closest('.error-dialog') || el.closest('.heroRight')) return;
+          if (el.children.length > 0 && el.querySelector('span[data-eo]')) return; // already applied
+          const text = el.textContent;
+          const words = text.split(/(\s+)/);
+          let wordIdx = 0;
+          el.innerHTML = words.map(w => {
+            if (/^\s+$/.test(w)) return w;
+            const style = wordIdx % 2 === 0 ? 'font-weight:900' : 'font-style:italic; opacity:0.75';
+            wordIdx++;
+            return `<span data-eo style="${style}">${w}</span>`;
+          }).join('');
+        });
+        siteFlash('rgba(255,255,255,.15)', 150);
+      }
+
       // helper for page-level toggle classes
-      const PAGE_CLASSES = ['page-tilt','page-blur','page-pixel','page-mirror','page-float','page-bw','page-vapor','page-matrix','page-comic','page-tiny','page-huge','page-upsidedown','page-typewriter','page-party','page-slowmo','page-fastfwd','page-static','page-moo','page-pirate','page-cursed','page-uwu','page-loading','page-hack','page-ghosted','page-thicc','page-smear','page-oldtv','page-windows','page-acid','page-orbit','page-wave','page-neon','page-sunset','page-aurora','page-underwater','page-retro','page-newspaper','page-bubblegum','page-moss','page-midnight','page-cozy','page-broken','page-dizzy','page-stretch','page-squish','page-wobble','page-breathe','page-gradient','page-spotlight','page-velvet','page-fog','page-dream','page-rainbow','page-galaxy','page-campfire','page-glass','page-chalk','page-blueprint','page-casino','page-jungle','page-candy','page-xray','page-thermal','page-emboss','page-paper','page-hologram','page-warp','page-marquee','page-rubbery','page-negative','page-elastic','page-drunk','page-ascii','page-heartbeat','page-cinema','page-oilspill','page-dialup','page-fisheye','page-marqueetext','page-sidebar'];
+      const PAGE_CLASSES = ['page-tilt','page-blur','page-pixel','page-mirror','page-float','page-bw','page-vapor','page-matrix','page-comic','page-tiny','page-huge','page-upsidedown','page-typewriter','page-party','page-slowmo','page-fastfwd','page-static','page-moo','page-pirate','page-cursed','page-uwu','page-loading','page-hack','page-ghosted','page-thicc','page-smear','page-oldtv','page-windows','page-acid','page-orbit','page-wave','page-neon','page-sunset','page-aurora','page-underwater','page-retro','page-newspaper','page-bubblegum','page-moss','page-midnight','page-cozy','page-broken','page-dizzy','page-stretch','page-squish','page-wobble','page-breathe','page-gradient','page-spotlight','page-velvet','page-fog','page-dream','page-rainbow','page-galaxy','page-campfire','page-glass','page-chalk','page-blueprint','page-casino','page-jungle','page-candy','page-xray','page-thermal','page-emboss','page-paper','page-hologram','page-warp','page-marquee','page-rubbery','page-negative','page-elastic','page-drunk','page-ascii','page-heartbeat','page-cinema','page-oilspill','page-dialup','page-fisheye','page-marqueetext','page-sidebar','page-wavytext'];
       // ===== ENHANCED THEME SYSTEM =====
       // Tracks all active page-level themes and blends colors
       const activeThemes = new Set();
