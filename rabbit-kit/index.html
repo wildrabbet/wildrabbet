@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rabbit Kit · wildrabbet</title>
+  <meta name="description" content="Rabbit Kit — a local Windows toolbox for convert, sprites, macros, keybinds, and Rabbit Script." />
+  <link rel="stylesheet" href="./rabbit-kit.css" />
+  <link rel="icon" href="data:," />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="top">
+    <a class="logo" href="../">
+      <span class="mark" aria-hidden="true">🐇</span>
+      <span class="word">wildrabbet</span>
+    </a>
+    <nav class="nav">
+      <a href="../#tools">Tools</a>
+      <a href="#features">Features</a>
+      <a class="navCta" href="#get">Get Rabbit Kit</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="heroPlane">
+        <img src="./shots/rk-script.png" alt="Rabbit Kit Rabbit Script tab" width="1280" height="720" />
+        <div class="heroScrim"></div>
+        <div class="heroCopy">
+          <p class="eyebrow">Local Windows toolbox</p>
+          <h1 class="brand">Rabbit Kit</h1>
+          <p class="lede">Convert media, build sprite sheets, record macros, bind virtual sticks, and automate with Rabbit Script. Runs on your PC. Nothing leaves the machine unless you turn Online on.</p>
+          <div class="ctaRow">
+            <a class="btn primary" href="#get">Get the kit</a>
+            <a class="btn ghost" href="#features">See features</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="features">
+      <article class="feat">
+        <div class="featText">
+          <h2>Convert anything</h2>
+          <p>Bulk convert images, video, and audio. Recursive folders. Cross-type paths like mp4 to mp3 or gif.</p>
+        </div>
+        <div class="featShot wrapShot">
+          <img src="./shots/rk-convert.png" alt="Convert tab" loading="lazy" />
+        </div>
+      </article>
+
+      <article class="feat flip">
+        <div class="featText">
+          <h2>Sprite sheets from video</h2>
+          <p>Turn webm, mp4, gif, or mov into a horizontal strip and a ready loader script. ffmpeg under the hood.</p>
+        </div>
+        <div class="featShot wrapShot">
+          <img src="./shots/rk-sprite.png" alt="Sprite Sheet tab" loading="lazy" />
+        </div>
+      </article>
+
+      <article class="feat">
+        <div class="featText">
+          <h2>Macros that feel human</h2>
+          <p>Record mouse and keyboard, edit steps, loop, and playback with optional human-like motion. Global hotkeys. F10 always stops.</p>
+        </div>
+        <div class="featShot wrapShot">
+          <img src="./shots/rk-macro.png" alt="Macros tab" loading="lazy" />
+        </div>
+      </article>
+
+      <article class="feat flip">
+        <div class="featText">
+          <h2>Analog walk on a keyboard</h2>
+          <p>Keybinds push a virtual Xbox stick to the deflection you set. Or fire a macro or Rabbit Script from a held key.</p>
+        </div>
+        <div class="featShot wrapShot">
+          <img src="./shots/rk-binds.png" alt="Keybinds tab" loading="lazy" />
+        </div>
+      </article>
+
+      <article class="feat">
+        <div class="featText">
+          <h2>Rabbit Script</h2>
+          <p>Drag blocks or write code. Launch apps, wait, ping, click, call macros and scripts, build overlays. Variables with <code>var name</code> or <code>${name}</code>.</p>
+        </div>
+        <div class="featShot wrapShot">
+          <img src="./shots/rk-script.png" alt="Rabbit Script tab" loading="lazy" />
+        </div>
+      </article>
+
+      <article class="feat flip">
+        <div class="featText">
+          <h2>Search your PC</h2>
+          <p>Build a local index, find files and apps fast, and pull results into scripts as <code>${result}</code> and <code>${count}</code>.</p>
+        </div>
+        <div class="featShot wrapShot">
+          <img src="./shots/rk-search.png" alt="Search tab" loading="lazy" />
+        </div>
+      </article>
+
+      <article class="feat">
+        <div class="featText">
+          <h2>Gaming overlays</h2>
+          <p>Crosshair, GPU HUD, auto high-priority on launch, and game shortcuts in one place.</p>
+        </div>
+        <div class="featShot wrapShot">
+          <img src="./shots/rk-gaming.png" alt="Gaming tab" loading="lazy" />
+        </div>
+      </article>
+
+      <article class="feat flip">
+        <div class="featText">
+          <h2>Fun extras</h2>
+          <p>Dice, wheels, radio globe, GeoGuessr, and more when you want a break from tooling.</p>
+        </div>
+        <div class="featShot wrapShot">
+          <img src="./shots/rk-fun.png" alt="Fun tab" loading="lazy" />
+        </div>
+      </article>
+    </section>
+
+    <section class="strip">
+      <div class="stripInner">
+        <h2>Local first</h2>
+        <p>Binds to 127.0.0.1 only. Settings and macros stay in a local data folder. Online features are opt-in and stay hidden when you are offline.</p>
+      </div>
+    </section>
+
+    <section id="get" class="get">
+      <h2>Get Rabbit Kit</h2>
+      <p>Windows. Python 3 and ffmpeg on PATH. Double-click the launcher.</p>
+      <ol class="steps">
+        <li>Download or clone the Rabbit Kit folder</li>
+        <li>Run <code>Launch Rabbit Kit.bat</code></li>
+        <li>First launch installs Python packages from requirements.txt</li>
+      </ol>
+      <p class="muted">Ask earthbotk for the current build if you do not have the folder yet.</p>
+      <a class="btn primary" href="https://github.com/wildrabbet/wildrabbet">wildrabbet on GitHub</a>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <a href="../">← wildrabbet</a>
+    <span class="dot">·</span>
+    <span>Rabbit Kit</span>
+  </footer>
+</body>
+</html>
