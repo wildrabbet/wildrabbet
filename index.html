@@ -314,7 +314,10 @@
         "tornado", "spaghetti", "RUN", "magnet", "flip table",
         "ragdoll", "quicksand", "supernova", "glue spill", "cat walk",
         "avalanche", "wormhole", "big bang", "jello world", "haunted",
-        "shatter", "wind", "drunk walk", "time warp", "reality break"
+        "shatter", "wind", "drunk walk", "time warp", "reality break",
+        // new toys
+        "shockwave", "lightning", "fish tank", "toasters", "portal",
+        "ripple", "pinball", "gooey", "comet", "disco floor"
       ];
 
       const FILLER = [
@@ -1031,6 +1034,334 @@
         tb.addEventListener('pointerdown',(ev)=>{dragging=true;ox=ev.clientX-dlg.offsetLeft;oy=ev.clientY-dlg.offsetTop;ev.preventDefault();});
         document.addEventListener('pointermove',(ev)=>{if(!dragging)return;dlg.style.left=ev.clientX-ox+'px';dlg.style.top=ev.clientY-oy+'px';});
         document.addEventListener('pointerup',()=>{dragging=false;});
+      }
+
+      // ===== SHOCKWAVE =====
+      function shockwave(e) {
+        const layer = document.createElement('div');
+        layer.className = 'shock-layer';
+        siteBody.appendChild(layer);
+        const hue = accentHue();
+        for (let i = 0; i < 4; i++) {
+          const ring = document.createElement('div');
+          ring.className = 'shock-ring';
+          ring.style.left = e.clientX + 'px';
+          ring.style.top = e.clientY + 'px';
+          ring.style.borderColor = `hsla(${hue + i*22} 90% 60% / ${0.75 - i*0.14})`;
+          ring.style.animationDelay = (i * 90) + 'ms';
+          layer.appendChild(ring);
+        }
+        setTimeout(() => layer.remove(), 1700);
+      }
+
+      // ===== LIGHTNING =====
+      function boltPath(x0, y0, x1, y1, jag) {
+        const steps = 9;
+        let d = `M${x0.toFixed(1)},${y0.toFixed(1)}`;
+        for (let i = 1; i <= steps; i++) {
+          const t = i / steps;
+          const x = x0 + (x1 - x0) * t + (i === steps ? 0 : r(-jag, jag));
+          const y = y0 + (y1 - y0) * t;
+          d += ` L${x.toFixed(1)},${y.toFixed(1)}`;
+        }
+        return d;
+      }
+
+      function lightning(e) {
+        const SVGNS = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(SVGNS, 'svg');
+        svg.setAttribute('class', 'bolt-layer');
+        svg.setAttribute('viewBox', `0 0 ${window.innerWidth} ${window.innerHeight}`);
+        svg.setAttribute('preserveAspectRatio', 'none');
+
+        const startX = e.clientX + r(-160, 160);
+        const main = boltPath(startX, 0, e.clientX, e.clientY, 34);
+        ['bolt-glow', 'bolt-core'].forEach(cls => {
+          const p = document.createElementNS(SVGNS, 'path');
+          p.setAttribute('d', main);
+          p.setAttribute('class', cls);
+          svg.appendChild(p);
+        });
+        // side forks branching off the main bolt
+        for (let i = 0; i < 3; i++) {
+          const t = r(0.3, 0.8);
+          const fx = startX + (e.clientX - startX) * t;
+          const fy = e.clientY * t;
+          const p = document.createElementNS(SVGNS, 'path');
+          p.setAttribute('d', boltPath(fx, fy, fx + r(-140, 140), fy + r(60, 180), 20));
+          p.setAttribute('class', 'bolt-fork');
+          svg.appendChild(p);
+        }
+        siteBody.appendChild(svg);
+
+        siteFlash('rgba(220,235,255,.55)', 90);
+        setTimeout(() => siteFlash('rgba(200,225,255,.30)', 70), 140);
+        setTimeout(() => svg.remove(), 700);
+        spawnParticles(e.clientX, e.clientY, { count: r(14,22), shape:'squares', hue: 210, dxMax: 200, dyUp: 190, durMin: 300, durMax: 620 });
+        beep('sawtooth', r(80,140), 0.5, 0.10);
+        beep('square', r(1200,2000), 0.05, 0.06);
+        quakeShake();
+      }
+
+      // ===== FISH TANK =====
+      let fishLayer = null;
+      let fishInterval = null;
+      function toggleFishTank() {
+        if (fishLayer) {
+          clearInterval(fishInterval); fishInterval = null;
+          fishLayer.remove(); fishLayer = null;
+          return;
+        }
+        fishLayer = document.createElement('div');
+        fishLayer.className = 'fish-layer';
+        siteBody.appendChild(fishLayer);
+        function spawnFish() {
+          const f = document.createElement('div');
+          const rtl = Math.random() < 0.5;
+          f.className = 'fish ' + (rtl ? 'rtl' : 'ltr');
+          f.textContent = rand(['🐠','🐟','🐡','🦑','🐙','🦐','🐢']);
+          f.style.top = r(5, 92) + '%';
+          f.style.fontSize = r(16, 40) + 'px';
+          f.style.opacity = r(0.35, 0.85);
+          f.style.animationDuration = r(9, 22) + 's';
+          fishLayer.appendChild(f);
+          setTimeout(() => f.remove(), 24000);
+        }
+        for (let i = 0; i < 8; i++) setTimeout(spawnFish, i * 400);
+        fishInterval = setInterval(() => { if (fishLayer.children.length < 16) spawnFish(); }, 1400);
+      }
+
+      // ===== FLYING TOASTERS =====
+      let toasterLayer = null;
+      let toasterInterval = null;
+      function toggleToasters() {
+        if (toasterLayer) {
+          clearInterval(toasterInterval); toasterInterval = null;
+          toasterLayer.remove(); toasterLayer = null;
+          return;
+        }
+        toasterLayer = document.createElement('div');
+        toasterLayer.className = 'toaster-layer';
+        siteBody.appendChild(toasterLayer);
+        function spawnToaster() {
+          const t = document.createElement('div');
+          t.className = 'toaster';
+          t.innerHTML = '<span class="twing">🪽</span><span class="tbody">🍞</span>';
+          t.style.top = r(-10, 70) + '%';
+          t.style.fontSize = r(20, 42) + 'px';
+          t.style.animationDuration = r(6, 13) + 's';
+          toasterLayer.appendChild(t);
+          setTimeout(() => t.remove(), 14000);
+        }
+        for (let i = 0; i < 6; i++) setTimeout(spawnToaster, i * 500);
+        toasterInterval = setInterval(() => { if (toasterLayer.children.length < 14) spawnToaster(); }, 900);
+      }
+
+      // ===== PORTALS =====
+      function portals(e) {
+        const layer = document.createElement('div');
+        layer.className = 'portal-layer';
+        siteBody.appendChild(layer);
+
+        const ax = e.clientX, ay = e.clientY;
+        const bx = r(90, Math.max(120, window.innerWidth - 90));
+        const by = r(90, Math.max(120, window.innerHeight - 90));
+
+        [[ax, ay, 'pIn'], [bx, by, 'pOut']].forEach(([x, y, cls]) => {
+          const p = document.createElement('div');
+          p.className = 'portal ' + cls;
+          p.style.left = x + 'px';
+          p.style.top = y + 'px';
+          layer.appendChild(p);
+        });
+
+        beep('sine', 300, 0.30, 0.07);
+        beep('triangle', 520, 0.25, 0.05);
+
+        let n = 0;
+        const iv = setInterval(() => {
+          const d = document.createElement('div');
+          d.className = 'portal-dot';
+          d.style.background = `hsl(${accentHue() + r(-30, 60)} 90% 62%)`;
+          layer.appendChild(d);
+          d.animate([
+            { transform: `translate(${ax}px, ${ay}px) scale(.2)`, opacity: 0 },
+            { transform: `translate(${ax + r(-20,20)}px, ${ay + r(-20,20)}px) scale(1)`, opacity: 1, offset: 0.12 },
+            { transform: `translate(${bx + r(-24,24)}px, ${by + r(-24,24)}px) scale(1)`, opacity: 1, offset: 0.88 },
+            { transform: `translate(${bx}px, ${by}px) scale(.2)`, opacity: 0 }
+          ], { duration: r(700, 1300), easing: 'cubic-bezier(.4,0,.6,1)' }).onfinish = () => d.remove();
+          if (++n > 26) clearInterval(iv);
+        }, 70);
+
+        setTimeout(() => { layer.classList.add('fadeOut'); setTimeout(() => layer.remove(), 600); }, 3400);
+      }
+
+      // ===== RIPPLE =====
+      function ripple(e) {
+        const layer = document.createElement('div');
+        layer.className = 'ripple-layer';
+        siteBody.appendChild(layer);
+        for (let i = 0; i < 5; i++) {
+          const ring = document.createElement('div');
+          ring.className = 'ripple-ring';
+          ring.style.left = e.clientX + 'px';
+          ring.style.top = e.clientY + 'px';
+          ring.style.animationDelay = (i * 220) + 'ms';
+          layer.appendChild(ring);
+        }
+        siteBody.classList.add('page-ripplewobble');
+        setTimeout(() => siteBody.classList.remove('page-ripplewobble'), 1800);
+        setTimeout(() => layer.remove(), 2700);
+        beep('sine', r(700, 1000), 0.18, 0.04);
+        beep('sine', r(300, 460), 0.30, 0.05);
+      }
+
+      // ===== PINBALL =====
+      let pinballBall = null;
+      let pinballRAF = null;
+      function togglePinball() {
+        if (pinballBall) {
+          cancelAnimationFrame(pinballRAF); pinballRAF = null;
+          pinballBall.remove(); pinballBall = null;
+          return;
+        }
+        pinballBall = document.createElement('div');
+        pinballBall.className = 'pinball';
+        siteBody.appendChild(pinballBall);
+
+        const R = 13;
+        let x = r(100, Math.max(140, window.innerWidth - 100));
+        let y = r(100, 300);
+        let vx = r(4, 8) * (Math.random() < 0.5 ? -1 : 1);
+        let vy = r(3, 6);
+        let hue = accentHue();
+
+        function ping() { beep('square', r(300, 900), 0.05, 0.04); }
+
+        function step() {
+          x += vx; y += vy;
+
+          if (x - R < 0) { x = R; vx = Math.abs(vx); hue += 40; ping(); }
+          if (x + R > window.innerWidth) { x = window.innerWidth - R; vx = -Math.abs(vx); hue += 40; ping(); }
+          if (y - R < 0) { y = R; vy = Math.abs(vy); hue += 40; ping(); }
+          if (y + R > window.innerHeight) { y = window.innerHeight - R; vy = -Math.abs(vy); hue += 40; ping(); }
+
+          // cards act as bumpers — push out along the shallowest overlap
+          document.querySelectorAll('.card, .heroLeft, .heroRight, .aboutCard').forEach(el => {
+            const b = el.getBoundingClientRect();
+            if (!b.width) return;
+            if (x + R > b.left && x - R < b.right && y + R > b.top && y - R < b.bottom) {
+              const overL = x + R - b.left, overR = b.right - (x - R);
+              const overT = y + R - b.top, overB = b.bottom - (y - R);
+              const m = Math.min(overL, overR, overT, overB);
+              if (m === overL) { x = b.left - R; vx = -Math.abs(vx); }
+              else if (m === overR) { x = b.right + R; vx = Math.abs(vx); }
+              else if (m === overT) { y = b.top - R; vy = -Math.abs(vy); }
+              else { y = b.bottom + R; vy = Math.abs(vy); }
+              hue += 55; ping();
+              el.classList.add('bumper-hit');
+              setTimeout(() => el.classList.remove('bumper-hit'), 220);
+            }
+          });
+
+          pinballBall.style.transform = `translate(${x}px, ${y}px)`;
+          pinballBall.style.background = `radial-gradient(circle at 34% 32%, #fff, hsl(${hue % 360} 85% 55%))`;
+          pinballRAF = requestAnimationFrame(step);
+        }
+        step();
+      }
+
+      // ===== GOOEY BLOBS (metaballs) =====
+      let gooOn = false;
+      function toggleGoo() {
+        const blobs = [b1, b2, b3];
+        if (gooOn) {
+          gooOn = false;
+          const wrap = toyBox.querySelector('.goo-wrap');
+          if (wrap) { blobs.forEach(b => toyBox.insertBefore(b, wrap)); wrap.remove(); }
+          return;
+        }
+        gooOn = true;
+        if (!document.getElementById('gooFilterSvg')) {
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.id = 'gooFilterSvg';
+          svg.setAttribute('class', 'goo-def');
+          svg.innerHTML = '<defs><filter id="gooFilter"><feGaussianBlur in="SourceGraphic" stdDeviation="12" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" result="g"/><feBlend in="SourceGraphic" in2="g"/></filter></defs>';
+          siteBody.appendChild(svg);
+        }
+        const wrap = document.createElement('div');
+        wrap.className = 'goo-wrap';
+        toyBox.insertBefore(wrap, toyBox.firstChild);
+        blobs.forEach(b => wrap.appendChild(b));
+        randomizeBlobs('normal');
+      }
+
+      // ===== COMET CURSOR TRAIL =====
+      let cometHandler = null;
+      let cometLayer = null;
+      function toggleComet() {
+        if (cometHandler) {
+          document.removeEventListener('pointermove', cometHandler);
+          cometHandler = null;
+          if (cometLayer) { cometLayer.remove(); cometLayer = null; }
+          return;
+        }
+        cometLayer = document.createElement('div');
+        cometLayer.className = 'comet-layer';
+        siteBody.appendChild(cometLayer);
+        let last = 0;
+        cometHandler = (ev) => {
+          const now = performance.now();
+          if (now - last < 16) return;
+          last = now;
+          const d = document.createElement('div');
+          d.className = 'comet-dot';
+          const size = r(5, 14);
+          d.style.width = size + 'px';
+          d.style.height = size + 'px';
+          d.style.left = ev.clientX + 'px';
+          d.style.top = ev.clientY + 'px';
+          d.style.color = d.style.background = `hsl(${(accentHue() + now / 12) % 360} 95% 62%)`;
+          cometLayer.appendChild(d);
+          d.animate([
+            { transform: 'translate(-50%,-50%) scale(1)', opacity: .9 },
+            { transform: `translate(-50%,-50%) translate(${r(-26,26)}px, ${r(14,52)}px) scale(0)`, opacity: 0 }
+          ], { duration: r(500, 900), easing: 'cubic-bezier(.2,.7,.3,1)' }).onfinish = () => d.remove();
+        };
+        document.addEventListener('pointermove', cometHandler, { passive: true });
+      }
+
+      // ===== DISCO FLOOR =====
+      let discoFloorEl = null;
+      let discoFloorIV = null;
+      function toggleDiscoFloor() {
+        if (discoFloorEl) {
+          clearInterval(discoFloorIV); discoFloorIV = null;
+          discoFloorEl.remove(); discoFloorEl = null;
+          return;
+        }
+        const COLS = 12, ROWS = 8;
+        discoFloorEl = document.createElement('div');
+        discoFloorEl.className = 'disco-floor';
+        discoFloorEl.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
+        discoFloorEl.style.gridTemplateRows = `repeat(${ROWS}, 1fr)`;
+        for (let i = 0; i < COLS * ROWS; i++) {
+          const t = document.createElement('div');
+          t.className = 'disco-tile';
+          discoFloorEl.appendChild(t);
+        }
+        siteBody.appendChild(discoFloorEl);
+        const tiles = Array.from(discoFloorEl.children);
+        function flashTiles() {
+          for (let i = 0; i < 14; i++) {
+            const t = rand(tiles);
+            t.style.background = `hsl(${r(0,360)} 90% 58%)`;
+            t.style.opacity = r(0.3, 0.75);
+            setTimeout(() => { t.style.opacity = 0.05; }, r(300, 800));
+          }
+        }
+        flashTiles();
+        discoFloorIV = setInterval(flashTiles, 420);
       }
 
       const ACTIONS = {
@@ -1933,6 +2264,18 @@
           },5000);
           spawnParticles(e.clientX,e.clientY,{count:r(24,36),shape:"mixed"});
         },
+
+        // ===== NEW TOYS =====
+        "shockwave": (e) => { shockwave(e); quakeShake(); randomizeBlobs("bonk"); flashOverlay("bonk"); spawnParticles(e.clientX,e.clientY,{count:r(16,26),shape:"squares",dxMax:260,dyUp:280,durMin:300,durMax:620}); beep("sine",r(60,110),0.45,0.13); beep("square",r(150,240),0.10,0.07); },
+        "lightning": (e) => { lightning(e); randomizeBlobs("zap"); },
+        "fish tank": (e) => { toggleFishTank(); randomizeBlobs("normal"); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"circles",hue:200,durMin:700,durMax:1200}); beep("sine",r(240,420),0.20,0.06); },
+        "toasters": (e) => { toggleToasters(); spawnParticles(e.clientX,e.clientY,{count:r(8,14),shape:"squares",hue:35,durMin:400,durMax:800}); beep("triangle",r(320,520),0.14,0.06); },
+        "portal": (e) => { portals(e); randomizeBlobs("normal"); },
+        "ripple": (e) => { ripple(e); randomizeBlobs("normal"); },
+        "pinball": (e) => { togglePinball(); spawnParticles(e.clientX,e.clientY,{count:r(8,14),shape:"circles",durMin:300,durMax:600}); beep("square",r(400,800),0.08,0.07); },
+        "gooey": (e) => { toggleGoo(); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"circles",sizeMin:14,sizeMax:30,durMin:700,durMax:1200}); beep("sine",r(160,280),0.24,0.07); },
+        "comet": (e) => { toggleComet(); spawnParticles(e.clientX,e.clientY,{count:r(12,20),durMin:500,durMax:900}); beep("triangle",r(600,1000),0.12,0.06); },
+        "disco floor": (e) => { toggleDiscoFloor(); flashOverlay("bonk"); beep("square",r(200,400),0.10,0.07); },
       };
 
       // ===== TEXT STYLING HELPERS =====
