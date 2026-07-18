@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#da5549">
+  <title>Mosaic — A Life, Lived</title>
+  <meta name="description" content="A detailed life simulation where people remember and belongings matter.">
+  <meta property="og:title" content="Mosaic — A Life, Lived">
+  <meta property="og:description" content="Build a person, make ordinary choices and live with the consequences.">
+  <meta property="og:image" content="https://www.rabbet.lol/games/mosaic/og.png">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="game-shell" id="gameShell">
+    <header class="topbar">
+      <a class="brand" href="../../" aria-label="Return to wildrabbet"><span class="brand-mark">M</span><span>Mosaic</span></a>
+      <div class="date-chip"><span class="live-dot"></span><span id="dateLabel">July 2026</span></div>
+      <div class="top-actions">
+        <button class="icon-button undo" id="undoButton" hidden aria-label="Undo last decision">↶</button>
+        <button class="money-chip" data-tab="things"><span id="moneyLabel">$18,420</span><small>Available</small></button>
+        <button class="avatar-mini" id="settingsButton" aria-label="Open preferences">⚙️</button>
+      </div>
+    </header>
+
+    <aside class="sidebar">
+      <div class="profile-block" id="profileBlock"></div>
+      <nav class="main-nav" aria-label="Game sections">
+        <button data-tab="life"><span>📖</span>My life</button>
+        <button data-tab="people"><span>❤️</span>People</button>
+        <button data-tab="things"><span>🎒</span>Belongings</button>
+        <button data-tab="plans"><span>📅</span>Plans</button>
+        <button data-tab="paths"><span>🧭</span>Paths</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="week-card"><span>THIS MONTH</span><strong id="surplusLabel">+$1,200</strong><small>after regular costs</small></div>
+        <button class="settings-link" id="preferencesButton">⚙️ Preferences</button>
+        <a class="wildrabbet-link" href="../../">🐇 wildrabbet</a>
+      </div>
+    </aside>
+
+    <main class="main-content" id="mainContent"></main>
+    <aside class="right-rail" id="rightRail"></aside>
+
+    <div class="action-dock">
+      <button class="activity-button" id="activityButton"><span>＋</span><div><b>Do something</b><small>People, work, health, everyday life</small></div></button>
+      <button class="advance-button" id="advanceButton"><span>Advance one month</span><i>→</i></button>
+    </div>
+
+    <nav class="mobile-nav" aria-label="Mobile game sections">
+      <button data-tab="life"><span>📖</span>Life</button>
+      <button data-tab="people"><span>❤️</span>People</button>
+      <button data-tab="things"><span>🎒</span>Things</button>
+      <button data-tab="plans"><span>📅</span>Plans</button>
+    </nav>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop" hidden></div>
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <div class="creator-backdrop" id="creatorBackdrop" hidden>
+    <section class="creator" role="dialog" aria-modal="true" aria-labelledby="creatorTitle">
+      <div class="creator-intro">
+        <a href="../../" class="creator-home">🐇 wildrabbet</a>
+        <span class="eyebrow">A NEW TIMELINE</span>
+        <h1 id="creatorTitle">Who will you become?</h1>
+        <p>Build a starting point, not a perfect person. Your choices will do the rest.</p>
+        <div class="creator-preview"><span id="creatorEmoji">🧑</span><div><b id="creatorPreviewName">Your person</b><small id="creatorPreviewDetail">24 · Sydney</small></div></div>
+      </div>
+      <form class="creator-form" id="creatorForm">
+        <div class="form-section"><span>01</span><div><h2>Identity</h2><p>The details people will know first.</p></div></div>
+        <div class="form-grid">
+          <label class="wide"><span>Full name</span><input name="name" id="creatorName" required maxlength="32" placeholder="Maya Chen" autocomplete="name"></label>
+          <label><span>Age</span><input name="age" id="creatorAge" required type="number" min="16" max="90" value="24"></label>
+          <label><span>Pronouns</span><select name="pronouns"><option>she/her</option><option>he/him</option><option>they/them</option><option>use my name</option></select></label>
+        </div>
+        <div class="form-section"><span>02</span><div><h2>Place & work</h2><p>This shapes costs, opportunities and people.</p></div></div>
+        <div class="form-grid">
+          <label><span>City</span><select name="city"><option>Sydney</option><option>Melbourne</option><option>Brisbane</option><option>Perth</option><option>Auckland</option><option>London</option><option>New York</option><option>Toronto</option><option>Tokyo</option></select></label>
+          <label><span>Starting path</span><select name="career"><option>Junior Architect</option><option>Barista</option><option>Graduate Nurse</option><option>Apprentice Electrician</option><option>Indie Developer</option><option>University Student</option><option>Unemployed</option></select></label>
+        </div>
+        <div class="form-section"><span>03</span><div><h2>Presence</h2><p>A face and a tendency—not a destiny.</p></div></div>
+        <fieldset class="emoji-choices"><legend>Appearance</legend><label><input type="radio" name="emoji" value="🧑" checked><span>🧑</span></label><label><input type="radio" name="emoji" value="👩"><span>👩</span></label><label><input type="radio" name="emoji" value="👨"><span>👨</span></label><label><input type="radio" name="emoji" value="🧑🏽"><span>🧑🏽</span></label><label><input type="radio" name="emoji" value="👩🏾"><span>👩🏾</span></label><label><input type="radio" name="emoji" value="👨🏿"><span>👨🏿</span></label><label><input type="radio" name="emoji" value="🧕"><span>🧕</span></label><label><input type="radio" name="emoji" value="🧔"><span>🧔</span></label></fieldset>
+        <fieldset class="trait-choices"><legend>Core tendency</legend><label><input type="radio" name="trait" value="Curious" checked><span><b>🔎 Curious</b><small>Learns quickly, gets distracted</small></span></label><label><input type="radio" name="trait" value="Steady"><span><b>🌿 Steady</b><small>Handles stress, avoids risk</small></span></label><label><input type="radio" name="trait" value="Bold"><span><b>⚡ Bold</b><small>Acts decisively, invites danger</small></span></label></fieldset>
+        <button class="begin-button" type="submit"><span>Begin this life</span><i>→</i></button>
+      </form>
+    </section>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
