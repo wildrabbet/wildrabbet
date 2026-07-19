@@ -495,6 +495,151 @@ function seedMotes(){
    is pinned to the centred organism. Fixated centrally and glimpsed peripherally,
    the visual system caricatures them — they read as grotesque without ever being
    consciously "seen". A round staggers several around a ring, then they vanish. */
+/* ============================================================================
+   PROCEDURAL HUMAN FACES  (no photos — shaded, distorted, uncanny)
+   Each face is a little genome rendered ONCE into a cached canvas: shaded skin
+   with volume, real sockets/eyes/iris/lids, a nose with bridge highlight and
+   nostril shadows, lips, brows and hair — then the proportions are pushed just
+   off (asymmetry, sunken, sickly) so it reads as a real person who is WRONG.
+   ============================================================================ */
+function makeFaceG(){
+  const sick=srand()<0.5;
+  return {
+    hue: sick? rr(50,150) : rr(16,34),
+    sat: sick? rr(5,16) : rr(14,32),
+    light: rr(50,74),
+    skew: gauss(0,0.05), asymX: gauss(1,0.05),
+    eyeY: rr(-0.02,0.03), eyeGap: rr(0.30,0.40), eyeW: rr(0.15,0.2), eyeH: rr(0.06,0.1),
+    eyeLR: gauss(0,0.02), eyeSz: clamp(gauss(1,0.12),0.75,1.3), sunken: rr(0.3,1),
+    gazeX: gauss(0,0.22), gazeY: gauss(0.04,0.18),
+    iris: pick([26,30,36,40,116,140,205,212]), irisSat: pick([52,46,40,28,22]), irisL: rr(20,44),
+    browY: rr(0.13,0.19), browTh: rr(0.015,0.04), browAng: gauss(0,0.22), browDark: rr(12,30),
+    noseLen: rr(0.18,0.28), noseW: rr(0.09,0.15),
+    mouthY: rr(0.30,0.37), mouthW: rr(0.20,0.32), lip: rr(0.6,1.2),
+    open: srand()<0.45? rr(0.05,0.45):0, smile: gauss(-0.12,0.22), mouthX: gauss(0,0.03),
+    hair: rr(0,1), hairL: rr(4,14), teeth: srand()<0.4,
+  };
+}
+function softEllipse(ctx,x,y,rx,ry,rot,rgbaInner){
+  ctx.save(); ctx.translate(x,y); if(rot) ctx.rotate(rot); ctx.scale(rx,ry);
+  const g=ctx.createRadialGradient(0,0,0,0,0,1);
+  g.addColorStop(0,rgbaInner); g.addColorStop(1,rgbaInner.replace(/[\d.]+\s*\)$/,'0)'));
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,0,1,0,TAU); ctx.fill(); ctx.restore();
+}
+function drawEye(ctx,ex,ey,ew,eh,g,skin,dark){
+  softEllipse(ctx,ex,ey+eh*0.1,ew*1.2,eh*2.0*g.sunken,0,skin(-16,0.7));   // socket
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(ex-ew,ey); ctx.quadraticCurveTo(ex,ey-eh*1.15,ex+ew,ey);
+  ctx.quadraticCurveTo(ex,ey+eh*1.05,ex-ew,ey); ctx.closePath(); ctx.clip();
+  ctx.fillStyle= dark? 'hsla(40,10%,44%,1)':'hsla(40,16%,86%,1)';               // sclera
+  ctx.fillRect(ex-ew,ey-eh*1.4,ew*2,eh*2.8);
+  softEllipse(ctx,ex,ey-eh*0.8,ew,eh*0.9,0,'rgba(22,12,10,0.5)');                // lid shadow
+  const ir=eh*1.18, ix=ex+g.gazeX*ew*0.5, iy=ey+g.gazeY*eh, il=g.irisL*(dark?0.6:1);
+  let gi=ctx.createRadialGradient(ix,iy,ir*0.15,ix,iy,ir);
+  gi.addColorStop(0,`hsl(${g.iris|0},${(g.irisSat+8)|0}%,${(il+14)|0}%)`);
+  gi.addColorStop(0.7,`hsl(${g.iris|0},${g.irisSat|0}%,${il|0}%)`);
+  gi.addColorStop(1,`hsl(${g.iris|0},${clamp(g.irisSat-10,10,60)|0}%,${(il*0.5)|0}%)`);
+  ctx.fillStyle=gi; ctx.beginPath(); ctx.arc(ix,iy,ir,0,TAU); ctx.fill();
+  ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(ix,iy,ir*0.46,0,TAU); ctx.fill();     // pupil
+  if(!dark){ ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.arc(ix-ir*0.3,iy-ir*0.35,ir*0.14,0,TAU); ctx.fill(); }
+  ctx.restore();
+  ctx.strokeStyle=skin(-22,0.8); ctx.lineWidth=Math.max(1,eh*0.2); ctx.lineCap='round';  // upper lid
+  ctx.beginPath(); ctx.moveTo(ex-ew,ey); ctx.quadraticCurveTo(ex,ey-eh*1.2,ex+ew,ey); ctx.stroke();
+  ctx.strokeStyle=skin(-8,0.4); ctx.lineWidth=Math.max(1,eh*0.1);                          // lower lid
+  ctx.beginPath(); ctx.moveTo(ex-ew*0.9,ey+eh*0.05); ctx.quadraticCurveTo(ex,ey+eh*0.9,ex+ew*0.9,ey+eh*0.05); ctx.stroke();
+}
+function drawMouth(ctx,mx,my,mw,g,dark){
+  const lip=g.lip, sm=g.smile, base=g.light*(dark?0.42:1);
+  const lipCol=(dl,a=1)=>`hsla(352,${clamp(g.sat+16,12,48)|0}%,${clamp(base-8+dl,4,74)|0}%,${a})`;
+  ctx.strokeStyle=`rgba(15,6,8,${dark?0.55:0.75})`; ctx.lineWidth=Math.max(1.5,mw*0.05);   // mouth line
+  ctx.beginPath(); ctx.moveTo(mx-mw,my); ctx.quadraticCurveTo(mx,my-sm*mw*0.4,mx+mw,my); ctx.stroke();
+  const drop=g.open>0.02? g.open*mw*0.3:0;
+  if(g.open>0.02){
+    ctx.fillStyle='rgba(8,3,5,0.92)';
+    ctx.beginPath(); ctx.ellipse(mx,my+g.open*mw*0.15,mw*0.7,g.open*mw*0.5,0,0,TAU); ctx.fill();
+    if(g.teeth){ ctx.fillStyle='rgba(215,210,196,0.65)';
+      ctx.beginPath(); ctx.ellipse(mx,my-g.open*mw*0.12,mw*0.6,g.open*mw*0.16,0,0,TAU); ctx.fill(); }
+  }
+  ctx.fillStyle=lipCol(-4,0.92);                                                            // upper lip
+  ctx.beginPath();
+  ctx.moveTo(mx-mw,my);
+  ctx.quadraticCurveTo(mx-mw*0.5,my-lip*mw*0.14, mx-mw*0.15,my-lip*mw*0.05);
+  ctx.quadraticCurveTo(mx,my-lip*mw*0.16, mx+mw*0.15,my-lip*mw*0.05);
+  ctx.quadraticCurveTo(mx+mw*0.5,my-lip*mw*0.14, mx+mw,my);
+  ctx.quadraticCurveTo(mx,my-sm*mw*0.4, mx-mw,my); ctx.closePath(); ctx.fill();
+  ctx.fillStyle=lipCol(5,0.92);                                                             // lower lip
+  ctx.beginPath();
+  ctx.moveTo(mx-mw*0.9,my+drop);
+  ctx.quadraticCurveTo(mx,my+lip*mw*0.34+drop, mx+mw*0.9,my+drop);
+  ctx.quadraticCurveTo(mx,my+lip*mw*0.06, mx-mw*0.9,my+drop); ctx.closePath(); ctx.fill();
+  softEllipse(ctx,mx,my+lip*mw*0.16+drop,mw*0.4,lip*mw*0.1,0,`hsla(352,${clamp(g.sat+16,12,48)|0}%,${clamp(base+6,5,82)|0}%,0.5)`);
+}
+function paintHumanFace(ctx, cx, cy, FW, FH, g, dark){
+  const bL=g.light*(dark?0.42:1), sat=g.sat, hue=g.hue|0;
+  const skin=(dl,a=1)=>`hsla(${hue},${sat|0}%,${clamp(bL+dl,2,97)|0}%,${a})`;
+  ctx.save(); ctx.translate(cx,cy); ctx.transform(g.asymX,0,g.skew,1,0,0);
+  const hw=FW/2, top=-FH*0.5, chin=FH*0.5, bb=[-hw*1.6,top-FH*0.1,FW*1.6,FH*1.5];
+  if(g.hair>0.25){ ctx.fillStyle=`hsla(${hue},${(sat*0.5)|0}%,${(g.hairL*(dark?0.5:1))|0}%,${dark?0.85:1})`;
+    ctx.beginPath(); ctx.ellipse(0,top+FH*0.17,hw*1.18,FH*0.36,0,0,TAU); ctx.fill(); }
+  ctx.beginPath();                                                                          // face silhouette
+  ctx.moveTo(-hw,-FH*0.1);
+  ctx.bezierCurveTo(-hw,top+FH*0.02,-hw*0.55,top,0,top);
+  ctx.bezierCurveTo(hw*0.55,top,hw,top+FH*0.02,hw,-FH*0.1);
+  ctx.bezierCurveTo(hw,FH*0.17,hw*0.8,FH*0.35,hw*0.42,chin*0.86);
+  ctx.bezierCurveTo(hw*0.2,chin,-hw*0.2,chin,-hw*0.42,chin*0.86);
+  ctx.bezierCurveTo(-hw*0.8,FH*0.35,-hw,FH*0.17,-hw,-FH*0.1);
+  ctx.closePath();
+  ctx.save(); ctx.clip();
+  ctx.fillStyle=skin(0); ctx.fillRect(bb[0],bb[1],bb[2],bb[3]);
+  let gr=ctx.createRadialGradient(0,-FH*0.1,FH*0.04,0,-FH*0.04,FH*0.72);                     // volume light
+  gr.addColorStop(0,skin(dark?7:11,0.95)); gr.addColorStop(1,skin(0,0));
+  ctx.fillStyle=gr; ctx.fillRect(bb[0],bb[1],bb[2],bb[3]);
+  gr=ctx.createRadialGradient(0,0,FH*0.22,0,0,FH*0.56);                                       // edge shadow
+  gr.addColorStop(0,skin(0,0)); gr.addColorStop(1,skin(-17,0.9));
+  ctx.fillStyle=gr; ctx.fillRect(bb[0],bb[1],bb[2],bb[3]);
+  softEllipse(ctx,0,chin*0.72,hw*0.72,FH*0.17,0,skin(-20,0.55));                             // jaw
+  softEllipse(ctx,-hw*0.62,FH*0.17,hw*0.3,FH*0.22,0,skin(-15,0.4*g.sunken));                 // gaunt cheeks
+  softEllipse(ctx, hw*0.62,FH*0.17,hw*0.3,FH*0.22,0,skin(-15,0.4*g.sunken));
+  softEllipse(ctx,-hw*0.82,-FH*0.2,hw*0.34,FH*0.24,0,skin(-14,0.5));                          // temples
+  softEllipse(ctx, hw*0.82,-FH*0.2,hw*0.34,FH*0.24,0,skin(-14,0.5));
+  ctx.restore();
+  const eyeY=g.eyeY*FH, gap=g.eyeGap*FW, ew=g.eyeW*FW;
+  drawEye(ctx,-gap/2, eyeY - g.eyeLR*FH, ew, g.eyeH*FH*g.eyeSz, g, skin, dark);
+  drawEye(ctx, gap/2, eyeY + g.eyeLR*FH, ew, g.eyeH*FH/g.eyeSz, g, skin, dark);
+  ctx.strokeStyle=`hsla(${hue},${(sat*0.7)|0}%,${(g.browDark*(dark?0.6:1))|0}%,${dark?0.7:0.92})`;
+  ctx.lineWidth=Math.max(1.5,g.browTh*FH); ctx.lineCap='round';
+  for(const s of [-1,1]){
+    const bx=s*gap/2, sEyeY=eyeY + s*g.eyeLR*FH;
+    const by=sEyeY - g.eyeH*FH*1.8 - g.browY*FH*0.12;   // sit just above the eye
+    const arch=FH*(0.03+Math.abs(g.browAng)*0.4), tilt=g.browAng*FH*0.18*s;
+    ctx.beginPath();                                     // a single smooth arch (never a W)
+    ctx.moveTo(bx-ew*1.05, by - tilt);
+    ctx.quadraticCurveTo(bx, by-arch, bx+ew*1.05, by + tilt);
+    ctx.stroke();
+  }
+  const noseTop=eyeY+FH*0.02, noseBot=eyeY+g.noseLen*FH, nw=g.noseW*FW;
+  softEllipse(ctx,-nw*0.5,(noseTop+noseBot)/2,nw*0.5,(noseBot-noseTop)*0.6,0,skin(-13,0.5));
+  softEllipse(ctx, nw*0.5,(noseTop+noseBot)/2,nw*0.5,(noseBot-noseTop)*0.6,0,skin(-13,0.5));
+  softEllipse(ctx,0,noseTop+FH*0.02,nw*0.4,(noseBot-noseTop)*0.5,0,skin(dark?6:12,0.6));      // bridge
+  softEllipse(ctx,0,noseBot,nw*0.7,FH*0.05,0,skin(dark?4:8,0.5));                              // tip
+  ctx.fillStyle=skin(-24,0.85);
+  for(const s of [-1,1]){ ctx.beginPath(); ctx.ellipse(s*nw*0.5,noseBot+FH*0.005,nw*0.28,nw*0.2,s*0.3,0,TAU); ctx.fill(); }
+  softEllipse(ctx,0,noseBot+FH*0.03,nw*1.1,FH*0.05,0,skin(-14,0.5));
+  drawMouth(ctx, g.mouthX*FW, g.mouthY*FH, g.mouthW*FW, g, dark);
+  ctx.restore();
+}
+function renderFaceImg(g, dark, halo){
+  const BW=200, BH=262;
+  const cv=document.createElement('canvas'); cv.width=BW; cv.height=BH;
+  const c=cv.getContext('2d');
+  if(halo){ const gr=c.createRadialGradient(BW/2,BH/2,0,BW/2,BH/2,BH*0.5);   // dark backing survives neon
+    gr.addColorStop(0,'rgba(3,2,5,0.82)'); gr.addColorStop(0.7,'rgba(3,2,5,0.45)'); gr.addColorStop(1,'rgba(3,2,5,0)');
+    c.fillStyle=gr; c.fillRect(0,0,BW,BH); }
+  paintHumanFace(c, BW/2, BH*0.5, BW*0.82, BH*0.86, g, dark);
+  return cv;
+}
+
 const faces=[];
 function spawnFaceRound(){
   const n=ri(3,6), baseAng=srand()*TAU, ring=rr(0.6,0.92);
@@ -502,34 +647,12 @@ function spawnFaceRound(){
     faces.push({
       ang: baseAng + i/n*TAU + gauss(0,0.22),
       rad: clamp(ring + gauss(0,0.05), 0.55, 0.95),
-      size: rr(0.05,0.11),
-      t0: G.t, delay: srand()*0.5, dur: rr(0.14,0.26),
-      tilt: gauss(0,0.5), sx: rr(0.72,1.08), sy: rr(0.95,1.3),
-      mouth: rr(0.3,1), asym: gauss(0,0.22), pale: rr(0,50),
+      size: rr(0.08,0.15),
+      // slow, natural swell + dissolve, spread across the round like a real trip
+      t0: G.t, delay: srand()*1.4, dur: rr(0.6,1.4),
+      tilt: gauss(0,0.35), img: renderFaceImg(makeFaceG(), false, true),
     });
   }
-}
-// paint one face at FULL opacity into a small buffer, so its internal contrast
-// (pale skin vs pure-black eyes/mouth) survives when we later blit it faintly.
-const faceCv=document.createElement('canvas'); faceCv.width=faceCv.height=128;
-const fctx=faceCv.getContext('2d');
-function paintFace(f){
-  const R=50;
-  fctx.clearRect(0,0,128,128);
-  fctx.save(); fctx.translate(64,64); fctx.scale(f.sx,f.sy);
-  // dark halo so the face still reads when blitted over bright neon
-  fctx.fillStyle='rgba(2,1,4,0.9)';
-  fctx.beginPath(); fctx.ellipse(0,0,R*1.2,R*1.45,0,0,TAU); fctx.fill();
-  // solid pale skin
-  fctx.fillStyle=`hsl(${(f.pale+80)|0},12%,82%)`;
-  fctx.beginPath(); fctx.ellipse(0,0,R*0.72,R,0,0,TAU); fctx.fill();
-  // hollow black eyes + open mouth
-  fctx.fillStyle='#000';
-  const ey=-R*0.16, ex=R*0.33, er=R*0.2;
-  fctx.beginPath(); fctx.ellipse(-ex+f.asym*R*0.14,ey,er,er*1.35,0,0,TAU); fctx.fill();
-  fctx.beginPath(); fctx.ellipse( ex,ey-f.asym*R*0.14,er,er*1.35,0,0,TAU); fctx.fill();
-  fctx.beginPath(); fctx.ellipse(0,R*0.46,R*0.26*f.mouth,R*0.13*f.mouth+R*0.06,f.asym*0.4,0,TAU); fctx.fill();
-  fctx.restore();
 }
 function drawFaces(){
   if(!faces.length) return;
@@ -540,16 +663,13 @@ function drawFaces(){
     const age=G.t - f.t0 - f.delay;
     if(age<0) continue;
     if(age>f.dur){ faces.splice(i,1); continue; }
-    const a=Math.sin(Math.PI*age/f.dur);          // quick fade in/out
-    const cx=w/2+Math.cos(f.ang)*f.rad*half;
-    const cy=h/2+Math.sin(f.ang)*f.rad*half;
-    const R=f.size*half*(0.9+0.2*a);
-    paintFace(f);
+    const a=smooth(Math.sin(Math.PI*age/f.dur));   // gentle ease in/out
+    const cx=w/2+Math.cos(f.ang)*f.rad*half, cy=h/2+Math.sin(f.ang)*f.rad*half;
+    const Hh=f.size*half*2.4*(0.9+0.14*a), Ww=Hh*(f.img.width/f.img.height);
     sctx.save();
-    sctx.globalAlpha=a*0.5;                        // faint enough to stay subliminal in the periphery
+    sctx.globalAlpha=a*0.62;
     sctx.translate(cx,cy); sctx.rotate(f.tilt);
-    const sc=R/50; sctx.scale(sc,sc);
-    sctx.drawImage(faceCv,-64,-64);
+    sctx.drawImage(f.img,-Ww/2,-Hh/2,Ww,Hh);
     sctx.restore();
   }
   sctx.globalAlpha=1;
@@ -563,30 +683,41 @@ const veilEl=document.getElementById('veil');
 const vctx=veilEl.getContext('2d');
 
 const shades=[];
+function renderShadeImg(g){
+  const BW=240, BH=560, cv=document.createElement('canvas'); cv.width=BW; cv.height=BH;
+  const c=cv.getContext('2d'), cx=BW/2, headR=BW*0.19, headY=headR*1.35, feet=BH, bw=BW*0.34;
+  c.fillStyle='rgba(0,0,0,0.92)';                       // dark body + shoulders
+  c.beginPath();
+  c.moveTo(cx-bw*0.5,feet);
+  c.quadraticCurveTo(cx-bw,headY+BH*0.32, cx-bw*0.7,headY+BH*0.05);
+  c.quadraticCurveTo(cx-bw*0.45,headY-headR*0.3, cx,headY-headR*0.5);
+  c.quadraticCurveTo(cx+bw*0.45,headY-headR*0.3, cx+bw*0.7,headY+BH*0.05);
+  c.quadraticCurveTo(cx+bw,headY+BH*0.32, cx+bw*0.5,feet);
+  c.closePath(); c.fill();
+  c.beginPath(); c.ellipse(cx,headY,headR,headR*1.22,0,0,TAU); c.fill();   // head
+  // a dim, distorted face emerging from the shadow of the head
+  paintHumanFace(c, cx, headY+headR*0.05, headR*1.7, headR*2.1, g, true);
+  return cv;
+}
 function spawnShade(){
   if(shades.length>=2) return;
-  shades.push({ fx: srand()<0.5? rr(0.04,0.19): rr(0.81,0.96), fy: rr(0.62,1.02),
-    h: rr(0.42,0.72), t0:G.t, dur:rr(2.6,4.6), sway:rr(0.4,1.1), phase:srand()*TAU, lean:gauss(0,0.1) });
+  shades.push({ fx: srand()<0.5? rr(0.05,0.2): rr(0.8,0.95), fy: rr(0.68,1.04),
+    h: rr(0.46,0.76), t0:G.t, dur:rr(3.4,5.6), sway:rr(0.4,1.0), phase:srand()*TAU,
+    lean:gauss(0,0.08), img: renderShadeImg(makeFaceG()) });
 }
 function drawShades(){
   const w=G.W,h=G.H;
   for(let i=shades.length-1;i>=0;i--){
     const s=shades[i]; const age=G.t-s.t0;
     if(age>s.dur){ shades.splice(i,1); continue; }
-    const env=Math.min(1,age/0.9)*Math.min(1,(s.dur-age)/0.9);
-    const alpha=clamp(env,0,1)*0.4;
+    const env=Math.min(1,age/1.3)*Math.min(1,(s.dur-age)/1.3);   // slow, natural fade in/out
+    const alpha=clamp(env,0,1)*0.5;
     if(alpha<=0.01) continue;
-    const H=s.h*h, feet=s.fy*h, head=feet-H;
-    const cx=s.fx*w + Math.sin(G.t*s.sway+s.phase)*w*0.006, lean=s.lean*H, bw=H*0.16;
-    vctx.save(); vctx.globalAlpha=alpha; vctx.fillStyle='#000';
-    vctx.beginPath();
-    vctx.moveTo(cx-bw*0.5,feet);
-    vctx.quadraticCurveTo(cx-bw,head+H*0.4, cx-bw*0.7+lean,head+H*0.16);
-    vctx.quadraticCurveTo(cx-bw*0.4+lean,head+H*0.02, cx+lean,head);
-    vctx.quadraticCurveTo(cx+bw*0.4+lean,head+H*0.02, cx+bw*0.7+lean,head+H*0.16);
-    vctx.quadraticCurveTo(cx+bw,head+H*0.4, cx+bw*0.5,feet);
-    vctx.closePath(); vctx.fill();
-    const hr=H*0.1; vctx.beginPath(); vctx.arc(cx+lean, head-hr*0.1, hr,0,TAU); vctx.fill();
+    const H=s.h*h, Ww=H*(s.img.width/s.img.height);
+    const cx=s.fx*w + Math.sin(G.t*s.sway+s.phase)*w*0.006, feet=s.fy*h;
+    vctx.save(); vctx.globalAlpha=alpha;
+    vctx.translate(cx,feet-H/2); vctx.transform(1,0,s.lean*0.4,1,0,0);
+    vctx.drawImage(s.img,-Ww/2,-H/2,Ww,H);
     vctx.restore();
   }
   vctx.globalAlpha=1;
@@ -690,7 +821,7 @@ function update(dt){
   G.shift = lerp(G.shift, G.shiftHeld?1:0, 1-Math.pow(0.001,dt));
   G.dash  = lerp(G.dash, (G.shiftHeld&&moving)?1:0, 1-Math.pow(0.002,dt));
   const transTgt = (G.shiftHeld && !moving && opened) ? 1 : 0;
-  G.trans = lerp(G.trans, transTgt, 1-Math.pow(transTgt?0.08:0.25, dt)); // slow rise, snappy release on input
+  G.trans = lerp(G.trans, transTgt, 1-Math.pow(transTgt?0.45:0.12, dt)); // slow, natural come-up; ease back on input
   const trans=G.trans, dash=G.dash;
   const rush = Math.max(trans, dash*0.55);       // combined "hyper" amount feeding the shader
   G.hyper = rush;                                // Post.frame reads this
@@ -738,9 +869,10 @@ function update(dt){
   player.radius = player.R0*Math.sqrt(player.mass/player.mass0);
   G.scale = G.targetScreenR/player.radius * (1 - trans*0.5);
 
-  // the fixation dot: bright while you stare in, a faint anchor afterward, gone in transcendence
-  cursorEl.style.opacity = (opened ? clamp(0.5-trans*0.5,0,1) : 1).toFixed(3);
-  const cs = opened ? 9 : (14+5*Math.sin(G.t*2.2));
+  // the fixation dot is ALWAYS visible — it is the anchor you stare through. Holding SHIFT
+  // makes it brighter and it swells/pulses as you transcend, never disappearing.
+  cursorEl.style.opacity = (opened ? clamp(0.4 + G.shift*0.55, 0, 1) : 1).toFixed(3);
+  const cs = opened ? (9 + G.shift*10 + trans*7*Math.abs(Math.sin(G.t*3))) : (14+5*Math.sin(G.t*2.2));
   cursorEl.style.width=cursorEl.style.height=cs.toFixed(1)+'px';
 
   // ---- shift the whole world to keep player centered ----
@@ -807,15 +939,16 @@ function update(dt){
   const tgtFeedR  = ((0.003 + trip*0.004)*amb + Math.sin(G.t*0.07)*0.004 + surge*0.006 + rush*0.05)*I;
   const tgtSpiral = (0.45 + trip*0.9)*amb + surge*0.5 + rush*1.4;
   const tgtSat    = 1.15 + (0.15 + trip*0.7)*amb + rush*0.4;
-  G.warp   =lerp(G.warp,tgtWarp, rush>0.01?0.2:0.08);
-  G.chroma =lerp(G.chroma,tgtChroma,0.12);
-  G.decay  =lerp(G.decay,tgtDecay,0.06);
-  G.kaleido=lerp(G.kaleido,tgtKal,0.05);
-  G.swirl  =lerp(G.swirl,tgtSwirl,0.1);
-  G.feedZoom=lerp(G.feedZoom,tgtFeedZ,0.08);
-  G.feedRot =lerp(G.feedRot,tgtFeedR,0.08);
-  G.spiral =lerp(G.spiral,tgtSpiral,0.06);
-  G.sat    =lerp(G.sat,tgtSat,0.05);
+  // gentle lerps => illusions morph slowly and naturally into one another, like a real trip
+  G.warp   =lerp(G.warp,tgtWarp, rush>0.01?0.14:0.05);
+  G.chroma =lerp(G.chroma,tgtChroma,0.06);
+  G.decay  =lerp(G.decay,tgtDecay,0.04);
+  G.kaleido=lerp(G.kaleido,tgtKal,0.03);
+  G.swirl  =lerp(G.swirl,tgtSwirl,0.06);
+  G.feedZoom=lerp(G.feedZoom,tgtFeedZ,0.05);
+  G.feedRot =lerp(G.feedRot,tgtFeedR,0.05);
+  G.spiral =lerp(G.spiral,tgtSpiral,0.035);
+  G.sat    =lerp(G.sat,tgtSat,0.03);
   G.hue = (G.hue + dt*((0.06+trip*0.12)*amb + surge*0.25 + rush*0.5) + G.hueSpike*dt*3) % TAU;
   // enlightenment: transcendence slowly floods the frame with light
   G.flash=lerp(G.flash, G.flashSpike + surge*0.05*I + trans*trans*0.35*I, 0.3);
