@@ -54,37 +54,57 @@ main, .top, .foot { position: relative; z-index: 1; }
   position: sticky;
   top: 0;
   z-index: 30;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   gap: 1rem;
-  padding: 0.85rem 1.4rem;
+  padding: 0.95rem 1.4rem;
   backdrop-filter: blur(16px);
   background: rgba(10, 6, 8, 0.72);
   border-bottom: 1px solid var(--line);
 }
 .logo {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-.nav {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 1.1rem;
+  justify-self: center;
+  text-align: center;
+  line-height: 1.05;
+}
+.logoMark {
+  font-family: var(--display);
+  font-size: clamp(1.55rem, 3vw, 2rem);
+  font-weight: 700;
+  font-style: italic;
+  letter-spacing: -0.02em;
+  background: linear-gradient(180deg, #fff5f8 10%, var(--blush) 70%, var(--cherry) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.logoSub {
+  margin-top: 0.15rem;
+  font-family: var(--display);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--skin);
+}
+.navSide {
   font-size: 0.92rem;
   color: var(--muted);
+  justify-self: start;
 }
-.nav a:hover { color: var(--blush); }
-.navCta {
+.navSide:hover { color: var(--blush); }
+.navSide.navCta {
+  justify-self: end;
   color: #1a0610 !important;
   background: linear-gradient(135deg, var(--blush), var(--cherry));
   padding: 0.48rem 0.95rem;
   border-radius: 999px;
   font-weight: 600;
   box-shadow: 0 0 24px rgba(255, 77, 122, 0.25);
+  text-align: center;
 }
 
 .hero { min-height: calc(100vh - 60px); }
@@ -122,14 +142,6 @@ main, .top, .foot { position: relative; z-index: 1; }
   justify-content: flex-end;
 }
 
-.eyebrow {
-  margin: 0 0 0.7rem;
-  color: var(--blush);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-}
 .brand {
   margin: 0;
   font-family: var(--display);
@@ -392,7 +404,7 @@ main, .top, .foot { position: relative; z-index: 1; }
   .heroScrim {
     background: linear-gradient(180deg, rgba(10,6,8,0.35) 0%, rgba(10,6,8,0.88) 55%, rgba(10,6,8,0.96) 100%);
   }
-  .nav a:not(.navCta) { display: none; }
+  .navSide:not(.navCta) { opacity: 0; pointer-events: none; }
   .gItem:nth-child(3n), .gItem:nth-child(5n) { transform: none; }
   .stripInner { text-align: left; }
 }
