@@ -107,10 +107,10 @@
           <div class="cardDesc">Succubus queen. An unhinged protagonist. Explore the realm.</div>
         </a>
 
-        <a class="card c1" href="./games/jim-eats-the-neighbours/">
+        <a class="card c1 soon" aria-disabled="true">
           <div class="cardTop">
             <div class="emoji">🍽️</div>
-            <div class="tag">social</div>
+            <div class="tag">soon</div>
           </div>
           <div class="cardTitle">Jim Eats the Neighbours</div>
           <div class="cardDesc">Jim is out and tonight he wants to eat the neighbours. Convince them to let him in!</div>
@@ -134,28 +134,28 @@
           <div class="cardDesc">So, Go.. Ding!</div>
         </a>
 
-        <a class="card c4" href="./games/infinite-retail/">
+        <a class="card c4 soon" aria-disabled="true">
           <div class="cardTop">
             <div class="emoji">🛒</div>
-            <div class="tag">horror?</div>
+            <div class="tag">soon</div>
           </div>
           <div class="cardTitle">Infinite Retail</div>
           <div class="cardDesc">Explore a never ending Supermarket! But be careful when the lights go out.</div>
         </a>
 
-        <a class="card c5" href="./games/datura-protocol/">
+        <a class="card c5 soon" aria-disabled="true">
           <div class="cardTop">
             <div class="emoji">☠️</div>
-            <div class="tag">do not</div>
+            <div class="tag">soon</div>
           </div>
           <div class="cardTitle">Datura Protocol</div>
           <div class="cardDesc">Oh God, do NOT play this</div>
         </a>
 
-        <a class="card c6" href="./games/codecrackers/">
+        <a class="card c6 soon" aria-disabled="true">
           <div class="cardTop">
             <div class="emoji">🧩</div>
-            <div class="tag">puzzle</div>
+            <div class="tag">soon</div>
           </div>
           <div class="cardTitle">CodeCrackers</div>
           <div class="cardDesc">Create your own Crosswords and Code Crackers!</div>
@@ -267,7 +267,7 @@
     // Surprise me -> picks a random tile in Stuff
     (function () {
       const btn = document.getElementById('surpriseBtn');
-      const cards = Array.from(document.querySelectorAll('#grid .card'));
+      const cards = Array.from(document.querySelectorAll('#grid .card:not(.soon)'));
       btn.addEventListener('click', () => {
         const pick = cards[Math.floor(Math.random() * cards.length)];
         if (!pick) return;
