@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Datura Protocol</title>
+<meta name="description" content="A procedurally hallucinated organism sim. Shapes touch you, become you, and never stop growing.">
+<style>
+  :root{ --ui:#e9dcff; --dim:#8f7fb0; }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html,body{ width:100%; height:100%; overflow:hidden; background:#05020a; }
+  body{
+    font-family:'Courier New',ui-monospace,monospace;
+    color:var(--ui); cursor:none; touch-action:none;
+    -webkit-user-select:none; user-select:none;
+  }
+  canvas{ position:fixed; inset:0; display:block; }
+  #gl{ z-index:1; }
+  #cursor{
+    position:fixed; z-index:6; width:26px; height:26px; margin:-13px 0 0 -13px;
+    border:1.5px solid rgba(233,220,255,.55); border-radius:50%;
+    mix-blend-mode:difference; pointer-events:none;
+    transition:width .12s,height .12s; will-change:transform;
+  }
+  #cursor::after{ content:''; position:absolute; inset:11px; border-radius:50%; background:rgba(233,220,255,.7); }
+
+  /* ---------- HUD ---------- */
+  #hud{ position:fixed; z-index:5; inset:0; pointer-events:none; }
+  .stat{ position:absolute; text-shadow:0 0 14px rgba(180,120,255,.6); }
+  #size{ top:16px; left:20px; font-size:12px; letter-spacing:.28em; color:var(--dim); }
+  #size b{ display:block; font-size:34px; letter-spacing:.02em; color:#fff; font-weight:400;
+           text-shadow:0 0 24px rgba(200,120,255,.9),0 0 60px rgba(120,80,255,.5); }
+  #forms{ top:18px; right:20px; text-align:right; font-size:11px; letter-spacing:.24em; color:var(--dim); }
+  #forms b{ color:#ffd9f4; font-weight:400; }
+  #whisper{ position:absolute; bottom:12%; left:0; right:0; text-align:center;
+            font-size:20px; letter-spacing:.6em; color:#fff; opacity:0; font-weight:400;
+            text-shadow:0 0 30px rgba(255,120,220,.9); }
+  #meterwrap{ position:absolute; left:20px; right:20px; bottom:16px; height:2px;
+              background:rgba(255,255,255,.08); overflow:hidden; }
+  #meter{ position:absolute; inset:0; width:0%; background:linear-gradient(90deg,#7cf,#c9f,#f9c,#fd8);
+          filter:blur(.4px); }
+  #hint{ position:absolute; bottom:26px; left:0; right:0; text-align:center; font-size:10px;
+         letter-spacing:.35em; color:var(--dim); opacity:.5; }
+
+  /* ---------- Intro ---------- */
+  #intro{ position:fixed; z-index:10; inset:0; display:flex; flex-direction:column;
+          align-items:center; justify-content:center; text-align:center; gap:24px;
+          background:radial-gradient(ellipse at 50% 40%,rgba(40,10,60,.35),rgba(5,2,10,.9) 70%);
+          cursor:pointer; transition:opacity .8s; }
+  #intro.gone{ opacity:0; pointer-events:none; }
+  #intro h1{ font-size:min(15vw,120px); font-weight:400; letter-spacing:.06em; line-height:.9;
+             color:#fff; text-shadow:0 0 40px rgba(200,80,255,.8),0 0 120px rgba(120,40,220,.6);
+             animation:breathe 5s ease-in-out infinite; }
+  #intro h1 span{ display:block; font-size:.34em; letter-spacing:.5em; color:#c9a8ff; text-shadow:none; margin-top:.4em; }
+  #intro p{ max-width:520px; font-size:13px; line-height:2; letter-spacing:.12em; color:var(--dim); padding:0 20px; }
+  #intro .warn{ color:#ff8fb8; letter-spacing:.2em; font-size:11px; }
+  #begin{ margin-top:8px; font-size:14px; letter-spacing:.5em; color:#fff; padding:14px 34px;
+          border:1px solid rgba(200,150,255,.4); border-radius:40px; animation:pulseb 2.2s ease-in-out infinite; }
+  #opts{ display:flex; gap:26px; font-size:10px; letter-spacing:.25em; color:var(--dim); }
+  #opts label{ cursor:pointer; display:flex; align-items:center; gap:8px; }
+  #opts input{ accent-color:#c084fc; }
+  @keyframes breathe{ 0%,100%{ transform:scale(1); filter:hue-rotate(0deg); } 50%{ transform:scale(1.04); filter:hue-rotate(40deg); } }
+  @keyframes pulseb{ 0%,100%{ box-shadow:0 0 0 0 rgba(200,150,255,.4); } 50%{ box-shadow:0 0 40px 4px rgba(200,150,255,.25); } }
+  #flashwarn{ position:fixed; z-index:11; bottom:14px; left:0; right:0; text-align:center;
+              font-size:9px; letter-spacing:.3em; color:#6b5a86; }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="cursor"></div>
+
+<div id="hud">
+  <div class="stat" id="size">MASS<b>1</b></div>
+  <div class="stat" id="forms">FORMS ABSORBED<br><b>0</b></div>
+  <div id="whisper"></div>
+  <div id="meterwrap"><div id="meter"></div></div>
+  <div id="hint">MOVE — merge — become</div>
+</div>
+
+<div id="intro">
+  <h1>DATURA<span>PROTOCOL</span></h1>
+  <p class="warn">⚠ FLASHING · MOTION · DISSOCIATION</p>
+  <p>You are the smallest thing here. Everything that touches you becomes part of you.
+     There is no goal, no end, no death. Only the shape you are turning into.</p>
+  <div id="begin">ENTER THE BLOOM</div>
+  <div id="opts">
+    <label><input type="checkbox" id="optReduce"> reduce flashing</label>
+    <label><input type="checkbox" id="optSound" checked> sound</label>
+  </div>
+</div>
+<div id="flashwarn">contains sustained flashing imagery — enable "reduce flashing" if sensitive</div>
+
+<script>
+"use strict";
+/* ============================================================================
+   DATURA PROTOCOL
+   A single-file procedural organism trip. Everything you see is generated:
+   creature genomes, their real silhouettes, and — when they touch you — those
+   silhouettes are grafted onto your own body, mutating what you are. You never
+   stop growing; the camera falls away from you forever. The whole frame is run
+   through a GPU feedback/warp/chroma pipeline so it reads like a datura bloom.
+   No libraries. No assets. Deterministic-ish RNG so forms feel authored.
+   ========================================================================== */
+
+/* ----------------------------- tiny math ---------------------------------- */
+const TAU = Math.PI * 2;
+const clamp = (v,a,b)=> v<a?a:v>b?b:v;
+const lerp  = (a,b,t)=> a+(b-a)*t;
+const smooth= (t)=> t*t*(3-2*t);
+let _seed = 0x9e3779b9 ^ 0x1234;
+function srand(){ // fast deterministic PRNG (mulberry32)
+  _seed |= 0; _seed = (_seed + 0x6D2B79F5) | 0;
+  let t = Math.imul(_seed ^ (_seed>>>15), 1 | _seed);
+  t = (t + Math.imul(t ^ (t>>>7), 61 | t)) ^ t;
+  return ((t ^ (t>>>14)) >>> 0) / 4294967296;
+}
+const rr  = (a,b)=> a + srand()*(b-a);
+const ri  = (a,b)=> (a + Math.floor(srand()*(b-a+1)));
+const pick= (arr)=> arr[(srand()*arr.length)|0];
+function gauss(m=0,s=1){ // box-muller
+  const u=1-srand(), v=srand();
+  return m + s*Math.sqrt(-2*Math.log(u))*Math.cos(TAU*v);
+}
+const GOLD = Math.PI*(3-Math.sqrt(5));
+
+/* number formatting for the ever-inflating mass counter */
+const SUF=['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc','Ud','Dd'];
+function fmt(n){
+  if(n<1000) return (n<10? n.toFixed(1) : Math.round(n)).toString();
+  let i=0; while(n>=1000 && i<SUF.length-1){ n/=1000; i++; }
+  if(i>=SUF.length-1 && n>=1000) return n.toExponential(1).replace('e+','e');
+  return (n<10?n.toFixed(2):n<100?n.toFixed(1):Math.round(n))+SUF[i];
+}
+
+/* --------------------------- global state --------------------------------- */
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const G = {
+  W:0,H:0, dpr:1,
+  t:0, dt:0, running:false, started:false,
+  intensity: REDUCED?0.35:1,       // master psychedelia multiplier (flash/chroma/strobe)
+  quality:1,                        // auto-degrades if slow
+  // camera lives at the player; player sits at world (0,0). scale shrinks as you grow.
+  scale:1, targetScreenR: 78,
+  // shader drive params (smoothed each frame)
+  warp:0.5, chroma:0.4, hue:0, decay:0.9, feedZoom:0, feedRot:0,
+  kaleido:0, swirl:0, breath:0, flash:0, invert:0, grain:0.05, vignette:0.9,
+  // event impulses (decay over time)
+  kick:0, hueSpike:0, warpSpike:0, chromaSpike:0, flashSpike:0, surge:0,
+  surgeTimer:8, sound:true,
+};
+
+/* =====================================================================
+   WEBGL POST PIPELINE  (feedback tunnel + domain warp + chroma + hue)
+   Falls back gracefully to a plain 2D blit if WebGL is unavailable.
+   ===================================================================== */
+const Post = (()=>{
+  const glc = document.getElementById('gl');
+  let gl = glc.getContext('webgl',{alpha:false,antialias:false,preserveDrawingBuffer:false})
+        || glc.getContext('experimental-webgl');
+  const ok = !!gl;
+  let progPost, progPresent, quad, sceneTex, fbo=[null,null], fboTex=[null,null], cur=0;
+  let ctx2d=null; // fallback
+
+  const VERT = `attribute vec2 p; varying vec2 vUv;
+    void main(){ vUv = p*0.5+0.5; gl_Position=vec4(p,0.0,1.0);} `;
+
+  const POST = `precision highp float; varying vec2 vUv;
+    uniform sampler2D uScene, uPrev; uniform vec2 uRes; uniform float uTime;
+    uniform float uWarp,uChroma,uHue,uDecay,uFeedZoom,uFeedRot,uKaleido,uBreath,uSwirl;
+    mat2 rot(float a){ float s=sin(a),c=cos(a); return mat2(c,-s,s,c);}
+    vec3 hueRot(vec3 col,float a){ const vec3 k=vec3(0.57735); float c=cos(a),s=sin(a);
+      return col*c + cross(k,col)*s + k*dot(k,col)*(1.0-c);}
+    vec2 warp(vec2 uv,float t,float amp){ vec2 p=uv;
+      p.x+=sin(uv.y*7.0+t*0.7)*0.5*amp; p.y+=cos(uv.x*8.0-t*0.6)*0.5*amp;
+      p.x+=sin(uv.y*15.0-t*1.3)*0.25*amp; p.y+=cos(uv.x*17.0+t*1.1)*0.25*amp; return p;}
+    void main(){
+      float aspect=uRes.x/uRes.y;
+      vec2 c=(vUv-0.5); c.x*=aspect;
+      float r=length(c), ang=atan(c.y,c.x);
+      ang += uSwirl*(0.6-r);
+      if(uKaleido>0.001){ float seg=1.04719755; float ka=mod(ang,seg); ka=abs(ka-seg*0.5);
+        ang=mix(ang,ka+3.14159,uKaleido);}
+      vec2 sc=vec2(cos(ang),sin(ang))*r; sc.x/=aspect; vec2 uv2=sc+0.5;
+      float amp=uWarp*(0.5+0.5*uBreath);
+      vec2 wuv=warp(uv2,uTime,amp*0.06);
+      vec2 dir=normalize(c+1e-5); float ca=uChroma*(0.004+0.02*r);
+      float R=texture2D(uScene,wuv+dir*ca).r;
+      float Gc=texture2D(uScene,wuv).g;
+      float B=texture2D(uScene,wuv-dir*ca).b;
+      vec3 scene=vec3(R,Gc,B);
+      vec2 fc=(vUv-0.5); fc.x*=aspect; fc*=(1.0+uFeedZoom); fc=rot(uFeedRot)*fc; fc.x/=aspect;
+      vec3 fb=texture2D(uPrev,fc+0.5).rgb*uDecay;
+      fb=hueRot(fb,0.04);
+      vec3 col=1.0-(1.0-scene)*(1.0-fb);   // screen-blend glow trails
+      col=hueRot(col,uHue);
+      float l=dot(col,vec3(0.299,0.587,0.114));
+      col=mix(vec3(l),col,1.28);
+      gl_FragColor=vec4(clamp(col,0.0,1.0),1.0);
+    }`;
+
+  const PRESENT = `precision highp float; varying vec2 vUv;
+    uniform sampler2D uTex; uniform vec2 uRes; uniform float uTime,uFlash,uGrain,uVig,uInvert;
+    float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+    void main(){ vec2 uv=vUv; vec3 col=texture2D(uTex,uv).rgb;
+      col=mix(col,1.0-col,uInvert);
+      col+=uFlash;
+      vec2 c=uv-0.5; float v=1.0-dot(c,c)*uVig; col*=clamp(v,0.0,1.0);
+      float g=hash(uv*uRes+uTime); col+=(g-0.5)*uGrain;
+      gl_FragColor=vec4(col,1.0);} `;
+
+  function sh(type,src){ const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){ console.warn(gl.getShaderInfoLog(s)); return null;} return s; }
+  function prog(vs,fs){ const p=gl.createProgram();
+    gl.attachShader(p,sh(gl.VERTEX_SHADER,vs)); gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));
+    gl.bindAttribLocation(p,0,'p'); gl.linkProgram(p);
+    if(!gl.getProgramParameter(p,gl.LINK_STATUS)){ console.warn(gl.getProgramInfoLog(p)); return null;} return p; }
+  function mkTex(w,h){ const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null); return t; }
+
+  function initGL(){
+    progPost=prog(VERT,POST); progPresent=prog(VERT,PRESENT);
+    if(!progPost||!progPresent){ return false; }
+    quad=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,quad);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1, 3,-1, -1,3]),gl.STATIC_DRAW);
+    sceneTex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,sceneTex);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+    return true;
+  }
+
+  let W=0,H=0;
+  function resize(w,h){
+    W=w;H=h; glc.width=w; glc.height=h;
+    if(!ok){ return; }
+    for(let i=0;i<2;i++){
+      if(fbo[i]) gl.deleteFramebuffer(fbo[i]);
+      if(fboTex[i]) gl.deleteTexture(fboTex[i]);
+      fboTex[i]=mkTex(w,h); fbo[i]=gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER,fbo[i]);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,fboTex[i],0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  }
+
+  function bindQuad(p){ gl.useProgram(p); gl.bindBuffer(gl.ARRAY_BUFFER,quad);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0); }
+  const U=(p,n)=>gl.getUniformLocation(p,n);
+
+  function frame(sceneCanvas,u){
+    if(!ok){ // 2D fallback: just blit the scene with a CSS filter for a little life
+      if(!ctx2d) ctx2d=glc.getContext('2d');
+      ctx2d.globalCompositeOperation='source-over';
+      ctx2d.drawImage(sceneCanvas,0,0);
+      glc.style.filter=`saturate(1.5) contrast(1.05) hue-rotate(${(u.hue*57.3)|0}deg)`;
+      return;
+    }
+    const prev=cur, next=cur^1;
+    // upload scene
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,sceneTex);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,sceneCanvas);
+    // pass 1 -> fbo[next]
+    gl.bindFramebuffer(gl.FRAMEBUFFER,fbo[next]); gl.viewport(0,0,W,H);
+    bindQuad(progPost);
+    gl.uniform1i(U(progPost,'uScene'),0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,fboTex[prev]);
+    gl.uniform1i(U(progPost,'uPrev'),1);
+    gl.uniform2f(U(progPost,'uRes'),W,H);
+    gl.uniform1f(U(progPost,'uTime'),u.t);
+    gl.uniform1f(U(progPost,'uWarp'),u.warp);
+    gl.uniform1f(U(progPost,'uChroma'),u.chroma);
+    gl.uniform1f(U(progPost,'uHue'),u.hue);
+    gl.uniform1f(U(progPost,'uDecay'),u.decay);
+    gl.uniform1f(U(progPost,'uFeedZoom'),u.feedZoom);
+    gl.uniform1f(U(progPost,'uFeedRot'),u.feedRot);
+    gl.uniform1f(U(progPost,'uKaleido'),u.kaleido);
+    gl.uniform1f(U(progPost,'uBreath'),u.breath);
+    gl.uniform1f(U(progPost,'uSwirl'),u.swirl);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+    // pass 2 -> screen (present)
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,W,H);
+    bindQuad(progPresent);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,fboTex[next]);
+    gl.uniform1i(U(progPresent,'uTex'),0);
+    gl.uniform2f(U(progPresent,'uRes'),W,H);
+    gl.uniform1f(U(progPresent,'uTime'),u.t);
+    gl.uniform1f(U(progPresent,'uFlash'),u.flash);
+    gl.uniform1f(U(progPresent,'uGrain'),u.grain);
+    gl.uniform1f(U(progPresent,'uVig'),u.vignette);
+    gl.uniform1f(U(progPresent,'uInvert'),u.invert);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+    cur=next;
+  }
+
+  let good = ok && initGL();
+  return { ok:good, resize, frame, get is2d(){return !good;} };
+})();
+
+/* the scene is drawn to an offscreen 2D canvas, then fed to Post */
+const scene = document.createElement('canvas');
+const sctx  = scene.getContext('2d');
+
+/* =====================================================================
+   PROCEDURAL FORM GENERATION
+   A "part" is one organ with a real silhouette. Bodies (you + creatures)
+   are bags of parts that orbit, spin, pulse and breathe. Absorbing a
+   creature grafts its parts onto you.
+   ===================================================================== */
+const KINDS = ['blob','crystal','star','ring','eye','tentacle','spore'];
+
+function silhouette(n, spikiness, wobble){
+  // radial signature: layered harmonics -> organic-but-authored outlines
+  const h1=ri(2,5), h2=ri(5,11), p1=rr(0,TAU), p2=rr(0,TAU);
+  const pts=[];
+  for(let i=0;i<n;i++){
+    const a=i/n*TAU;
+    let r=1 + spikiness*Math.sin(a*h1+p1) + wobble*Math.sin(a*h2+p2);
+    r=Math.max(0.25,r);
+    pts.push(r);
+  }
+  return pts;
+}
+
+function makePart(genome, deep){
+  const kind = deep ? pick(KINDS) : (srand()<0.5?'blob':pick(KINDS));
+  const hue  = (genome.hue + gauss(0,genome.spread)) % 360;
+  const p = {
+    kind, hue:(hue+360)%360,
+    sat: clamp(genome.sat+gauss(0,10),40,100),
+    light: clamp(genome.light+gauss(0,12),42,80),
+    alpha: rr(0.7,1),
+    size: rr(0.18,0.5),                     // fraction of body radius
+    orbitR: rr(0,1.0),                      // distance of part from core
+    orbitA: srand()*TAU,
+    orbitSpeed: gauss(0,0.5)*genome.anim,
+    rot: srand()*TAU,
+    spin: gauss(0,0.7)*genome.anim,
+    pulseA: rr(0.04,0.22), pulseP:srand()*TAU, pulseS: rr(0.6,2.4)*genome.anim,
+    glow: rr(0.5,1),
+  };
+  if(kind==='blob')    p.sil=silhouette(ri(9,16), rr(0.12,0.4), rr(0.05,0.25));
+  else if(kind==='crystal') p.sil=silhouette(ri(3,7), rr(0.2,0.7), rr(0,0.1));
+  else if(kind==='star'){ p.petals=ri(4,9); p.inner=rr(0.35,0.62); }
+  else if(kind==='ring'){ p.inner=rr(0.45,0.72); }
+  else if(kind==='eye'){ p.size=rr(0.16,0.34); p.lash=srand()<0.5; }
+  else if(kind==='tentacle'){ p.segs=ri(5,9); p.len=rr(1.1,2.4); p.wave=rr(1.5,3.5);
+    p.width=rr(0.1,0.24); p.orbitR=rr(0.6,1.05); }
+  else if(kind==='spore'){ p.dots=ri(5,12); p.spread=rr(0.4,1); }
+  return p;
+}
+
+function makeGenome(){
+  const palettes=[ // curated hallucinogenic hue anchors
+    [300,42,60],[190,70,58],[45,90,60],[330,80,62],[265,60,58],
+    [150,65,55],[15,88,60],[210,75,60],[95,60,55],[350,70,60],
+  ];
+  const base=pick(palettes);
+  return {
+    hue: base[0]+gauss(0,20),
+    spread: rr(14,70),
+    sat: base[1]+gauss(0,8),
+    light: base[2]+gauss(0,6),
+    anim: rr(0.6,1.8),
+    symmetry: pick([1,1,2,2,3,4,5,6]),
+  };
+}
+
+function buildBody(genome, nParts, deep){
+  const parts=[];
+  const sym=genome.symmetry;
+  const base=Math.max(1,Math.ceil(nParts/sym));
+  for(let i=0;i<base;i++){
+    const seed=makePart(genome, deep);
+    for(let s=0;s<sym;s++){
+      const clone=Object.assign({},seed);
+      clone.orbitA = seed.orbitA + s*(TAU/sym);
+      clone.sil = seed.sil;  // share silhouette across a symmetric set
+      if(s>0){ clone.hue=(seed.hue+ s*rr(4,16))%360; clone.pulseP=seed.pulseP+s*0.4; }
+      parts.push(clone);
+    }
+  }
+  return parts;
+}
+
+/* ------------------------------- creatures -------------------------------- */
+const beings=[];
+function spawnBeing(){
+  const g=makeGenome();
+  // relative mass: mostly-smaller, sometimes far bigger -> no size drop-off ever
+  let ratio=Math.exp(gauss(-0.35,0.95));
+  ratio=clamp(ratio,0.05,4.2);
+  const isLeviathan = ratio>2.4;
+  const mass=player.mass*ratio;
+  const nParts=clamp(Math.round(4+ratio*5+ri(0,4)),3,20);
+  const body=buildBody(g,nParts,ratio>1);
+  // spawn just outside the visible radius, in view-relative coords (player at 0,0)
+  const viewR=Math.hypot(G.W,G.H)/2/G.scale;
+  const a=srand()*TAU, d=viewR*rr(1.05,1.5);
+  const behavior = isLeviathan ? 'drift' : pick(['seek','seek','wander','orbit','seek','flee']);
+  const spd = player.radius * (isLeviathan? rr(0.4,0.9) : rr(1.3,3.6)) * (behavior==='flee'?1.4:1);
+  const va=srand()*TAU;
+  beings.push({
+    x:Math.cos(a)*d, y:Math.sin(a)*d,
+    vx:Math.cos(va)*spd, vy:Math.sin(va)*spd, spd,
+    mass, radius: player.R0*Math.sqrt(mass/player.mass0),
+    genome:g, parts:body, spin:gauss(0,0.5), spinV:gauss(0,0.4),
+    behavior, wa:srand()*TAU, born:G.t, leviathan:isLeviathan,
+    hueDrift: gauss(0,0.3),
+  });
+}
+
+/* --------------------------------- player --------------------------------- */
+const player = {
+  x:0,y:0, vx:0,vy:0,
+  mass0:1, mass:1, R0:60, radius:60,
+  genome:null, parts:[], spin:0,
+  hue:280, absorbed:0,
+  targetX:0, targetY:0, _pmx:0, _pmy:0,
+};
+function initPlayer(){
+  player.genome=makeGenome();
+  player.parts=buildBody(player.genome, 6, false);
+  player.hue=player.genome.hue;
+}
+
+function graft(b){
+  // absorb creature b: add mass, graft some of its real parts onto us, mutate hue
+  const before=player.mass;
+  player.mass += b.mass;
+  player.absorbed++;
+  // how much of it literally becomes us
+  const take=clamp(Math.round(1+ b.mass/before*3), 1, 8);
+  const src=b.parts;
+  for(let i=0;i<take && src.length;i++){
+    // full-clone a real organ from the creature so it keeps its kind AND every
+    // kind-specific field (segs/petals/inner/sil...) — its true shape becomes ours
+    const chosen=src[(srand()*src.length)|0];
+    const p=Object.assign({},chosen);
+    Object.assign(p,{ orbitA:player.parts.length*GOLD + srand()*0.3,
+      orbitR:rr(0.55,1.12), orbitSpeed:gauss(0,0.4)*player.genome.anim,
+      size:clamp(chosen.size*rr(0.7,1.1),0.12,0.5),
+      pulseP:srand()*TAU });
+    player.parts.push(p);
+  }
+  // mutate the whole organism's hue toward what we ate (procedural transformation)
+  let dh=((b.genome.hue-player.hue+540)%360)-180;
+  player.hue=(player.hue + dh*clamp(b.mass/player.mass,0.03,0.5) + 360)%360;
+  // bound part count: fold the smallest/oldest into the core, keep the mass
+  if(player.parts.length>120){
+    player.parts.sort((a,c)=> (a.orbitR+ a.size) - (c.orbitR+c.size));
+    player.parts.splice(0, player.parts.length-120);
+  }
+  // impulses
+  const punch=clamp(b.mass/before,0.15,1.6);
+  G.hueSpike   = Math.min(1.4, G.hueSpike + punch*0.8);
+  G.warpSpike  = Math.min(1.6, G.warpSpike + punch);
+  G.chromaSpike= Math.min(1.8, G.chromaSpike + punch*1.2);
+  G.flashSpike = Math.min(0.9, G.flashSpike + punch*0.5*G.intensity);
+  G.kick       = Math.min(1.5, G.kick + punch);
+  burst(b.x,b.y, b.radius, b.genome.hue, 14+punch*22);
+  audio.absorb(b.mass/before);
+  UI.whisper();
+}
+
+/* --------------------------------- particles ------------------------------ */
+const parts=[]; // motes + absorb bursts
+function burst(x,y,r,hue,n){
+  for(let i=0;i<n;i++){
+    const a=srand()*TAU, s=rr(0.5,3)*r;
+    parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,decay:rr(0.5,1.4),
+      r:rr(0.04,0.14)*r,hue:(hue+gauss(0,40))%360,kind:'spark'});
+  }
+}
+function seedMotes(){
+  for(let i=0;i<90;i++){
+    const a=srand()*TAU,d=rr(0.2,2.2)*player.radius*6;
+    parts.push({x:Math.cos(a)*d,y:Math.sin(a)*d,vx:gauss(0,4),vy:gauss(0,4),
+      life:Infinity,r:rr(1,3),hue:rr(0,360),kind:'mote',ph:srand()*TAU});
+  }
+}
+
+/* =====================================================================
+   UPDATE
+   ===================================================================== */
+function update(dt){
+  G.t += dt;
+  // ---- breathing / surge scheduler ----
+  G.breath = 0.5+0.5*Math.sin(G.t*0.5) ;
+  G.surgeTimer -= dt;
+  if(G.surgeTimer<=0){ G.surge=1; G.surgeTimer=rr(14,28); audio.surge(); }
+  G.surge=Math.max(0,G.surge-dt*0.22);
+  const surge=smooth(G.surge);
+
+  // ---- player movement: snappy chase of the pointer/keys, scaled to size ----
+  const spd=player.radius*4.0*(1+surge*0.5);
+  // desired velocity toward the pointer target (already in player-centric world space)
+  let dx=player.targetX, dy=player.targetY;
+  const dm=Math.hypot(dx,dy)||1;
+  const want = Math.min(dm/ (0.12), spd); // ease in
+  let wvx=dx/dm*want, wvy=dy/dm*want;
+  // keyboard override/add
+  if(keys.size){
+    let kx=(keys.has('d')||keys.has('arrowright'))-(keys.has('a')||keys.has('arrowleft'));
+    let ky=(keys.has('s')||keys.has('arrowdown'))-(keys.has('w')||keys.has('arrowup'));
+    if(kx||ky){ const km=Math.hypot(kx,ky); wvx=kx/km*spd; wvy=ky/km*spd; }
+  }
+  player.vx=lerp(player.vx,wvx,1-Math.pow(0.0009,dt));
+  player.vy=lerp(player.vy,wvy,1-Math.pow(0.0009,dt));
+  // player sits at origin: the world moves opposite to the player's velocity
+  const shx=-player.vx*dt, shy=-player.vy*dt;
+  player.spin += dt*0.15*(1+surge);
+
+  // recompute radius/scale from mass (infinite growth; camera falls away)
+  player.radius = player.R0*Math.sqrt(player.mass/player.mass0);
+  G.scale = G.targetScreenR/player.radius;
+
+  // ---- shift the whole world to keep player centered, update pointer target world-space
+  for(const b of beings){ b.x+=shx; b.y+=shy; }
+  for(const p of parts){ p.x+=shx; p.y+=shy; }
+
+  // ---- creatures ----
+  const viewR=Math.hypot(G.W,G.H)/2/G.scale;
+  for(let i=beings.length-1;i>=0;i--){
+    const b=beings[i];
+    b.radius=player.R0*Math.sqrt(b.mass/player.mass0);
+    // behaviors
+    let bx=0,by=0;
+    const d=Math.hypot(b.x,b.y)||1;
+    if(b.behavior==='seek'){ bx=-b.x/d; by=-b.y/d; }
+    else if(b.behavior==='flee'){ bx=b.x/d; by=b.y/d; }
+    else if(b.behavior==='orbit'){ bx=-b.y/d; by=b.x/d; }
+    else { b.wa+=gauss(0,1)*dt*2; bx=Math.cos(b.wa); by=Math.sin(b.wa); }
+    const acc=b.spd*(1+surge*0.6);
+    b.vx=lerp(b.vx, bx*acc, 1-Math.pow(0.02,dt));
+    b.vy=lerp(b.vy, by*acc, 1-Math.pow(0.02,dt));
+    b.x+=b.vx*dt; b.y+=b.vy*dt;
+    b.spin+=b.spinV*dt;
+    b.genome.hue=(b.genome.hue + b.hueDrift*dt*40)%360;
+    // absorb on contact
+    const dist=Math.hypot(b.x,b.y);
+    if(dist < player.radius*0.82 + b.radius*0.28){ graft(b); beings.splice(i,1); continue; }
+    // cull if wandered absurdly far
+    if(dist > viewR*2.2){ beings.splice(i,1); }
+  }
+  // keep the world populated & fast
+  const target = 22 + Math.round(6*G.quality);
+  let guard=0;
+  while(beings.length<target && guard++<6) spawnBeing();
+
+  // ---- particles ----
+  for(let i=parts.length-1;i>=0;i--){
+    const p=parts[i];
+    p.x+=p.vx*dt; p.y+=p.vy*dt;
+    if(p.kind==='spark'){ p.vx*=Math.pow(0.1,dt); p.vy*=Math.pow(0.1,dt);
+      p.life-=dt*p.decay; if(p.life<=0){ parts.splice(i,1); continue; } }
+    else { // mote: gentle drift, wrap around the player field
+      p.ph+=dt; const dd=Math.hypot(p.x,p.y);
+      if(dd>viewR*1.8){ const a=srand()*TAU,nd=viewR*rr(0.3,0.9);
+        p.x=Math.cos(a)*nd; p.y=Math.sin(a)*nd; }
+    }
+  }
+
+  // ---- drive the shader params (smoothed) ----
+  const I=G.intensity;
+  G.warpSpike*=Math.pow(0.02,dt); G.chromaSpike*=Math.pow(0.05,dt);
+  G.hueSpike*=Math.pow(0.15,dt);  G.flashSpike*=Math.pow(0.003,dt);
+  G.kick*=Math.pow(0.02,dt);
+  const tgtWarp   = 0.35 + 0.25*G.breath + surge*0.7 + G.warpSpike;
+  const tgtChroma = (0.3 + surge*0.6 + G.chromaSpike)*I;
+  const tgtDecay  = 0.855 + surge*0.07 + G.kick*0.02;
+  const tgtKal    = (surge*0.45)*I;
+  const tgtSwirl  = (Math.sin(G.t*0.13)*0.12 + surge*0.25)*I;
+  const tgtFeedZ  = (-0.006 - G.kick*0.02 + Math.sin(G.t*0.31)*0.004);
+  const tgtFeedR  = (0.002 + Math.sin(G.t*0.07)*0.004 + surge*0.006)*I;
+  G.warp   =lerp(G.warp,tgtWarp,0.08);
+  G.chroma =lerp(G.chroma,tgtChroma,0.1);
+  G.decay  =lerp(G.decay,tgtDecay,0.06);
+  G.kaleido=lerp(G.kaleido,tgtKal,0.05);
+  G.swirl  =lerp(G.swirl,tgtSwirl,0.05);
+  G.feedZoom=lerp(G.feedZoom,tgtFeedZ,0.06);
+  G.feedRot =lerp(G.feedRot,tgtFeedR,0.06);
+  G.hue = (G.hue + dt*(0.06+surge*0.25) + G.hueSpike*dt*3) % TAU;
+  G.flash=lerp(G.flash, G.flashSpike + surge*0.05*I, 0.4);
+  G.invert = (I>0.5 && surge>0.85)? (0.5+0.5*Math.sin(G.t*30))*0.6 : lerp(G.invert,0,0.2);
+  G.grain = 0.045 + surge*0.05;
+  G.vignette = 0.95 - surge*0.25;
+}
+
+/* =====================================================================
+   RENDER  (draw the world to the 2D scene canvas)
+   ===================================================================== */
+function hsl(h,s,l,a){ return `hsla(${((h%360)+360)%360},${s|0}%,${l|0}%,${a})`; }
+
+function drawSilhouette(x,y,R,rot,sil,fill,close=true){
+  const n=sil.length;
+  sctx.beginPath();
+  for(let i=0;i<=n;i++){
+    const idx=i%n, a=idx/n*TAU+rot, r=sil[idx]*R;
+    const px=x+Math.cos(a)*r, py=y+Math.sin(a)*r;
+    // smooth blob via midpoint quad curves
+    const nx=(i)/n; // unused, keep straightforward
+    if(i===0) sctx.moveTo(px,py); else sctx.lineTo(px,py);
+  }
+  if(close) sctx.closePath();
+  sctx.fillStyle=fill; sctx.fill();
+}
+
+function drawPart(body, p, cx, cy, R, rot){
+  const t=G.t;
+  const pulse=1+p.pulseA*Math.sin(t*p.pulseS+p.pulseP + (0.5+0.5*Math.sin(t*0.5)) );
+  const a=p.orbitA + t*p.orbitSpeed + rot;
+  const px=cx+Math.cos(a)*R*p.orbitR;
+  const py=cy+Math.sin(a)*R*p.orbitR;
+  const pr=R*p.size*pulse;
+  if(pr<0.6) return;
+  // frustum cull
+  if(px<-pr*3||px>G.W+pr*3||py<-pr*3||py>G.H+pr*3) return;
+  const prot=p.rot + t*p.spin;
+  const hue=(p.hue + body.hueShift*40)%360;
+
+  const glowOn = pr>3 && G.quality>0.5;
+  if(p.kind==='blob'||p.kind==='crystal'){
+    if(glowOn){ sctx.globalCompositeOperation='lighter'; sctx.globalAlpha=0.28*p.glow;
+      drawSilhouette(px,py,pr*1.35,prot,p.sil,hsl(hue,90,65,1)); }
+    sctx.globalCompositeOperation='source-over'; sctx.globalAlpha=p.alpha;
+    drawSilhouette(px,py,pr,prot,p.sil,hsl(hue,p.sat,p.light,1));
+    sctx.globalCompositeOperation='lighter'; sctx.globalAlpha=0.5;
+    drawSilhouette(px,py,pr*0.5,prot,p.sil,hsl(hue,95,80,1));
+  }
+  else if(p.kind==='star'){
+    const n=p.petals*2; sctx.beginPath();
+    for(let i=0;i<=n;i++){ const ang=i/n*TAU+prot; const rad=(i%2? p.inner:1)*pr;
+      const X=px+Math.cos(ang)*rad, Y=py+Math.sin(ang)*rad; i?sctx.lineTo(X,Y):sctx.moveTo(X,Y);}
+    sctx.closePath();
+    if(glowOn){ sctx.globalCompositeOperation='lighter'; sctx.globalAlpha=0.3*p.glow;
+      sctx.fillStyle=hsl(hue,95,66,1); sctx.fill(); }
+    sctx.globalCompositeOperation='source-over'; sctx.globalAlpha=p.alpha;
+    sctx.fillStyle=hsl(hue,p.sat,p.light,1); sctx.fill();
+  }
+  else if(p.kind==='ring'){
+    sctx.globalCompositeOperation='lighter'; sctx.globalAlpha=0.9*p.alpha;
+    sctx.lineWidth=pr*(1-p.inner)*0.9; sctx.strokeStyle=hsl(hue,p.sat,p.light+8,1);
+    sctx.beginPath(); sctx.arc(px,py,pr*(p.inner+ (1-p.inner)/2),0,TAU); sctx.stroke();
+  }
+  else if(p.kind==='eye'){
+    // sclera
+    sctx.globalCompositeOperation='source-over'; sctx.globalAlpha=p.alpha;
+    sctx.fillStyle=hsl(hue,30,92,1); sctx.beginPath(); sctx.ellipse(px,py,pr,pr*0.72,prot,0,TAU); sctx.fill();
+    // iris looks toward pointer (you) / player-center (creatures)
+    const lx = body.watch? (player._pmx-px):(0-px), ly=body.watch? (player._pmy-py):(0-py);
+    const lm=Math.hypot(lx,ly)||1; const io=pr*0.32;
+    const ix=px+lx/lm*io, iy=py+ly/lm*io;
+    sctx.fillStyle=hsl((hue+180)%360,90,50,1); sctx.beginPath(); sctx.arc(ix,iy,pr*0.5,0,TAU); sctx.fill();
+    sctx.fillStyle='#08040c'; sctx.beginPath(); sctx.arc(ix,iy,pr*0.24,0,TAU); sctx.fill();
+    sctx.globalCompositeOperation='lighter'; sctx.globalAlpha=0.9;
+    sctx.fillStyle='#fff'; sctx.beginPath(); sctx.arc(ix-pr*0.12,iy-pr*0.12,pr*0.08,0,TAU); sctx.fill();
+  }
+  else if(p.kind==='tentacle'){
+    sctx.globalCompositeOperation='lighter'; sctx.globalAlpha=0.85*p.alpha;
+    sctx.lineCap='round';
+    const segs=p.segs, L=pr*p.len;
+    let x=px,y=py, ang=a;
+    sctx.beginPath(); sctx.moveTo(x,y);
+    for(let i=1;i<=segs;i++){
+      ang += Math.sin(t*p.wave + i*0.7 + p.pulseP)*0.5;
+      x+=Math.cos(ang)*L/segs; y+=Math.sin(ang)*L/segs;
+      sctx.lineTo(x,y);
+    }
+    sctx.strokeStyle=hsl(hue,p.sat,p.light,1); sctx.lineWidth=pr*p.width*2; sctx.stroke();
+    sctx.strokeStyle=hsl(hue,95,82,1); sctx.lineWidth=pr*p.width*0.8; sctx.stroke();
+  }
+  else if(p.kind==='spore'){
+    sctx.globalCompositeOperation='lighter';
+    for(let i=0;i<p.dots;i++){ const ang=i/p.dots*TAU+prot; const rad=pr*p.spread*(0.4+0.6*((i*7)%p.dots)/p.dots);
+      sctx.globalAlpha=0.7*p.alpha; sctx.fillStyle=hsl((hue+i*8)%360,90,68,1);
+      sctx.beginPath(); sctx.arc(px+Math.cos(ang)*rad,py+Math.sin(ang)*rad,pr*0.16,0,TAU); sctx.fill(); }
+  }
+}
+
+function drawBody(body, wx, wy){
+  const sx=(wx-0)*G.scale + G.W/2;
+  const sy=(wy-0)*G.scale + G.H/2;
+  const R=body.radius*G.scale;
+  if(R<0.5) return;
+  // core glow
+  sctx.globalCompositeOperation='lighter';
+  const grd=sctx.createRadialGradient(sx,sy,0,sx,sy,R*1.35);
+  grd.addColorStop(0,hsl(body.hue,90,58,0.4));
+  grd.addColorStop(0.5,hsl(body.hue,90,50,0.11));
+  grd.addColorStop(1,hsl(body.hue,90,50,0));
+  sctx.globalAlpha=1; sctx.fillStyle=grd;
+  sctx.beginPath(); sctx.arc(sx,sy,R*1.35,0,TAU); sctx.fill();
+  // parts (outer last)
+  const rot=body.spin;
+  const list=body.parts;
+  for(let i=0;i<list.length;i++) drawPart(body,list[i],sx,sy,R,rot);
+  sctx.globalCompositeOperation='source-over'; sctx.globalAlpha=1;
+}
+
+function render(){
+  const w=G.W,h=G.H;
+  // background: a TRUE-BLACK void. Any non-black here is pumped forever through the
+  // screen-blend feedback loop, so the empty field must read as pure dark for the
+  // beings (and their trails) to glow as light against infinite depth.
+  sctx.globalCompositeOperation='source-over'; sctx.globalAlpha=1;
+  sctx.fillStyle='#000'; sctx.fillRect(0,0,w,h);
+  const bh=(G.hue*57.3)%360;
+  // a couple of very dim, localized fog patches for colour — kept low so they never flood
+  sctx.globalCompositeOperation='lighter';
+  for(let i=0;i<2;i++){
+    const t=G.t*0.045+i*3.3;
+    const x=w/2+Math.cos(t)*w*0.32, y=h/2+Math.sin(t*1.27)*h*0.32;
+    const g=sctx.createRadialGradient(x,y,0,x,y,w*0.32);
+    g.addColorStop(0,hsl(bh+i*120,80,20,0.05)); g.addColorStop(1,hsl(bh,70,12,0));
+    sctx.fillStyle=g; sctx.fillRect(0,0,w,h);
+  }
+  // motes
+  for(const p of parts){
+    if(p.kind!=='mote') continue;
+    const sx=p.x*G.scale+w/2, sy=p.y*G.scale+h/2;
+    if(sx<0||sx>w||sy<0||sy>h) continue;
+    const tw=0.4+0.6*Math.abs(Math.sin(p.ph*2));
+    sctx.globalAlpha=0.5*tw; sctx.fillStyle=hsl(p.hue+bh,80,70,1);
+    sctx.beginPath(); sctx.arc(sx,sy,p.r*tw,0,TAU); sctx.fill();
+  }
+  // creatures
+  for(const b of beings) drawBody({parts:b.parts,radius:b.radius,hue:b.genome.hue,spin:b.spin,hueShift:0,watch:false}, b.x,b.y);
+  // sparks
+  sctx.globalCompositeOperation='lighter';
+  for(const p of parts){
+    if(p.kind!=='spark') continue;
+    const sx=p.x*G.scale+w/2, sy=p.y*G.scale+h/2;
+    const R=Math.max(0.6,p.r*G.scale);
+    sctx.globalAlpha=clamp(p.life,0,1); sctx.fillStyle=hsl(p.hue+bh,95,70,1);
+    sctx.beginPath(); sctx.arc(sx,sy,R,0,TAU); sctx.fill();
+  }
+  // the player, always centered, drawn last & on top
+  drawBody({parts:player.parts,radius:player.radius,hue:player.hue,spin:player.spin,hueShift:0,watch:true}, 0,0);
+  sctx.globalCompositeOperation='source-over'; sctx.globalAlpha=1;
+
+  // hand to the GPU trip pipeline
+  Post.frame(scene, G);
+}
+
+/* =====================================================================
+   AUDIO  (generative drone + absorb blips) — no assets
+   ===================================================================== */
+const audio=(()=>{
+  let ac=null, master, drone=[], delay, wet, started=false;
+  function ensure(){
+    if(ac) return;
+    try{ ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
+    master=ac.createGain(); master.gain.value=0.0; master.connect(ac.destination);
+    // feedback delay for space
+    delay=ac.createDelay(1.5); delay.delayTime.value=0.42;
+    const fb=ac.createGain(); fb.gain.value=0.38;
+    wet=ac.createGain(); wet.gain.value=0.35;
+    delay.connect(fb); fb.connect(delay); delay.connect(wet); wet.connect(master);
+    // drone: detuned oscillators through a slow filter LFO
+    const filt=ac.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value=520; filt.Q.value=6;
+    filt.connect(master); filt.connect(delay);
+    const lfo=ac.createOscillator(); const lg=ac.createGain(); lfo.frequency.value=0.06; lg.gain.value=380;
+    lfo.connect(lg); lg.connect(filt.frequency); lfo.start();
+    [55,55.3,82.5,110,110.6].forEach((f,i)=>{
+      const o=ac.createOscillator(); o.type=i%2?'sawtooth':'triangle'; o.frequency.value=f;
+      const g=ac.createGain(); g.gain.value=0.14/(i+1); o.connect(g); g.connect(filt); o.start();
+      drone.push({o,g});
+    });
+  }
+  function on(){ ensure(); if(!ac) return; if(ac.state==='suspended') ac.resume();
+    started=true; master.gain.setTargetAtTime(G.sound?0.5:0.0, ac.currentTime, 1.2); }
+  function setEnabled(v){ if(!ac) return; master.gain.setTargetAtTime(v?0.5:0.0, ac.currentTime, 0.3); }
+  function blip(freq,dur,type,vol){ if(!ac||!started||!G.sound) return;
+    const o=ac.createOscillator(); o.type=type||'sine'; const g=ac.createGain();
+    const m=ac.createOscillator(); const mg=ac.createGain(); // FM
+    m.frequency.value=freq*rr(1.4,2.2); mg.gain.value=freq*rr(0.5,1.5);
+    m.connect(mg); mg.connect(o.frequency); m.start();
+    o.frequency.value=freq; g.gain.value=0; o.connect(g); g.connect(master); g.connect(delay);
+    const n=ac.currentTime; g.gain.setValueAtTime(0,n);
+    g.gain.linearRampToValueAtTime((vol||0.2),n+0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001,n+dur);
+    o.frequency.exponentialRampToValueAtTime(freq*rr(1.3,2.0),n+dur);
+    o.start(n); o.stop(n+dur+0.02); m.stop(n+dur+0.02);
+  }
+  return {
+    on, setEnabled,
+    absorb(p){ const base=200+ (1/(1+p))*500; blip(base*rr(0.9,1.1),0.35+p*0.4,'triangle',0.18+Math.min(0.2,p*0.2));
+      if(p>0.6) blip(base*0.5,0.9,'sine',0.2); },
+    surge(){ blip(70,2.2,'sawtooth',0.22); blip(105,1.8,'sine',0.16); },
+  };
+})();
+
+/* =====================================================================
+   UI / DOM
+   ===================================================================== */
+const WHISPERS=['BREATHE','STAY','WHO','MORE','BLOOM','OPEN','SOFTER','AGAIN','GROW','LOOK','MELT','YES','DEEPER','WARM','HELLO'];
+const UI=(()=>{
+  const sizeEl=document.getElementById('size').querySelector('b');
+  const formsEl=document.getElementById('forms').querySelector('b');
+  const meter=document.getElementById('meter');
+  const whisperEl=document.getElementById('whisper');
+  let wT=0;
+  return {
+    frame(){
+      sizeEl.textContent=fmt(player.mass);
+      formsEl.textContent=player.absorbed;
+      meter.style.width=(smooth(G.surge)*100).toFixed(0)+'%';
+      if(wT>0){ wT-=G.dt; whisperEl.style.opacity=clamp(wT,0,1)*0.8; }
+    },
+    whisper(){ if(G.intensity<0.5 && srand()<0.6) return;
+      if(srand()<0.35){ const el=whisperEl; el.textContent=pick(WHISPERS); wT=1.4;
+        el.style.transform=`scale(${rr(0.8,1.4)})`; } },
+  };
+})();
+
+/* =====================================================================
+   INPUT
+   ===================================================================== */
+const keys=new Set();
+const cursorEl=document.getElementById('cursor');
+function setTargetFromClient(cx,cy){
+  // pointer -> world (player-centric) target
+  player._pmx=(cx-G.W/2); player._pmy=(cy-G.H/2);
+  player.targetX=(cx-G.W/2)/G.scale;
+  player.targetY=(cy-G.H/2)/G.scale;
+}
+addEventListener('pointermove',e=>{
+  setTargetFromClient(e.clientX*G.dpr, e.clientY*G.dpr);
+  cursorEl.style.transform=`translate(${e.clientX}px,${e.clientY}px)`;
+},{passive:true});
+addEventListener('pointerdown',e=>{ setTargetFromClient(e.clientX*G.dpr,e.clientY*G.dpr);
+  cursorEl.style.width='40px'; cursorEl.style.height='40px'; audio.on(); },{passive:true});
+addEventListener('pointerup',()=>{ cursorEl.style.width='26px'; cursorEl.style.height='26px'; },{passive:true});
+addEventListener('keydown',e=>{ keys.add(e.key.toLowerCase());
+  const k=e.key.toLowerCase();
+  if(k==='m'){ G.sound=!G.sound; audio.setEnabled(G.sound); }
+  if(k==='f'){ G.intensity=G.intensity>0.5?0.35:1; }
+});
+addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
+
+/* =====================================================================
+   BOOT / RESIZE / LOOP
+   ===================================================================== */
+function resize(){
+  G.dpr=Math.min(window.devicePixelRatio||1, 1.4);
+  G.W=Math.floor(innerWidth*G.dpr); G.H=Math.floor(innerHeight*G.dpr);
+  scene.width=G.W; scene.height=G.H;
+  Post.resize(G.W,G.H);
+  document.getElementById('gl').style.width=innerWidth+'px';
+  document.getElementById('gl').style.height=innerHeight+'px';
+}
+addEventListener('resize',resize);
+
+let last=0, fpsAcc=0, fpsN=0;
+function loop(now){
+  requestAnimationFrame(loop);
+  if(!G.running) return;
+  let dt=(now-last)/1000; last=now; if(!(dt>0)) dt=0.016; dt=Math.min(dt,0.05);
+  G.dt=dt;
+  // auto quality
+  fpsAcc+=dt; fpsN++;
+  if(fpsAcc>1){ const fps=fpsN/fpsAcc; fpsAcc=0; fpsN=0;
+    if(fps<45 && G.quality>0.4) G.quality-=0.1;
+    else if(fps>57 && G.quality<1) G.quality+=0.05; }
+  update(dt); render(); UI.frame();
+}
+
+function start(){
+  if(G.started) return; G.started=true; G.running=true;
+  _seed=(Date.now()>>>0)^0x5bd1e995;   // one-time entropy at start; RNG deterministic thereafter
+  initPlayer(); seedMotes();
+  for(let i=0;i<20;i++) spawnBeing();
+  document.getElementById('intro').classList.add('gone');
+  audio.on();
+  last=performance.now();
+}
+
+document.getElementById('optReduce').checked=REDUCED;
+document.getElementById('optReduce').addEventListener('change',e=>{ G.intensity=e.target.checked?0.35:1; });
+document.getElementById('optSound').addEventListener('change',e=>{ G.sound=e.target.checked; audio.setEnabled(G.sound); });
+document.getElementById('intro').addEventListener('click',start);
+addEventListener('keydown',e=>{ if(!G.started && (e.key===' '||e.key==='Enter')) start(); });
+
+resize();
+requestAnimationFrame(loop);
+
+// expose a few handles for debugging / external drivers
+window.G=G; window.player=player; window.beings=beings; window.parts=parts; window.Post=Post;
+</script>
+</body>
+</html>
