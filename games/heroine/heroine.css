@@ -142,6 +142,14 @@ main, .top, .foot { position: relative; z-index: 1; }
   justify-content: flex-end;
 }
 
+.eyebrow {
+  margin: 0 0 0.7rem;
+  color: var(--blush);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
 .brand {
   margin: 0;
   font-family: var(--display);
