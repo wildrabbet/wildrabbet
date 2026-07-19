@@ -250,6 +250,33 @@ h2{ margin: 0; font-size: 20px; letter-spacing: .2px; }
   box-shadow: 0 18px 48px rgba(20,24,40,.10);
 }
 
+/* ===== coming-soon (disabled) cards ===== */
+.card.soon{
+  filter: grayscale(1);
+  opacity: .5;
+  cursor: not-allowed;
+  pointer-events: none;
+  box-shadow: none;
+}
+.card.soon:hover{
+  transform: none;
+  border-color: var(--line);
+  box-shadow: none;
+}
+.card.soon .tag{
+  color: var(--muted);
+  border-style: dashed;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.card.soon .cardTitle::after{
+  content: " · coming soon";
+  font-weight: 800;
+  font-size: .72em;
+  color: var(--muted);
+  letter-spacing: .3px;
+}
+
 .cardTop{
   display:flex;
   align-items:center;
