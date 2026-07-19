@@ -69,26 +69,10 @@
 <canvas id="gl"></canvas>
 <div id="cursor"></div>
 
-<div id="hud">
-  <div class="stat" id="size">MASS<b>1</b></div>
-  <div class="stat" id="forms">FORMS ABSORBED<br><b>0</b></div>
-  <div id="whisper"></div>
-  <div id="meterwrap"><div id="meter"></div></div>
-  <div id="hint">MOVE — merge — become</div>
-</div>
-
 <div id="intro">
   <h1>DATURA<span>PROTOCOL</span></h1>
-  <p class="warn">⚠ FLASHING · MOTION · DISSOCIATION</p>
-  <p>You are the smallest thing here. Everything that touches you becomes part of you.
-     There is no goal, no end, no death. Only the shape you are turning into.</p>
-  <div id="begin">ENTER THE BLOOM</div>
-  <div id="opts">
-    <label><input type="checkbox" id="optReduce"> reduce flashing</label>
-    <label><input type="checkbox" id="optSound" checked> sound</label>
-  </div>
+  <div id="begin">play</div>
 </div>
-<div id="flashwarn">contains sustained flashing imagery — enable "reduce flashing" if sensitive</div>
 
 <script>
 "use strict";
@@ -140,13 +124,15 @@ const G = {
   intensity: REDUCED?0.35:1,       // master psychedelia multiplier (flash/chroma/strobe)
   quality:1,                        // auto-degrades if slow
   // camera lives at the player; player sits at world (0,0). scale shrinks as you grow.
-  scale:1, targetScreenR: 78,
+  // small targetScreenR => the player is tiny on screen => the world reads as vast.
+  scale:1, targetScreenR: 44,
   // shader drive params (smoothed each frame)
-  warp:0.5, chroma:0.4, hue:0, decay:0.9, feedZoom:0, feedRot:0,
+  warp:0.55, chroma:0.45, hue:0, decay:0.86, feedZoom:0, feedRot:0,
   kaleido:0, swirl:0, breath:0, flash:0, invert:0, grain:0.05, vignette:0.9,
+  spiral:0.5, hyper:0, hyperTarget:0, pace:0.4,
   // event impulses (decay over time)
   kick:0, hueSpike:0, warpSpike:0, chromaSpike:0, flashSpike:0, surge:0,
-  surgeTimer:8, sound:true,
+  surgeTimer:16, faceTimer:6, sound:true,
 };
 
 /* =====================================================================
@@ -166,7 +152,7 @@ const Post = (()=>{
 
   const POST = `precision highp float; varying vec2 vUv;
     uniform sampler2D uScene, uPrev; uniform vec2 uRes; uniform float uTime;
-    uniform float uWarp,uChroma,uHue,uDecay,uFeedZoom,uFeedRot,uKaleido,uBreath,uSwirl;
+    uniform float uWarp,uChroma,uHue,uDecay,uFeedZoom,uFeedRot,uKaleido,uBreath,uSwirl,uSpiral,uHyper;
     mat2 rot(float a){ float s=sin(a),c=cos(a); return mat2(c,-s,s,c);}
     vec3 hueRot(vec3 col,float a){ const vec3 k=vec3(0.57735); float c=cos(a),s=sin(a);
       return col*c + cross(k,col)*s + k*dot(k,col)*(1.0-c);}
@@ -195,13 +181,22 @@ const Post = (()=>{
       col=hueRot(col,uHue);
       float l=dot(col,vec3(0.299,0.587,0.114));
       col=mix(vec3(l),col,1.28);
+      // endless logarithmic spiral — subliminal rotating arms that converge to the
+      // centre forever (a Fraser-style illusion); intensifies during hyperspace.
+      float arms = sin(ang*5.0 + log(r+0.05)*7.0 - uTime*(0.5+uHyper*3.5));
+      col += arms * (0.02 + 0.05*uHyper) * (0.6+uSpiral) * (0.35+0.65*r);
       gl_FragColor=vec4(clamp(col,0.0,1.0),1.0);
     }`;
 
   const PRESENT = `precision highp float; varying vec2 vUv;
-    uniform sampler2D uTex; uniform vec2 uRes; uniform float uTime,uFlash,uGrain,uVig,uInvert;
+    uniform sampler2D uTex; uniform vec2 uRes; uniform float uTime,uFlash,uGrain,uVig,uInvert,uHyper;
     float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
     void main(){ vec2 uv=vUv; vec3 col=texture2D(uTex,uv).rgb;
+      if(uHyper>0.001){            // hyperspace: radial motion blur streaking toward centre
+        vec2 dir=uv-0.5; vec3 acc=col;
+        for(int i=1;i<=8;i++){ float s=float(i)/8.0*uHyper*0.16; acc+=texture2D(uTex,uv-dir*s).rgb; }
+        col=acc/9.0;
+      }
       col=mix(col,1.0-col,uInvert);
       col+=uFlash;
       vec2 c=uv-0.5; float v=1.0-dot(c,c)*uVig; col*=clamp(v,0.0,1.0);
@@ -283,6 +278,8 @@ const Post = (()=>{
     gl.uniform1f(U(progPost,'uKaleido'),u.kaleido);
     gl.uniform1f(U(progPost,'uBreath'),u.breath);
     gl.uniform1f(U(progPost,'uSwirl'),u.swirl);
+    gl.uniform1f(U(progPost,'uSpiral'),u.spiral);
+    gl.uniform1f(U(progPost,'uHyper'),u.hyper);
     gl.drawArrays(gl.TRIANGLES,0,3);
     // pass 2 -> screen (present)
     gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,W,H);
@@ -295,6 +292,7 @@ const Post = (()=>{
     gl.uniform1f(U(progPresent,'uGrain'),u.grain);
     gl.uniform1f(U(progPresent,'uVig'),u.vignette);
     gl.uniform1f(U(progPresent,'uInvert'),u.invert);
+    gl.uniform1f(U(progPresent,'uHyper'),u.hyper);
     gl.drawArrays(gl.TRIANGLES,0,3);
     cur=next;
   }
@@ -306,6 +304,7 @@ const Post = (()=>{
 /* the scene is drawn to an offscreen 2D canvas, then fed to Post */
 const scene = document.createElement('canvas');
 const sctx  = scene.getContext('2d');
+const glCanvas = document.getElementById('gl');
 
 /* =====================================================================
    PROCEDURAL FORM GENERATION
@@ -466,7 +465,6 @@ function graft(b){
   G.kick       = Math.min(1.5, G.kick + punch);
   burst(b.x,b.y, b.radius, b.genome.hue, 14+punch*22);
   audio.absorb(b.mass/before);
-  UI.whisper();
 }
 
 /* --------------------------------- particles ------------------------------ */
@@ -479,11 +477,76 @@ function burst(x,y,r,hue,n){
   }
 }
 function seedMotes(){
-  for(let i=0;i<90;i++){
-    const a=srand()*TAU,d=rr(0.2,2.2)*player.radius*6;
+  for(let i=0;i<140;i++){
+    const a=srand()*TAU,d=rr(0.2,2.4)*player.radius*6;
     parts.push({x:Math.cos(a)*d,y:Math.sin(a)*d,vx:gauss(0,4),vy:gauss(0,4),
       life:Infinity,r:rr(1,3),hue:rr(0,360),kind:'mote',ph:srand()*TAU});
   }
+}
+
+/* --------- peripheral face flashes (flashed-face-distortion illusion) -------
+   Brief, low-contrast faces bloom only in the periphery while the player's gaze
+   is pinned to the centred organism. Fixated centrally and glimpsed peripherally,
+   the visual system caricatures them — they read as grotesque without ever being
+   consciously "seen". A round staggers several around a ring, then they vanish. */
+const faces=[];
+function spawnFaceRound(){
+  const n=ri(3,6), baseAng=srand()*TAU, ring=rr(0.6,0.92);
+  for(let i=0;i<n;i++){
+    faces.push({
+      ang: baseAng + i/n*TAU + gauss(0,0.22),
+      rad: clamp(ring + gauss(0,0.05), 0.55, 0.95),
+      size: rr(0.05,0.11),
+      t0: G.t, delay: srand()*0.5, dur: rr(0.14,0.26),
+      tilt: gauss(0,0.5), sx: rr(0.72,1.08), sy: rr(0.95,1.3),
+      mouth: rr(0.3,1), asym: gauss(0,0.22), pale: rr(0,50),
+    });
+  }
+}
+// paint one face at FULL opacity into a small buffer, so its internal contrast
+// (pale skin vs pure-black eyes/mouth) survives when we later blit it faintly.
+const faceCv=document.createElement('canvas'); faceCv.width=faceCv.height=128;
+const fctx=faceCv.getContext('2d');
+function paintFace(f){
+  const R=50;
+  fctx.clearRect(0,0,128,128);
+  fctx.save(); fctx.translate(64,64); fctx.scale(f.sx,f.sy);
+  // dark halo so the face still reads when blitted over bright neon
+  fctx.fillStyle='rgba(2,1,4,0.9)';
+  fctx.beginPath(); fctx.ellipse(0,0,R*1.2,R*1.45,0,0,TAU); fctx.fill();
+  // solid pale skin
+  fctx.fillStyle=`hsl(${(f.pale+80)|0},12%,82%)`;
+  fctx.beginPath(); fctx.ellipse(0,0,R*0.72,R,0,0,TAU); fctx.fill();
+  // hollow black eyes + open mouth
+  fctx.fillStyle='#000';
+  const ey=-R*0.16, ex=R*0.33, er=R*0.2;
+  fctx.beginPath(); fctx.ellipse(-ex+f.asym*R*0.14,ey,er,er*1.35,0,0,TAU); fctx.fill();
+  fctx.beginPath(); fctx.ellipse( ex,ey-f.asym*R*0.14,er,er*1.35,0,0,TAU); fctx.fill();
+  fctx.beginPath(); fctx.ellipse(0,R*0.46,R*0.26*f.mouth,R*0.13*f.mouth+R*0.06,f.asym*0.4,0,TAU); fctx.fill();
+  fctx.restore();
+}
+function drawFaces(){
+  if(!faces.length) return;
+  const w=G.W,h=G.H, half=Math.min(w,h)/2;
+  sctx.globalCompositeOperation='source-over';
+  for(let i=faces.length-1;i>=0;i--){
+    const f=faces[i];
+    const age=G.t - f.t0 - f.delay;
+    if(age<0) continue;
+    if(age>f.dur){ faces.splice(i,1); continue; }
+    const a=Math.sin(Math.PI*age/f.dur);          // quick fade in/out
+    const cx=w/2+Math.cos(f.ang)*f.rad*half;
+    const cy=h/2+Math.sin(f.ang)*f.rad*half;
+    const R=f.size*half*(0.9+0.2*a);
+    paintFace(f);
+    sctx.save();
+    sctx.globalAlpha=a*0.5;                        // faint enough to stay subliminal in the periphery
+    sctx.translate(cx,cy); sctx.rotate(f.tilt);
+    const sc=R/50; sctx.scale(sc,sc);
+    sctx.drawImage(faceCv,-64,-64);
+    sctx.restore();
+  }
+  sctx.globalAlpha=1;
 }
 
 /* =====================================================================
@@ -491,15 +554,23 @@ function seedMotes(){
    ===================================================================== */
 function update(dt){
   G.t += dt;
-  // ---- breathing / surge scheduler ----
+  // pace ramps up: starts slow & hypnotic, accelerates as you grow into the trip
+  G.pace = clamp(0.4 + G.t*0.011 + Math.log2(1+player.mass)*0.03, 0.4, 1.7);
+  // hyperspace (hold SHIFT): everything rushes, spins and blurs
+  G.hyper = lerp(G.hyper, G.hyperTarget, 1-Math.pow(0.0025,dt));
+  const hyper=G.hyper;
+  // ---- breathing / surge scheduler (rarer & later early on) ----
   G.breath = 0.5+0.5*Math.sin(G.t*0.5) ;
-  G.surgeTimer -= dt;
+  G.surgeTimer -= dt*G.pace;
   if(G.surgeTimer<=0){ G.surge=1; G.surgeTimer=rr(14,28); audio.surge(); }
   G.surge=Math.max(0,G.surge-dt*0.22);
   const surge=smooth(G.surge);
+  // ---- peripheral face rounds (suppressed mid-hyperspace) ----
+  G.faceTimer -= dt;
+  if(G.faceTimer<=0){ if(hyper<0.3) spawnFaceRound(); G.faceTimer = rr(5,11)/(0.7+G.pace*0.5); }
 
   // ---- player movement: snappy chase of the pointer/keys, scaled to size ----
-  const spd=player.radius*4.0*(1+surge*0.5);
+  const spd=player.radius*(2.4+2.0*G.pace)*(1+surge*0.5)*(1+hyper*3.5);
   // desired velocity toward the pointer target (already in player-centric world space)
   let dx=player.targetX, dy=player.targetY;
   const dm=Math.hypot(dx,dy)||1;
@@ -537,7 +608,7 @@ function update(dt){
     else if(b.behavior==='flee'){ bx=b.x/d; by=b.y/d; }
     else if(b.behavior==='orbit'){ bx=-b.y/d; by=b.x/d; }
     else { b.wa+=gauss(0,1)*dt*2; bx=Math.cos(b.wa); by=Math.sin(b.wa); }
-    const acc=b.spd*(1+surge*0.6);
+    const acc=b.spd*(0.5+0.7*G.pace)*(1+surge*0.6)*(1+hyper*2.0);
     b.vx=lerp(b.vx, bx*acc, 1-Math.pow(0.02,dt));
     b.vy=lerp(b.vy, by*acc, 1-Math.pow(0.02,dt));
     b.x+=b.vx*dt; b.y+=b.vy*dt;
@@ -549,8 +620,8 @@ function update(dt){
     // cull if wandered absurdly far
     if(dist > viewR*2.2){ beings.splice(i,1); }
   }
-  // keep the world populated & fast
-  const target = 22 + Math.round(6*G.quality);
+  // keep the world populated (more visible now that we're zoomed way out)
+  const target = 22 + Math.round(16*G.quality);
   let guard=0;
   while(beings.length<target && guard++<6) spawnBeing();
 
@@ -572,25 +643,29 @@ function update(dt){
   G.warpSpike*=Math.pow(0.02,dt); G.chromaSpike*=Math.pow(0.05,dt);
   G.hueSpike*=Math.pow(0.15,dt);  G.flashSpike*=Math.pow(0.003,dt);
   G.kick*=Math.pow(0.02,dt);
-  const tgtWarp   = 0.35 + 0.25*G.breath + surge*0.7 + G.warpSpike;
-  const tgtChroma = (0.3 + surge*0.6 + G.chromaSpike)*I;
-  const tgtDecay  = 0.855 + surge*0.07 + G.kick*0.02;
-  const tgtKal    = (surge*0.45)*I;
-  const tgtSwirl  = (Math.sin(G.t*0.13)*0.12 + surge*0.25)*I;
-  const tgtFeedZ  = (-0.006 - G.kick*0.02 + Math.sin(G.t*0.31)*0.004);
-  const tgtFeedR  = (0.002 + Math.sin(G.t*0.07)*0.004 + surge*0.006)*I;
-  G.warp   =lerp(G.warp,tgtWarp,0.08);
-  G.chroma =lerp(G.chroma,tgtChroma,0.1);
+  const tgtWarp   = 0.42 + 0.28*G.breath + surge*0.7 + G.warpSpike + hyper*1.2;
+  const tgtChroma = (0.4 + surge*0.6 + G.chromaSpike + hyper*1.6)*I;
+  const tgtDecay  = 0.86 + surge*0.06 + G.kick*0.02 + hyper*0.06;
+  const tgtKal    = (surge*0.4 + hyper*0.25)*I;
+  const tgtSwirl  = (Math.sin(G.t*0.13)*0.14 + surge*0.25 + hyper*1.2)*I;
+  const tgtFeedZ  = (-0.007 - G.kick*0.02 + Math.sin(G.t*0.31)*0.004 - hyper*0.07);
+  const tgtFeedR  = (0.003 + Math.sin(G.t*0.07)*0.004 + surge*0.006 + hyper*0.05)*I;
+  const tgtSpiral = 0.5 + surge*0.5 + hyper*1.3;
+  G.warp   =lerp(G.warp,tgtWarp, hyper>0.01?0.2:0.08);
+  G.chroma =lerp(G.chroma,tgtChroma,0.12);
   G.decay  =lerp(G.decay,tgtDecay,0.06);
   G.kaleido=lerp(G.kaleido,tgtKal,0.05);
-  G.swirl  =lerp(G.swirl,tgtSwirl,0.05);
-  G.feedZoom=lerp(G.feedZoom,tgtFeedZ,0.06);
-  G.feedRot =lerp(G.feedRot,tgtFeedR,0.06);
-  G.hue = (G.hue + dt*(0.06+surge*0.25) + G.hueSpike*dt*3) % TAU;
+  G.swirl  =lerp(G.swirl,tgtSwirl,0.1);
+  G.feedZoom=lerp(G.feedZoom,tgtFeedZ,0.08);
+  G.feedRot =lerp(G.feedRot,tgtFeedR,0.08);
+  G.spiral =lerp(G.spiral,tgtSpiral,0.06);
+  G.hue = (G.hue + dt*(0.06+surge*0.25+hyper*0.4) + G.hueSpike*dt*3) % TAU;
   G.flash=lerp(G.flash, G.flashSpike + surge*0.05*I, 0.4);
   G.invert = (I>0.5 && surge>0.85)? (0.5+0.5*Math.sin(G.t*30))*0.6 : lerp(G.invert,0,0.2);
-  G.grain = 0.045 + surge*0.05;
-  G.vignette = 0.95 - surge*0.25;
+  G.grain = 0.045 + surge*0.05 + hyper*0.05;
+  G.vignette = 0.95 - surge*0.25 + hyper*0.4;
+  // extra dizzy blur during hyperspace (GPU path only; the 2D fallback owns its filter)
+  if(!Post.is2d) glCanvas.style.filter = hyper>0.008 ? `blur(${(hyper*hyper*6).toFixed(2)}px) saturate(${(1+hyper*0.8).toFixed(2)})` : '';
 }
 
 /* =====================================================================
@@ -732,6 +807,8 @@ function render(){
   }
   // creatures
   for(const b of beings) drawBody({parts:b.parts,radius:b.radius,hue:b.genome.hue,spin:b.spin,hueShift:0,watch:false}, b.x,b.y);
+  // peripheral face flashes (illusion) — drawn into the scene so the pipeline warps them too
+  drawFaces();
   // sparks
   sctx.globalCompositeOperation='lighter';
   for(const p of parts){
@@ -797,28 +874,7 @@ const audio=(()=>{
   };
 })();
 
-/* =====================================================================
-   UI / DOM
-   ===================================================================== */
-const WHISPERS=['BREATHE','STAY','WHO','MORE','BLOOM','OPEN','SOFTER','AGAIN','GROW','LOOK','MELT','YES','DEEPER','WARM','HELLO'];
-const UI=(()=>{
-  const sizeEl=document.getElementById('size').querySelector('b');
-  const formsEl=document.getElementById('forms').querySelector('b');
-  const meter=document.getElementById('meter');
-  const whisperEl=document.getElementById('whisper');
-  let wT=0;
-  return {
-    frame(){
-      sizeEl.textContent=fmt(player.mass);
-      formsEl.textContent=player.absorbed;
-      meter.style.width=(smooth(G.surge)*100).toFixed(0)+'%';
-      if(wT>0){ wT-=G.dt; whisperEl.style.opacity=clamp(wT,0,1)*0.8; }
-    },
-    whisper(){ if(G.intensity<0.5 && srand()<0.6) return;
-      if(srand()<0.35){ const el=whisperEl; el.textContent=pick(WHISPERS); wT=1.4;
-        el.style.transform=`scale(${rr(0.8,1.4)})`; } },
-  };
-})();
+/* no HUD, no counters, no words — only the void and what you are becoming */
 
 /* =====================================================================
    INPUT
@@ -840,10 +896,15 @@ addEventListener('pointerdown',e=>{ setTargetFromClient(e.clientX*G.dpr,e.client
 addEventListener('pointerup',()=>{ cursorEl.style.width='26px'; cursorEl.style.height='26px'; },{passive:true});
 addEventListener('keydown',e=>{ keys.add(e.key.toLowerCase());
   const k=e.key.toLowerCase();
+  if(k==='shift'){ G.hyperTarget=1; }        // hold to hyperspace
   if(k==='m'){ G.sound=!G.sound; audio.setEnabled(G.sound); }
   if(k==='f'){ G.intensity=G.intensity>0.5?0.35:1; }
 });
-addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
+addEventListener('keyup',e=>{ keys.delete(e.key.toLowerCase());
+  if(e.key.toLowerCase()==='shift') G.hyperTarget=0;
+});
+// never leave hyperspace/keys stuck if focus is lost mid-hold
+addEventListener('blur',()=>{ keys.clear(); G.hyperTarget=0; });
 
 /* =====================================================================
    BOOT / RESIZE / LOOP
@@ -869,30 +930,32 @@ function loop(now){
   if(fpsAcc>1){ const fps=fpsN/fpsAcc; fpsAcc=0; fpsN=0;
     if(fps<45 && G.quality>0.4) G.quality-=0.1;
     else if(fps>57 && G.quality<1) G.quality+=0.05; }
-  update(dt); render(); UI.frame();
+  update(dt); render();
 }
 
 function start(){
   if(G.started) return; G.started=true; G.running=true;
   _seed=(Date.now()>>>0)^0x5bd1e995;   // one-time entropy at start; RNG deterministic thereafter
+  try{ const el=document.documentElement;
+    (el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen||function(){}).call(el); }catch(e){}
   initPlayer(); seedMotes();
-  for(let i=0;i<20;i++) spawnBeing();
+  for(let i=0;i<26;i++) spawnBeing();
   document.getElementById('intro').classList.add('gone');
   audio.on();
+  setTimeout(resize,80);   // re-measure once fullscreen has settled
   last=performance.now();
 }
 
-document.getElementById('optReduce').checked=REDUCED;
-document.getElementById('optReduce').addEventListener('change',e=>{ G.intensity=e.target.checked?0.35:1; });
-document.getElementById('optSound').addEventListener('change',e=>{ G.sound=e.target.checked; audio.setEnabled(G.sound); });
 document.getElementById('intro').addEventListener('click',start);
 addEventListener('keydown',e=>{ if(!G.started && (e.key===' '||e.key==='Enter')) start(); });
+addEventListener('fullscreenchange',resize);
+addEventListener('webkitfullscreenchange',resize);
 
 resize();
 requestAnimationFrame(loop);
 
 // expose a few handles for debugging / external drivers
-window.G=G; window.player=player; window.beings=beings; window.parts=parts; window.Post=Post;
+window.G=G; window.player=player; window.beings=beings; window.parts=parts; window.faces=faces; window.Post=Post;
 </script>
 </body>
 </html>
