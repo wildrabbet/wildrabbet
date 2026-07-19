@@ -50,6 +50,8 @@
         <div class="toyBoxTitle">
           <span class="toyBoxLabel">Useless Box</span>
           <div class="toyBoxStats">
+            <span class="statPill comboPill" id="comboPill" hidden>combo x1</span>
+            <span class="statPill cpsPill" id="cpsPill" hidden>0.0/s</span>
             <span class="statPill" id="myClicks">you: 0</span>
             <span class="statPill totalPill" id="totalClicks">everyone: 0</span>
           </div>
@@ -83,6 +85,9 @@
         <!-- gravity ball -->
         <div class="gravBall" id="gravBall" aria-hidden="true"></div>
       </div>
+        <!-- milestone progress -->
+        <div class="ub-milestone" aria-hidden="true"><div class="ub-milestone-fill" id="msFill"></div></div>
+        <div class="ub-milestone-label" id="msLabel" aria-hidden="true"></div>
       </div>
     </section>
 
@@ -2607,6 +2612,7 @@
         if (action) action(e);
         else doGenericClick(e);
         updateStats();
+        if (typeof ubOnClick === 'function') ubOnClick(w, e, !!action);
         maybeColorTakeover();
         refreshTextAndPositions();
         const rect = toyBox.getBoundingClientRect();
@@ -2622,9 +2628,798 @@
         return visible.length ? rand(visible) : rand(ACTION_WORDS);
       }
 
+      // =================================================================
+      // ===== ADDICTION ENGINE — dopamine, combos, toys, milestones =====
+      // =================================================================
+      const comboPillEl = document.getElementById('comboPill');
+      const cpsPillEl   = document.getElementById('cpsPill');
+      const msFillEl    = document.getElementById('msFill');
+      const msLabelEl   = document.getElementById('msLabel');
+      const toyBoxWrap  = document.querySelector('.toyBoxWrap');
+
+      const COMBO_WINDOW = 1300;   // ms before a streak dies
+      const FEVER_COMBO  = 15;     // streak needed to ignite fever mode
+      const MILESTONES = [10,25,50,100,200,350,500,750,1000,1500,2000,3000,5000,7500,10000,25000,50000,100000];
+
+      let combo = 0, bestCombo = 0;
+      let lastClickAt = 0;
+      let feverActive = false;
+      const clickTimes = [];       // timestamps for CPS
+      let lastToySpawn = 0;
+      let lastActivity = performance.now();
+      let tauntLevel = 0;
+      let tauntEl = null;
+      let popMult = 1;             // "combo x2" reward doubles popup flair
+
+      // toast container
+      const toastWrap = document.createElement('div');
+      toastWrap.className = 'ub-toastWrap';
+      siteBody.appendChild(toastWrap);
+
+      // persistent unlocked achievements
+      let unlocked = new Set();
+      try { unlocked = new Set(JSON.parse(localStorage.getItem('ub:achv') || '[]')); } catch(e){}
+      let milestoneSeen = parseInt(localStorage.getItem('ub:msSeen') || '0', 10) || 0;
+
+      function toast(text){
+        const t = document.createElement('div');
+        t.className = 'ub-toast';
+        t.textContent = text;
+        toastWrap.appendChild(t);
+        setTimeout(() => { t.classList.add('bye'); setTimeout(() => t.remove(), 500); }, 3200);
+      }
+      function achieve(id, text){
+        if (unlocked.has(id)) return;
+        unlocked.add(id);
+        try { localStorage.setItem('ub:achv', JSON.stringify([...unlocked])); } catch(e){}
+        toast('🏆 ' + text);
+        beep('triangle', 720, 0.10, 0.08); beep('sine', 980, 0.12, 0.06);
+      }
+
+      function ubPop(x, y, text, opts = {}){
+        const p = document.createElement('div');
+        p.className = 'ub-pop' + (opts.crit ? ' ub-crit' : '');
+        p.textContent = text;
+        p.style.left = x + 'px';
+        p.style.top  = y + 'px';
+        p.style.fontSize = (opts.size ?? r(18, 26)) + 'px';
+        if (!opts.crit) p.style.color = `hsl(${accentHue() + r(-40, 60)} 90% 58%)`;
+        siteBody.appendChild(p);
+        const dx = opts.dx ?? r(-30, 30);
+        const dy = opts.dy ?? r(-70, -110);
+        p.animate([
+          { transform:'translate(-50%,-50%) scale(.4)', opacity:0 },
+          { transform:`translate(-50%,-50%) translate(${dx*0.4}px,${dy*0.4}px) scale(${opts.crit?1.5:1.1})`, opacity:1, offset:0.25 },
+          { transform:`translate(-50%,-50%) translate(${dx}px,${dy}px) scale(${opts.crit?1.2:0.9})`, opacity:0 }
+        ], { duration: opts.crit ? 1100 : 800, easing:'cubic-bezier(.2,.8,.2,1)' }).onfinish = () => p.remove();
+      }
+
+      function clickRing(x, y){
+        const ring = document.createElement('div');
+        ring.className = 'ub-clickring';
+        ring.style.left = x + 'px';
+        ring.style.top = y + 'px';
+        const s = r(20, 30);
+        ring.style.width = s + 'px'; ring.style.height = s + 'px';
+        siteBody.appendChild(ring);
+        ring.animate([
+          { transform:'translate(-50%,-50%) scale(.3)', opacity:.9 },
+          { transform:'translate(-50%,-50%) scale(3.2)', opacity:0 }
+        ], { duration: 520, easing:'cubic-bezier(.2,.8,.2,1)' }).onfinish = () => ring.remove();
+      }
+
+      function shout(text, opts = {}){
+        const s = document.createElement('div');
+        s.className = 'ub-shout';
+        s.textContent = text;
+        s.style.fontSize = (opts.size ?? 'clamp(34px,8vw,90px)');
+        if (opts.color) s.style.color = opts.color;
+        siteBody.appendChild(s);
+        s.animate([
+          { transform:'translate(-50%,-50%) scale(.4) rotate(' + r(-8,8) + 'deg)', opacity:0 },
+          { transform:'translate(-50%,-50%) scale(1.1) rotate(0deg)', opacity:1, offset:0.3 },
+          { transform:'translate(-50%,-50%) scale(1) rotate(0deg)', opacity:1, offset:0.7 },
+          { transform:'translate(-50%,-50%) scale(1.3)', opacity:0 }
+        ], { duration: opts.dur ?? 1100, easing:'cubic-bezier(.2,.8,.2,1)' }).onfinish = () => s.remove();
+      }
+
+      function banner(text){
+        const b = document.createElement('div');
+        b.className = 'ub-banner';
+        b.textContent = text;
+        siteBody.appendChild(b);
+        b.animate([
+          { transform:'translateX(-30px)', opacity:0 },
+          { transform:'none', opacity:1, offset:0.2 },
+          { transform:'none', opacity:1, offset:0.75 },
+          { transform:'translateX(30px)', opacity:0 }
+        ], { duration: 2200, easing:'ease-out' }).onfinish = () => b.remove();
+      }
+
+      // batched bonus clicks (from toys) — counts toward the real global tally
+      function ubAddClicks(n){
+        n = Math.max(0, Math.floor(n));
+        if (!n) return;
+        clickCount += n; totalCount += n; pending += n;
+        saveLocal(); renderCounts();
+        clearTimeout(flushTimer); flushTimer = setTimeout(flushPending, 1000);
+        checkMilestone();
+      }
+
+      function checkMilestone(){
+        // fill bar toward next milestone
+        let next = MILESTONES.find(m => m > clickCount);
+        let prev = 0;
+        for (const m of MILESTONES){ if (m <= clickCount) prev = m; }
+        if (next){
+          const pct = Math.max(0, Math.min(100, (clickCount - prev) / (next - prev) * 100));
+          msFillEl.style.width = pct + '%';
+          msLabelEl.textContent = clickCount.toLocaleString() + ' / ' + next.toLocaleString() + ' clicks';
+        } else {
+          msFillEl.style.width = '100%';
+          msLabelEl.textContent = clickCount.toLocaleString() + ' clicks — legend';
+        }
+        // celebrate newly crossed milestones
+        for (const m of MILESTONES){
+          if (clickCount >= m && milestoneSeen < m){
+            milestoneSeen = m;
+            try { localStorage.setItem('ub:msSeen', String(m)); } catch(e){}
+            banner(m.toLocaleString() + ' CLICKS!');
+            siteFall(rand(['🎉','🎊','⭐','🏆','✨']), 3500);
+            for (let i=0;i<4;i++) setTimeout(() => spawnParticles(window.innerWidth/2 + r(-120,120), window.innerHeight*0.35, {count:r(12,20), shape:'mixed', dxMax:250, dyUp:300}), i*100);
+            beep('triangle', 660, 0.14, 0.09); beep('sine', 880, 0.16, 0.07);
+            dropGift(); // reward
+          }
+        }
+      }
+
+      function updateComboUI(){
+        if (combo >= 2){
+          comboPillEl.hidden = false;
+          comboPillEl.textContent = 'combo x' + combo;
+          comboPillEl.classList.add('pulse');
+          setTimeout(() => comboPillEl.classList.remove('pulse'), 180);
+          comboPillEl.classList.toggle('hot', combo >= 10);
+        } else {
+          comboPillEl.hidden = true;
+          comboPillEl.classList.remove('hot');
+        }
+      }
+
+      function updateCPS(){
+        const now = performance.now();
+        while (clickTimes.length && now - clickTimes[0] > 1000) clickTimes.shift();
+        const cps = clickTimes.length;
+        if (cps > 0){
+          cpsPillEl.hidden = false;
+          cpsPillEl.textContent = cps.toFixed(0) + '/s';
+        } else {
+          cpsPillEl.hidden = true;
+        }
+        if (cps >= 8) achieve('cps8', 'Machine-gun fingers — 8 clicks/sec!');
+        if (cps >= 12) achieve('cps12', 'Are you a robot? 12 clicks/sec!');
+      }
+
+      function enterFever(){
+        if (feverActive) return;
+        feverActive = true;
+        siteBody.classList.add('fever-mode');
+        shout('🔥 FEVER! 🔥', { color:'#ff5a2c' });
+        achieve('fever', 'FEVER MODE ignited!');
+        beep('sawtooth', 180, 0.3, 0.09); beep('square', 320, 0.12, 0.08);
+        siteFall(rand(['🔥','⚡','💥']), 2500);
+      }
+      function exitFever(){
+        if (!feverActive) return;
+        feverActive = false;
+        siteBody.classList.remove('fever-mode');
+      }
+
+      // ===== the hook fired on every box click =====
+      function ubOnClick(word, e, wasAction){
+        const now = performance.now();
+        lastActivity = now;
+        hideTaunt();
+
+        // combo bookkeeping
+        if (now - lastClickAt < COMBO_WINDOW) combo++; else combo = 1;
+        lastClickAt = now;
+        if (combo > bestCombo){ bestCombo = combo; }
+        clickTimes.push(now);
+
+        updateComboUI();
+        updateCPS();
+        clickRing(e.clientX, e.clientY);
+
+        // floating feedback number
+        const crit = Math.random() < (0.05 + combo * 0.01);
+        if (crit){
+          ubPop(e.clientX, e.clientY, rand(['CRIT!','+BOOM','MEGA','✦x10','NICE']), { crit:true, size:r(26,36) });
+          spawnParticles(e.clientX, e.clientY, { count:r(16,26), shape:'mixed', durMin:400, durMax:900 });
+          beep('triangle', r(700,1100), 0.10, 0.09);
+        } else {
+          const label = combo >= 3 ? ('x' + combo) : '+1';
+          ubPop(e.clientX, e.clientY, label, { size: Math.min(38, 16 + combo) });
+        }
+
+        // combo shout milestones
+        if (combo === 5)  shout('COMBO!');
+        if (combo === 10){ shout('ON FIRE! 🔥'); achieve('combo10', 'Combo x10 — on fire!'); }
+        if (combo === 25){ shout('UNSTOPPABLE ⚡', { color:'#ffd23f' }); achieve('combo25', 'Combo x25 — unstoppable!'); }
+        if (combo === 50){ shout('GODLIKE 👑', { color:'#ffd23f' }); achieve('combo50', 'Combo x50 — GODLIKE!'); }
+        if (combo === 100){ shout('IMPOSSIBLE 🌈', { color:'#ff5ad4' }); achieve('combo100', 'Combo x100 — how?!'); }
+
+        // fever
+        if (combo >= FEVER_COMBO && !feverActive) enterFever();
+        if (feverActive){
+          spawnParticles(e.clientX, e.clientY, { count:r(6,12), shape:'mixed', durMin:300, durMax:700, dxMax:180, dyUp:200 });
+          if (Math.random() < 0.18){
+            const words = Object.keys(ACTIONS);
+            const rw = rand(words);
+            try { ACTIONS[rw](e); } catch(err){}
+          }
+        }
+
+        achieve('first', 'First contact 🐇 — welcome to the box');
+        if (bestCombo >= 3 && wasAction === false) {} // noop
+
+        checkMilestone();
+
+        // feed the trip engine — fast, sustained clicking bends reality
+        tripAddHeat(clickTimes.length, e);
+
+        // surprise toy drop
+        maybeSpawnToy(now, e);
+      }
+
+      function maybeSpawnToy(now, e){
+        if (now - lastToySpawn < 4500) return;
+        if (combo < 4) return;
+        if (Math.random() > 0.05 + (feverActive ? 0.06 : 0)) return;
+        lastToySpawn = now;
+        rand([dropCoins, spawnMole, spawnPinata, dropGift, dropDiscoBall, spinSlots])();
+      }
+
+      // ===== IDLE TAUNTS ("come back and click me") =====
+      const TAUNTS = [
+        ['bored already? 👀', 'click me', 'hello? 🐇', 'i dare you', 'poke me'],
+        ['still there?', "don't leave me", 'one more click', 'i miss you', 'pspspsps 🐈'],
+        ['the box is lonely', 'CLICK. ME. NOW.', 'i live for this', 'do it for the combo', 'we were having fun'],
+      ];
+      function showTaunt(){
+        hideTaunt();
+        const tier = Math.min(tauntLevel, TAUNTS.length - 1);
+        tauntEl = document.createElement('div');
+        tauntEl.className = 'ub-taunt';
+        tauntEl.textContent = rand(TAUNTS[tier]);
+        toyBoxWrap.appendChild(tauntEl);
+        tauntLevel++;
+      }
+      function hideTaunt(){
+        if (tauntEl){ tauntEl.remove(); tauntEl = null; }
+      }
+      // idle + decay loop
+      setInterval(() => {
+        const now = performance.now();
+        // decay combo / cps / fever
+        if (combo > 0 && now - lastClickAt > COMBO_WINDOW){
+          combo = 0; updateComboUI(); exitFever();
+        }
+        updateCPS();
+        // idle taunts
+        if (now - lastActivity > 9000){
+          lastActivity = now - 3000; // re-arm sooner after first
+          if (tauntLevel < 8) showTaunt();
+        }
+      }, 400);
+
+      // ============================================================
+      // ===== BONUS TOYS (clickable, reward spam-clicking) =========
+      // ============================================================
+      function rewardBurst(x, y, amount){
+        ubAddClicks(amount);
+        ubPop(x, y, '+' + amount, { crit:true, size:r(26,34) });
+        spawnParticles(x, y, { count:r(14,22), shape:'mixed', durMin:400, durMax:900, dxMax:200, dyUp:240 });
+        beep('triangle', r(500,800), 0.10, 0.08); beep('sine', r(700,1000), 0.12, 0.06);
+      }
+
+      // falling collectible coins
+      function dropCoins(){
+        const n = Math.floor(r(5, 9));
+        for (let i = 0; i < n; i++){
+          setTimeout(() => {
+            const c = document.createElement('button');
+            c.className = 'ub-coin';
+            c.textContent = rand(['🪙','💰','💎','⭐']);
+            const startX = r(40, window.innerWidth - 40);
+            c.style.left = startX + 'px'; c.style.top = '-40px';
+            siteBody.appendChild(c);
+            let grabbed = false;
+            const anim = c.animate([
+              { transform:'translateY(0) rotate(0deg)' },
+              { transform:`translateY(${window.innerHeight + 80}px) rotate(${r(-180,180)}deg)` }
+            ], { duration: r(2600, 4200), easing:'cubic-bezier(.4,0,.7,1)' });
+            anim.onfinish = () => c.remove();
+            c.addEventListener('pointerdown', (ev) => {
+              ev.stopPropagation();
+              if (grabbed) return; grabbed = true;
+              anim.cancel();
+              rewardBurst(ev.clientX, ev.clientY, Math.floor(r(2,6)));
+              c.remove();
+            });
+          }, i * 220);
+        }
+        beep('sine', 880, 0.08, 0.05);
+      }
+
+      // whack-a-mole
+      function spawnMole(){
+        const rounds = Math.floor(r(3, 6));
+        for (let k = 0; k < rounds; k++){
+          setTimeout(() => {
+            const m = document.createElement('button');
+            m.className = 'ub-mole';
+            m.textContent = rand(['🐹','🐰','🦔','🐭','🐸']);
+            m.style.left = r(60, window.innerWidth - 100) + 'px';
+            m.style.top  = r(120, window.innerHeight - 120) + 'px';
+            siteBody.appendChild(m);
+            const gone = setTimeout(() => { m.style.transition='transform .2s, opacity .2s'; m.style.opacity='0'; m.style.transform='scale(.2) translateY(30px)'; setTimeout(()=>m.remove(),200); }, r(900, 1500));
+            m.addEventListener('pointerdown', (ev) => {
+              ev.stopPropagation();
+              clearTimeout(gone);
+              shout('BONK!', { size:'clamp(30px,7vw,70px)', dur:600 });
+              rewardBurst(ev.clientX, ev.clientY, Math.floor(r(3,7)));
+              beep('square', r(140,240), 0.10, 0.12);
+              m.remove();
+            });
+          }, k * 700);
+        }
+      }
+
+      // piñata — needs a few whacks
+      function spawnPinata(){
+        const p = document.createElement('button');
+        p.className = 'ub-pinata';
+        p.textContent = '🪅';
+        p.style.left = r(120, window.innerWidth - 160) + 'px';
+        p.style.top  = r(120, Math.max(160, window.innerHeight * 0.5)) + 'px';
+        siteBody.appendChild(p);
+        let hp = 3;
+        const gone = setTimeout(() => p.remove(), 6000);
+        p.addEventListener('pointerdown', (ev) => {
+          ev.stopPropagation();
+          hp--;
+          p.animate([{ transform:'scale(1.2) rotate('+r(-20,20)+'deg)' }, { transform:'scale(1) rotate(0)' }], { duration:200 });
+          spawnParticles(ev.clientX, ev.clientY, { count:r(6,12), shape:'squares' });
+          beep('square', r(180,300), 0.09, 0.10);
+          if (hp <= 0){
+            clearTimeout(gone);
+            shout('🎉 PIÑATA! 🎉', { color:'#ff5ad4' });
+            for (let i=0;i<8;i++) setTimeout(()=>spawnParticles(ev.clientX+r(-40,40), ev.clientY+r(-40,40), {count:r(12,20), shape:'mixed', dxMax:300, dyUp:350}), i*70);
+            siteFall(rand(['🍬','🍭','🎊','⭐']), 3500);
+            rewardBurst(ev.clientX, ev.clientY, Math.floor(r(15,30)));
+            p.remove();
+          }
+        });
+      }
+
+      // gift box — open for a random reward
+      function dropGift(){
+        const g = document.createElement('button');
+        g.className = 'ub-gift';
+        g.textContent = '🎁';
+        g.style.left = r(80, window.innerWidth - 120) + 'px';
+        g.style.top  = r(120, window.innerHeight - 140) + 'px';
+        siteBody.appendChild(g);
+        const gone = setTimeout(() => g.remove(), 7000);
+        g.addEventListener('pointerdown', (ev) => {
+          ev.stopPropagation();
+          clearTimeout(gone);
+          const roll = Math.random();
+          if (roll < 0.5){
+            rewardBurst(ev.clientX, ev.clientY, Math.floor(r(8,20)));
+            shout(rand(['+CLICKS!','BONUS!','SWEET!']));
+          } else {
+            // unleash a random effect
+            const words = Object.keys(ACTIONS);
+            shout('✨ ' + '?!' , { size:'clamp(30px,7vw,64px)' });
+            try { ACTIONS[rand(words)](ev); } catch(err){}
+            rewardBurst(ev.clientX, ev.clientY, Math.floor(r(3,8)));
+          }
+          g.remove();
+        });
+        beep('triangle', 620, 0.10, 0.06);
+      }
+
+      // slot machine
+      function spinSlots(){
+        const box = document.createElement('div');
+        box.className = 'ub-slots';
+        const symbols = ['🍒','🍋','🔔','⭐','💎','🐇','7️⃣'];
+        const reels = [];
+        for (let i=0;i<3;i++){ const rl = document.createElement('div'); rl.className='ub-reel'; rl.textContent=rand(symbols); box.appendChild(rl); reels.push(rl); }
+        siteBody.appendChild(box);
+        const spinIv = setInterval(() => { reels.forEach(rl => rl.textContent = rand(symbols)); beep('square', r(400,900), 0.03, 0.05); }, 80);
+        setTimeout(() => {
+          clearInterval(spinIv);
+          const final = reels.map(rl => { const s = rand(symbols); rl.textContent = s; return s; });
+          const win = final[0] === final[1] && final[1] === final[2];
+          if (win){
+            shout('🎰 JACKPOT! 🎰', { color:'#ffd23f' });
+            achieve('jackpot', 'JACKPOT — three of a kind!');
+            const cx = window.innerWidth/2;
+            for (let i=0;i<10;i++) setTimeout(()=>spawnParticles(cx+r(-120,120), window.innerHeight*0.35, {count:r(14,22), shape:'mixed', dxMax:280, dyUp:340}), i*80);
+            siteFall(rand(['🪙','💰','⭐','7️⃣']), 4000);
+            rewardBurst(cx, window.innerHeight*0.4, Math.floor(r(40,80)));
+          } else if (final[0] === final[1] || final[1] === final[2]){
+            shout('so close! 🎰', { size:'clamp(26px,6vw,52px)' });
+            rewardBurst(window.innerWidth/2, window.innerHeight*0.4, Math.floor(r(4,10)));
+          }
+          box.animate([{opacity:1},{opacity:1,offset:0.7},{opacity:0}], {duration:1400}).onfinish = () => box.remove();
+        }, 1300);
+      }
+
+      // disco ball takeover
+      let discoBallEl = null;
+      function dropDiscoBall(){
+        if (discoBallEl) return;
+        discoBallEl = document.createElement('div');
+        discoBallEl.className = 'ub-discoball';
+        discoBallEl.innerHTML = '<div class="ub-db-beams"></div><div class="ub-db-ball">🪩</div>';
+        siteBody.appendChild(discoBallEl);
+        beep('triangle', 440, 0.14, 0.07);
+        const el = discoBallEl;
+        setTimeout(() => { el.classList.add('fadeOut'); setTimeout(() => { el.remove(); if (discoBallEl === el) discoBallEl = null; }, 600); }, 6000);
+      }
+
+      // bubble wrap minigame
+      function bubbleWrap(){
+        const existing = document.querySelector('.ub-wrap-layer');
+        if (existing) { existing.remove(); return; }
+        const layer = document.createElement('div');
+        layer.className = 'ub-wrap-layer';
+        const close = document.createElement('button');
+        close.className = 'ub-wrap-close'; close.textContent = 'done ✕';
+        close.addEventListener('pointerdown', (ev) => { ev.stopPropagation(); layer.remove(); });
+        layer.appendChild(close);
+        const cells = 96;
+        for (let i=0;i<cells;i++){
+          const b = document.createElement('button');
+          b.className = 'ub-wrap-cell';
+          b.addEventListener('pointerdown', (ev) => {
+            ev.stopPropagation();
+            if (b.classList.contains('popped')) return;
+            b.classList.add('popped');
+            beep('sine', r(500,1100), 0.05, 0.09);
+            spawnParticles(ev.clientX, ev.clientY, { count:r(3,6), shape:'circles', sizeMin:6, sizeMax:14, durMin:250, durMax:500 });
+            ubAddClicks(1);
+            ubPop(ev.clientX, ev.clientY, 'pop', { size:14 });
+          });
+          layer.appendChild(b);
+        }
+        siteBody.appendChild(layer);
+      }
+
+      // ============================================================
+      // ===== NEW EFFECTS (dozens more, wired into ACTIONS) ========
+      // ============================================================
+      function launchEmoji(char, fromX, fromY, opts = {}){
+        const el = document.createElement('div');
+        el.className = 'fx-emoji';
+        el.textContent = char;
+        el.style.left = fromX + 'px'; el.style.top = fromY + 'px';
+        el.style.fontSize = (opts.size ?? r(24, 44)) + 'px';
+        siteBody.appendChild(el);
+        const dx = opts.dx ?? r(-160, 160);
+        const dy = opts.dy ?? r(-260, -420);
+        const rot = r(-360, 360);
+        el.animate([
+          { transform:'translate(-50%,-50%) scale(.3) rotate(0)', opacity:0 },
+          { transform:`translate(-50%,-50%) translate(${dx*0.5}px,${dy*0.5}px) scale(1) rotate(${rot*0.5}deg)`, opacity:1, offset:0.3 },
+          { transform:`translate(-50%,-50%) translate(${dx}px,${dy + 200}px) scale(.8) rotate(${rot}deg)`, opacity:0 }
+        ], { duration: opts.dur ?? r(900, 1500), easing:'cubic-bezier(.2,.7,.4,1)' }).onfinish = () => el.remove();
+      }
+
+      function fireworks(e){
+        const shots = Math.floor(r(3, 6));
+        for (let s = 0; s < shots; s++){
+          setTimeout(() => {
+            const bx = r(window.innerWidth*0.2, window.innerWidth*0.8);
+            const by = r(window.innerHeight*0.2, window.innerHeight*0.5);
+            const hue = r(0, 360);
+            for (let i=0;i<r(18,30);i++){
+              const angle = (i / 24) * Math.PI * 2;
+              const dist = r(80, 200);
+              spawnParticles(bx, by, { count:1, hue, shape:'circles', sizeMin:6, sizeMax:12, dxMax:1, dyUp:1, durMin:600, durMax:1100 });
+            }
+            // radial burst via direct particles
+            spawnParticles(bx, by, { count:r(20,32), shape:'mixed', dxMax:220, dyUp:220, dyDown:220, hue, durMin:500, durMax:1000 });
+            siteFlash(`hsla(${hue},90%,60%,.12)`, 120);
+            beep('sine', r(120,220), 0.18, 0.05); beep('square', r(500,900), 0.05, 0.05);
+          }, s * 260);
+        }
+      }
+
+      function rocket(e){
+        const startX = e.clientX, startY = window.innerHeight + 20;
+        const el = document.createElement('div');
+        el.className = 'ub-rocket'; el.textContent = '🚀';
+        siteBody.appendChild(el);
+        const topY = r(60, 160);
+        el.animate([
+          { left:startX+'px', top:startY+'px' },
+          { left:(startX + r(-40,40))+'px', top:topY+'px' }
+        ], { duration: 900, easing:'cubic-bezier(.3,.1,.6,1)', fill:'forwards' }).onfinish = () => {
+          fireworks(e);
+          el.remove();
+        };
+        // trail
+        let t = 0; const trail = setInterval(() => {
+          const rect = el.getBoundingClientRect();
+          spawnParticles(rect.left + rect.width/2, rect.top + rect.height, { count:r(2,4), shape:'circles', hue:30, sizeMin:4, sizeMax:10, dyDown:60, dyUp:0, durMin:300, durMax:600 });
+          if (++t > 14) clearInterval(trail);
+        }, 60);
+        beep('sawtooth', r(120,200), 0.6, 0.06);
+      }
+
+      function screenCrack(e){
+        const layer = document.createElement('div');
+        layer.className = 'ub-crack';
+        const svgns = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(svgns, 'svg');
+        svg.setAttribute('viewBox', `0 0 ${window.innerWidth} ${window.innerHeight}`);
+        svg.setAttribute('preserveAspectRatio', 'none');
+        const cx = e.clientX, cy = e.clientY;
+        for (let i=0;i<r(9,16);i++){
+          const ang = r(0, Math.PI*2);
+          let x = cx, y = cy, d = `M${cx},${cy}`;
+          const segs = Math.floor(r(3,6));
+          for (let s=0;s<segs;s++){
+            x += Math.cos(ang) * r(40,140) + r(-30,30);
+            y += Math.sin(ang) * r(40,140) + r(-30,30);
+            d += ` L${x.toFixed(0)},${y.toFixed(0)}`;
+          }
+          const p = document.createElementNS(svgns, 'path');
+          p.setAttribute('d', d);
+          svg.appendChild(p);
+        }
+        layer.appendChild(svg);
+        siteBody.appendChild(layer);
+        siteFlash('rgba(255,255,255,.5)', 100);
+        quakeShake();
+        beep('square', r(60,120), 0.16, 0.14); beep('sine', r(1400,2000), 0.04, 0.06);
+        setTimeout(() => { layer.classList.add('fadeOut'); setTimeout(() => layer.remove(), 1000); }, 2500);
+      }
+
+      function walker(chars, count){
+        for (let i=0;i<count;i++){
+          setTimeout(() => {
+            const w = document.createElement('div');
+            w.className = 'ub-walker';
+            const rtl = Math.random() < 0.5;
+            w.textContent = rand(chars) + (rtl ? '' : '');
+            w.style.top = r(30, 80) + '%';
+            w.style.fontSize = r(28, 46) + 'px';
+            siteBody.appendChild(w);
+            const from = rtl ? window.innerWidth + 60 : -60;
+            const to   = rtl ? -60 : window.innerWidth + 60;
+            if (!rtl) w.style.transform = 'scaleX(-1)';
+            w.animate([{ left:from+'px' }, { left:to+'px' }], { duration:r(4000,7000), easing:'linear' }).onfinish = () => w.remove();
+            w.style.left = from + 'px';
+          }, i * 350);
+        }
+      }
+
+      function beeSwarm(e){
+        const layer = document.createElement('div');
+        layer.className = 'fx-layer';
+        siteBody.appendChild(layer);
+        const bees = [];
+        for (let i=0;i<12;i++){ const b = document.createElement('div'); b.className='fx-emoji'; b.textContent='🐝'; b.style.fontSize=r(18,28)+'px'; layer.appendChild(b); bees.push({el:b, ang:r(0,Math.PI*2), rad:r(30,90), sp:r(0.05,0.12)}); }
+        let tx = e.clientX, ty = e.clientY, frames = 0;
+        const move = (ev) => { tx = ev.clientX; ty = ev.clientY; };
+        document.addEventListener('pointermove', move, { passive:true });
+        const iv = setInterval(() => {
+          frames++;
+          bees.forEach(bee => { bee.ang += bee.sp; const x = tx + Math.cos(bee.ang)*bee.rad; const y = ty + Math.sin(bee.ang)*bee.rad; bee.el.style.left = x+'px'; bee.el.style.top = y+'px'; });
+          if (frames > 130){ clearInterval(iv); document.removeEventListener('pointermove', move); layer.classList.add('fadeOut'); layer.style.transition='opacity .5s'; layer.style.opacity='0'; setTimeout(()=>layer.remove(),500); }
+        }, 30);
+        beep('sawtooth', r(180,260), 0.4, 0.05);
+      }
+
+      function fireRandomEffects(e, n){
+        const words = Object.keys(ACTIONS);
+        for (let i=0;i<n;i++){
+          const w = rand(words);
+          if (w === 'chaos' || w === 'roulette') continue;
+          try { ACTIONS[w](e); } catch(err){}
+        }
+      }
+
+      Object.assign(ACTIONS, {
+        "jackpot": (e) => { spinSlots(); beep('triangle', r(400,700), 0.10, 0.07); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:'mixed'}); },
+        "disco ball": (e) => { dropDiscoBall(); applySiteTheme('disco'); beep('triangle', r(400,700), 0.10, 0.07); spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:'mixed'}); },
+        "bubble wrap": (e) => { bubbleWrap(); beep('sine', r(600,1000), 0.08, 0.06); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:'circles'}); },
+        "whack": (e) => { spawnMole(); beep('square', r(160,260), 0.10, 0.10); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "piñata": (e) => { spawnPinata(); beep('triangle', r(300,500), 0.10, 0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:'mixed'}); },
+        "gift drop": (e) => { dropGift(); beep('triangle', r(500,800), 0.10, 0.07); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "coin rain": (e) => { dropCoins(); siteFall(rand(['🪙','💰','⭐']),3000); beep('sine', 880, 0.10, 0.06); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "fireworks": (e) => { fireworks(e); },
+        "rocket": (e) => { rocket(e); spawnParticles(e.clientX,e.clientY,{count:r(10,16),hue:30}); },
+        "confetti cannon": (e) => { for(let i=0;i<10;i++) setTimeout(()=>spawnParticles(e.clientX+r(-30,30),e.clientY,{count:r(14,22),shape:'mixed',dxMax:300,dyUp:400,durMin:500,durMax:1100}),i*60); siteFall(rand(['🎊','🎉','✦']),3000); beep('square',r(200,400),0.10,0.10); shout('🎊'); },
+        "screen crack": (e) => { screenCrack(e); },
+        "sheep": (e) => { walker(['🐑','🐏'], Math.floor(r(4,8))); beep('sine',r(200,350),0.14,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
+        "duck army": (e) => { walker(['🦆','🦆','🐤'], Math.floor(r(6,12))); siteFall('🦆',2500); beep('sine',r(300,500),0.12,0.08); },
+        "bees": (e) => { beeSwarm(e); siteFall('🐝',2000); spawnParticles(e.clientX,e.clientY,{count:r(8,14),hue:50}); },
+        "bullet time": (e) => { siteBody.classList.add('page-bullettime'); beep('sine',r(120,200),0.4,0.06); spawnParticles(e.clientX,e.clientY,{count:r(10,16),durMin:1500,durMax:2500,dxMax:60}); setTimeout(()=>siteBody.classList.remove('page-bullettime'),3000); },
+        "high five": (e) => { launchEmoji('🖐️', e.clientX, e.clientY, {size:r(40,60), dy:-120}); shout('HIGH FIVE! ✋', {size:'clamp(28px,6vw,56px)', dur:800}); siteFlash('rgba(255,220,120,.25)',200); beep('triangle',r(500,800),0.10,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:'mixed'}); },
+        "boing": (e) => { toyBox.classList.add('bounce'); setTimeout(()=>toyBox.classList.remove('bounce'),1000); launchEmoji('🥾', e.clientX, e.clientY, {dy:-300}); beep('sine',r(200,500),0.16,0.09); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:'circles'}); },
+        "money": (e) => { for(let i=0;i<8;i++) setTimeout(()=>launchEmoji(rand(['💵','💸','🤑','💰']), r(0,window.innerWidth), window.innerHeight+20, {dy:-r(300,600), dur:r(1400,2200)}),i*100); dropCoins(); siteFall(rand(['💵','💸']),3000); beep('sine',r(400,700),0.12,0.07); },
+        "stonks": (e) => { launchEmoji('📈', e.clientX, e.clientY, {size:r(44,64), dy:-260}); shout('STONKS 📈', {color:'#3ddc84'}); siteFlash('rgba(60,220,130,.2)',250); document.querySelectorAll('.card').forEach((c,i)=>{c.style.transition='transform .5s ease';c.style.transform='translateY(-'+r(10,30)+'px)';setTimeout(()=>c.style.transform='',900+i*40);}); beep('triangle',r(400,900),0.12,0.08); },
+        "glitter bomb": (e) => { siteSparkle(3500); for(let i=0;i<6;i++) setTimeout(()=>spawnParticles(e.clientX+r(-60,60),e.clientY+r(-60,60),{count:r(14,22),shape:'mixed',durMin:600,durMax:1300}),i*90); siteFall(rand(['✨','💫','⭐','✦']),3500); beep('triangle',r(600,1100),0.10,0.07); },
+        "sprinkles": (e) => { for(let i=0;i<5;i++) setTimeout(()=>{ for(let j=0;j<r(6,10);j++) spawnParticles(r(0,window.innerWidth), -10, {count:1, shape:'mixed', sizeMin:5, sizeMax:11, dxMax:40, dyUp:0, dyDown:window.innerHeight, durMin:1200, durMax:2200}); },i*180); beep('sine',r(700,1100),0.06,0.05); },
+        "trampoline": (e) => { document.querySelectorAll('.card').forEach((c,i)=>{ c.style.transition='transform .5s cubic-bezier(.3,1.6,.5,1)'; let up=true; const bnc=setInterval(()=>{ c.style.transform= up?'translateY(-'+r(15,35)+'px)':'translateY(0)'; up=!up; },300); setTimeout(()=>{clearInterval(bnc);c.style.transform='';}, 2400 + i*60); }); beep('sine',r(300,600),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:'circles'}); },
+        "laser show": (e) => { for(let i=0;i<5;i++) setTimeout(()=>spawnLasers(),i*260); beep('square',r(200,500),0.08,0.10); },
+        "kaboom": (e) => { screenCrack(e); quakeShake(); for(let i=0;i<8;i++) setTimeout(()=>spawnParticles(e.clientX+r(-120,120),e.clientY+r(-120,120),{count:r(14,22),shape:'squares',dxMax:300,dyUp:350}),i*60); siteFlash('rgba(255,180,60,.4)',300); shout('💥 KABOOM 💥'); beep('square',r(50,100),0.2,0.16); },
+        "yes": (e) => { shout('YES! ✅', {color:'#3ddc84', size:'clamp(34px,8vw,80px)'}); siteFlash('rgba(60,220,130,.2)',250); siteFall('✅',2000); beep('triangle',r(500,900),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:'mixed'}); },
+        "no": (e) => { shout('NO. ❌', {color:'#ff4d4d', size:'clamp(34px,8vw,80px)'}); siteBody.classList.add('page-quake'); setTimeout(()=>siteBody.classList.remove('page-quake'),600); siteFlash('rgba(255,60,60,.2)',250); beep('sawtooth',r(120,200),0.18,0.08); },
+        "again": (e) => { shout('AGAIN! 🔁', {size:'clamp(28px,6vw,56px)', dur:700}); combo += 2; updateComboUI(); spawnParticles(e.clientX,e.clientY,{count:r(12,18)}); beep('triangle',r(400,700),0.10,0.08); },
+        "combo boost": (e) => { combo += 5; updateComboUI(); if(combo>=FEVER_COMBO) enterFever(); for(let i=0;i<5;i++) setTimeout(()=>ubPop(e.clientX+r(-40,40),e.clientY+r(-20,20),'+combo',{size:r(16,24)}),i*80); beep('triangle',r(500,900),0.10,0.08); spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:'mixed'}); },
+        "chaos": (e) => { shout('CHAOS! 🌀', {color:'#ff5ad4'}); fireRandomEffects(e, 3); beep('square',r(100,300),0.12,0.12); },
+        "roulette": (e) => { shout('🎲', {size:'clamp(40px,9vw,90px)', dur:700}); fireRandomEffects(e, 1); },
+        "vacuum": (e) => { const mx=e.clientX,my=e.clientY; document.querySelectorAll('.card,.aboutCard,.emoji,.tag').forEach(el=>{ const rect=el.getBoundingClientRect(); const dx=mx-(rect.left+rect.width/2), dy=my-(rect.top+rect.height/2); const dist=Math.max(Math.hypot(dx,dy),1); el.style.transition='transform .8s cubic-bezier(.4,0,.6,1)'; el.style.transform=`translate(${dx*0.5}px,${dy*0.5}px) scale(.4) rotate(${r(-90,90)}deg)`; }); launchEmoji('🌪️', mx, my, {dy:-40, size:50}); beep('sine',r(120,220),0.3,0.08); setTimeout(()=>document.querySelectorAll('.card,.aboutCard,.emoji,.tag').forEach(el=>{el.style.transition='transform 1.2s cubic-bezier(.2,.8,.2,1)';el.style.transform='';}),1600); },
+        "heart burst": (e) => { for(let i=0;i<r(14,22);i++){ const ang=(i/18)*Math.PI*2; launchEmoji('❤️', e.clientX, e.clientY, {dx:Math.cos(ang)*r(100,200), dy:Math.sin(ang)*r(100,200), size:r(18,30), dur:r(700,1200)}); } spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:'hearts'}); beep('triangle',r(500,900),0.10,0.07); },
+        "star shower": (e) => { for(let i=0;i<10;i++) setTimeout(()=>launchEmoji(rand(['⭐','🌟','✨','💫']), r(0,window.innerWidth), -10, {dy:window.innerHeight, dx:r(-40,40), dur:r(1400,2400), size:r(16,28)}),i*120); siteSparkle(3000); beep('sine',r(600,1000),0.08,0.05); },
+        "rain of frogs": (e) => { for(let i=0;i<r(8,14);i++) setTimeout(()=>launchEmoji('🐸', r(0,window.innerWidth), -10, {dy:window.innerHeight, dx:r(-30,30), dur:r(1400,2200), size:r(24,38)}),i*100); siteFall('🐸',2500); beep('sine',r(200,400),0.12,0.08); },
+        "dizzy spin": (e) => { toyBox.style.transition='transform 1.4s cubic-bezier(.2,.8,.2,1)'; toyBox.style.transform='rotate(1080deg)'; setTimeout(()=>{toyBox.style.transform='';setTimeout(()=>toyBox.style.transition='',700);},1500); siteFall('💫',2000); beep('sine',r(300,700),0.16,0.08); spawnParticles(e.clientX,e.clientY,{count:r(16,24),dxMax:200,dyUp:200}); },
+      });
+
+      // register the new words so they appear on the box
+      const NEW_WORDS = [
+        "jackpot","disco ball","bubble wrap","whack","piñata","gift drop","coin rain",
+        "fireworks","rocket","confetti cannon","screen crack","sheep","duck army","bees",
+        "bullet time","high five","boing","money","stonks","glitter bomb","sprinkles",
+        "trampoline","laser show","kaboom","yes","no","again","combo boost","chaos",
+        "roulette","vacuum","heart burst","star shower","rain of frogs","dizzy spin"
+      ];
+      NEW_WORDS.forEach(w => { if (!ACTION_WORDS.includes(w)) ACTION_WORDS.push(w); });
+
+      // ================================================================
+      // ===== LSD TRIP ENGINE — reality bends the longer you spam =======
+      // ================================================================
+      // Heat accumulates per click, faster when clicks-per-second is high.
+      // It only NET-builds under sustained fast spam (decay outpaces slow
+      // clicking), so a real ~15-20s spiral requires genuine spam-clicking.
+      // tripLevel (0..1) then drives layered optical illusions:
+      //  - a rotating hypnotic pinwheel (motion after-effect)
+      //  - breathing concentric tunnel rings (inward/outward drift)
+      //  - an SVG turbulence displacement filter (everything melts/breathes)
+      //  - chromatic aberration + accelerating hue rotation + saturation
+      // Stop clicking and it gently comes back down (afterglow).
+      const HEAT_MAX = 160;
+      let heat = 0, tripLevel = 0, tripPhase = 0, spiralAngle = 0, hueAccum = 0;
+      let lastTripT = performance.now();
+      let tripStageShown = -1;
+
+      const contentEls = [document.querySelector('.top'), document.querySelector('.wrap')].filter(Boolean);
+
+      const spiralEl = document.createElement('div');
+      spiralEl.className = 'ub-spiral'; siteBody.appendChild(spiralEl);
+      const ringsEl = document.createElement('div');
+      ringsEl.className = 'ub-rings'; siteBody.appendChild(ringsEl);
+      const washEl = document.createElement('div');
+      washEl.className = 'ub-wash'; siteBody.appendChild(washEl);
+
+      // SVG turbulence + displacement filter (the "melt")
+      const _svgns = 'http://www.w3.org/2000/svg';
+      const tripSvg = document.createElementNS(_svgns, 'svg');
+      tripSvg.setAttribute('class', 'ub-trip-svg');
+      tripSvg.innerHTML =
+        '<defs><filter id="ubWarp">' +
+        '<feTurbulence id="ubTurb" type="fractalNoise" baseFrequency="0.006 0.008" numOctaves="2" seed="4" result="n"/>' +
+        '<feDisplacementMap id="ubDisp" in="SourceGraphic" in2="n" scale="0" xChannelSelector="R" yChannelSelector="G"/>' +
+        '</filter></defs>';
+      siteBody.appendChild(tripSvg);
+      const turbEl = tripSvg.querySelector('#ubTurb');
+      const dispEl = tripSvg.querySelector('#ubDisp');
+
+      const TRIP_WHISPERS = [
+        '…is it warm in here? 🫠',
+        'the walls are breathing 🌀',
+        'you can hear colors now 🌈',
+        'oh no. oh yes. 👁️',
+        'ego death imminent 🫠🌀'
+      ];
+
+      function tripAddHeat(cps, e){
+        const gain = 0.7 + Math.min(cps, 16) * 0.13;
+        heat = Math.min(HEAT_MAX, heat + gain);
+      }
+
+      function tripLoop(t){
+        const dt = Math.min(0.05, (t - lastTripT) / 1000);
+        lastTripT = t;
+
+        // decay — grows slightly with level so peak spam is required to hold it
+        heat = Math.max(0, heat - (7 + tripLevel * 5) * dt);
+        // ease level toward heat ratio for smoothness
+        const target = heat / HEAT_MAX;
+        tripLevel += (target - tripLevel) * Math.min(1, dt * 6);
+        if (tripLevel < 0.0015) tripLevel = target < 0.0015 ? 0 : tripLevel;
+        const L = tripLevel;
+
+        tripPhase  += dt * (0.5 + L * 3.2);
+        spiralAngle += dt * (6 + L * 90);
+        hueAccum   += dt * L * 90;
+
+        if (L <= 0.004){
+          if (spiralEl.style.opacity !== '0'){
+            spiralEl.style.opacity = '0'; ringsEl.style.opacity = '0'; washEl.style.opacity = '0';
+            dispEl.setAttribute('scale', '0');
+            contentEls.forEach(el => { el.style.filter = ''; el.style.transform = ''; });
+            tripStageShown = -1;
+          }
+          requestAnimationFrame(tripLoop);
+          return;
+        }
+
+        // rotating pinwheel + breathing rings + hue wash
+        const eased = L * L; // ramps late — subtle until you really commit
+        spiralEl.style.opacity = (L * 0.5).toFixed(3);
+        spiralEl.style.transform = `translate(-50%,-50%) rotate(${spiralAngle}deg) scale(${1 + L * 0.35})`;
+        const ringPulse = 1 + Math.sin(tripPhase * 2.2) * 0.16 * L + L * 0.12;
+        ringsEl.style.opacity = (L * 0.45).toFixed(3);
+        ringsEl.style.transform = `translate(-50%,-50%) rotate(${-spiralAngle * 0.5}deg) scale(${ringPulse})`;
+        washEl.style.opacity = (eased * 0.7).toFixed(3);
+
+        // melt: turbulence + displacement, both breathing
+        const bf = (0.005 + 0.010 * L + 0.003 * Math.sin(tripPhase)) ;
+        turbEl.setAttribute('baseFrequency', bf.toFixed(4) + ' ' + (bf * 1.25).toFixed(4));
+        const dScale = L * 32 * (0.55 + 0.45 * Math.sin(tripPhase * 3));
+        dispEl.setAttribute('scale', dScale.toFixed(1));
+
+        // content warp: displacement + chromatic aberration + hue + saturation + blur, breathing scale
+        const breathe = 1 + Math.sin(tripPhase * 2) * 0.035 * L;
+        const ca = eased * 5; // chromatic aberration px
+        const filterStr =
+          `url(#ubWarp) hue-rotate(${hueAccum.toFixed(1)}deg) ` +
+          `saturate(${(1 + L * 1.6).toFixed(2)}) contrast(${(1 + L * 0.25).toFixed(2)}) ` +
+          `blur(${(eased * 1.2).toFixed(2)}px) ` +
+          `drop-shadow(${ca.toFixed(1)}px 0 0 rgba(255,0,80,.5)) ` +
+          `drop-shadow(${(-ca).toFixed(1)}px 0 0 rgba(0,220,255,.5))`;
+        contentEls.forEach(el => {
+          el.style.filter = filterStr;
+          el.style.transform = `scale(${breathe.toFixed(4)})`;
+          el.style.willChange = 'filter, transform';
+        });
+
+        // escalating whispers as you cross new depths
+        const stage = L < 0.2 ? -1 : Math.min(TRIP_WHISPERS.length - 1, Math.floor((L - 0.2) / 0.16));
+        if (stage > tripStageShown){
+          tripStageShown = stage;
+          if (stage >= 0) toast(TRIP_WHISPERS[stage]);
+        }
+
+        requestAnimationFrame(tripLoop);
+      }
+      requestAnimationFrame(tripLoop);
+
+      // Once you're deep in the spiral, don't let a stray spam-click on a
+      // (chaos-flung) link yank you off the page — the trip keeps you.
+      document.addEventListener('click', (ev) => {
+        if (tripLevel > 0.28){
+          const a = ev.target.closest && ev.target.closest('a[href]');
+          if (a && (a.closest('#grid') || a.closest('#toolsGrid') || a.closest('.nav') || a.classList.contains('logo'))){
+            ev.preventDefault();
+            shout('🌀 you can\'t leave 🌀', { size:'clamp(24px,5vw,44px)', dur:700 });
+          }
+        }
+      }, true);
+
       // init
       randomizeBlobs("normal");
       refreshTextAndPositions();
+      checkMilestone();
 
       toyBox.addEventListener('pointerdown', (e) => {
         const t = e.target;
