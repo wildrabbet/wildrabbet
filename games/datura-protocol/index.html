@@ -131,13 +131,14 @@ const G = {
   // shader drive params (smoothed each frame)
   warp:0.55, chroma:0.45, hue:0, decay:0.86, feedZoom:0, feedRot:0,
   kaleido:0, swirl:0, breath:0, flash:0, invert:0, grain:0.05, vignette:0.9,
-  spiral:0.5, sat:1.3, pace:0.4,
-  // ascension: trip escalates with size AND time; SHIFT-while-still => transcendence
-  trip:0, tripTime:0, open:0, phase:'fixate', fixate:10,
-  shiftHeld:false, shift:0, dash:0, trans:0,
+  spiral:0.5, sat:1.3, pace:0.4, _hueAcc:0, realmHue:0,
+  // ascension: SHIFT builds it; you keep PLAYING while you travel through realms.
+  trip:0, tripTime:0, open:0, phase:'fixate', fixate:1.5,
+  shiftHeld:false, shift:0, asc:0, travel:0, realm:0, realmTimer:9,
+  rm:{hueRot:0,sat:0,warp:0,chroma:0,kal:0,spiral:0,flowZ:0,flowR:0,spin:0,spd:0,grain:0,vig:0},
   // event impulses (decay over time)
   kick:0, hueSpike:0, warpSpike:0, chromaSpike:0, flashSpike:0, surge:0,
-  surgeTimer:16, faceTimer:6, burnTimer:5, shadeTimer:9, crawlTimer:13, sound:true,
+  surgeTimer:16, faceTimer:4, bigFaceTimer:5, burnTimer:4, shadeTimer:8, crawlTimer:12, sound:true,
 };
 
 /* =====================================================================
@@ -470,6 +471,7 @@ function graft(b){
   G.flashSpike = Math.min(0.9, G.flashSpike + punch*0.5*G.intensity);
   G.kick       = Math.min(1.5, G.kick + punch);
   burst(b.x,b.y, b.radius, b.genome.hue, 14+punch*22);
+  parts.push({x:0,y:0,life:1,decay:rr(0.7,1.1),r0:player.radius*0.6,hue:b.genome.hue,kind:'ring'}); // absorb shock-ring
   audio.absorb(b.mass/before);
 }
 
@@ -483,10 +485,10 @@ function burst(x,y,r,hue,n){
   }
 }
 function seedMotes(){
-  for(let i=0;i<140;i++){
-    const a=srand()*TAU,d=rr(0.2,2.4)*player.radius*6;
+  for(let i=0;i<200;i++){
+    const a=srand()*TAU,d=rr(0.2,2.4)*player.radius*6, dep=rr(0.35,1.15);   // depth => parallax
     parts.push({x:Math.cos(a)*d,y:Math.sin(a)*d,vx:gauss(0,4),vy:gauss(0,4),
-      life:Infinity,r:rr(1,3),hue:rr(0,360),kind:'mote',ph:srand()*TAU});
+      life:Infinity,r:rr(0.8,3)*dep,hue:rr(0,360),kind:'mote',ph:srand()*TAU,dep});
   }
 }
 
@@ -758,7 +760,7 @@ function drawCrawlers(dt){
 const APP=['eyes','face','figure'];
 let burn=null;
 function spawnBurn(){
-  const full = srand() < 0.3*Math.min(1, G.trans + G.trip*0.3); // rare 1-beat full-frame subliminal
+  const full = srand() < 0.3*Math.min(1, G.asc + G.trip*0.3); // rare 1-beat full-frame subliminal
   burn={ type:pick(APP), t0:G.t, dur: full?0.06:rr(0.09,0.18),
     x: full?0.5:rr(0.28,0.72), y: full?0.5:rr(0.28,0.72), scale: full?1.5:rr(0.3,0.7), full };
 }
@@ -798,38 +800,92 @@ function drawVeil(){
   drawCrawlers(G.dt);
 }
 
+/* ---------- REALMS: while ascended you drift between these visual regimes. Each is a set
+   of DELTAS from the base look — palette rotation, saturation, warp/chroma, spiral, the
+   direction of the feedback flow, spin, being-speed, grain and vignette. Index 0 is neutral
+   (what you see un-ascended); the rest are the places SHIFT takes you. ---------- */
+const REALMS=[
+  {hueRot:0,    sat:0,    warp:0,   chroma:0,   kal:0,   spiral:0,   flowZ:0,     flowR:0,     spin:0,    spd:0,    grain:0,    vig:0},
+  {hueRot:-1.6, sat:0.35, warp:0.3, chroma:0.3, kal:0.1, spiral:0.5, flowZ:-0.010,flowR:0.006, spin:0.22, spd:0.2,  grain:0,    vig:0.1},   // ember
+  {hueRot:2.4,  sat:0.1,  warp:0.2, chroma:0.4, kal:0.0, spiral:0.7, flowZ:0.012, flowR:-0.005,spin:-0.2, spd:-0.2, grain:0,    vig:0.3},   // abyss
+  {hueRot:-3.4, sat:0.5,  warp:0.4, chroma:0.35,kal:0.28,spiral:0.6, flowZ:-0.014,flowR:0.011, spin:0.35, spd:0.45, grain:0,    vig:-0.1},  // bloom
+  {hueRot:0.6,  sat:-0.6, warp:0.7, chroma:0.6, kal:0.0, spiral:0.2, flowZ:0.004, flowR:0.002, spin:0.05, spd:-0.1, grain:0.12, vig:0.25},  // bone
+  {hueRot:1.4,  sat:0.35, warp:0.2, chroma:0.2, kal:0.16,spiral:0.4, flowZ:-0.006,flowR:0.009, spin:0.2,  spd:0.1,  grain:0,    vig:0},     // verdant
+  {hueRot:-2.6, sat:0.7,  warp:0.7, chroma:0.9, kal:0.42,spiral:1.0, flowZ:-0.02, flowR:0.02,  spin:0.5,  spd:0.6,  grain:0.04, vig:-0.1},  // fever
+  {hueRot:0.2,  sat:-0.9, warp:0.1, chroma:0.1, kal:0.0, spiral:0.1, flowZ:0.002, flowR:0.0,   spin:0.02, spd:-0.3, grain:0.02, vig:0.5},   // void
+];
+
+/* ---------- MASSIVE, near-invisible faces that bleed out of the current background.
+   Rendered desaturated and blended with soft-light so they modulate the luminance already
+   on screen — they emerge where the background has colour, blending in but never perfectly.
+   Random sizes up to enormous; slow to materialise and dissolve; very hard to catch. ---------- */
+const bigFaces=[];
+function spawnBigFace(){
+  const g=makeFaceG(); g.sat=0; g.hairL=Math.max(g.hairL,10);   // desaturate -> pure luminance
+  bigFaces.push({
+    img: renderFaceImg(g,false,false),
+    size: rr(0.45,1.4), ang: srand()*TAU, rad: rr(0.05,0.7), rot: gauss(0,0.18),
+    t0:G.t, dur: rr(5.5,11), alpha: rr(0.05,0.13),
+  });
+}
+function drawBigFaces(){
+  if(!bigFaces.length) return;
+  const w=G.W,h=G.H, mn=Math.min(w,h);
+  for(let i=bigFaces.length-1;i>=0;i--){
+    const f=bigFaces[i]; const age=G.t-f.t0;
+    if(age>f.dur){ bigFaces.splice(i,1); continue; }
+    const a=smooth(Math.sin(Math.PI*age/f.dur));
+    const cx=w/2+Math.cos(f.ang)*f.rad*mn, cy=h/2+Math.sin(f.ang)*f.rad*mn;
+    const Hh=f.size*mn, Ww=Hh*(f.img.width/f.img.height);
+    sctx.save(); sctx.translate(cx,cy); sctx.rotate(f.rot);
+    sctx.globalCompositeOperation='soft-light'; sctx.globalAlpha=f.alpha*a;      // blends into lit background
+    sctx.drawImage(f.img,-Ww/2,-Hh/2,Ww,Hh);
+    sctx.globalCompositeOperation='lighter'; sctx.globalAlpha=f.alpha*a*0.25;     // a whisper even on the black
+    sctx.drawImage(f.img,-Ww/2,-Hh/2,Ww,Hh);
+    sctx.restore();
+  }
+  sctx.globalAlpha=1; sctx.globalCompositeOperation='source-over';
+}
+
 /* =====================================================================
    UPDATE
    ===================================================================== */
 function update(dt){
   G.t += dt;
 
-  // ---- fixation intro: stare into the centre dot for ~10s, THEN the trip blooms ----
+  // ---- brief fixation, then the trip is ON almost immediately ----
   if(G.phase==='fixate'){
     G.fixate -= dt;
     if(G.fixate<=0){ G.phase='open'; for(let i=0;i<26;i++) spawnBeing(); }
   }
   const opened = G.phase!=='fixate';
 
-  // ---- controls: WASD only. You are locked dead centre; the world moves around you. ----
+  // ---- controls: WASD moves the world; you stay dead centre and ALWAYS in control ----
   let kx=(keys.has('d')||keys.has('arrowright'))-(keys.has('a')||keys.has('arrowleft'));
   let ky=(keys.has('s')||keys.has('arrowdown'))-(keys.has('w')||keys.has('arrowup'));
-  const moving = (kx||ky)?1:0;
 
-  // SHIFT with WASD => a controlled dash (you STAY in control). SHIFT held while STILL,
-  // staring at the centre => transcendence builds: the out-of-body awakening.
-  G.shift = lerp(G.shift, G.shiftHeld?1:0, 1-Math.pow(0.001,dt));
-  G.dash  = lerp(G.dash, (G.shiftHeld&&moving)?1:0, 1-Math.pow(0.002,dt));
-  const transTgt = (G.shiftHeld && !moving && opened) ? 1 : 0;
-  G.trans = lerp(G.trans, transTgt, 1-Math.pow(transTgt?0.45:0.12, dt)); // slow, natural come-up; ease back on input
-  const trans=G.trans, dash=G.dash;
-  const rush = Math.max(trans, dash*0.55);       // combined "hyper" amount feeding the shader
-  G.hyper = rush;                                // Post.frame reads this
+  // ---- SHIFT = ASCENSION. You keep PLAYING, but you rush faster and travel through realms,
+  // and it deepens the longer you hold. It lingers after release so you play on inside it. ----
+  G.shift = lerp(G.shift, G.shiftHeld?1:0, 1-Math.pow(0.02,dt));
+  G.asc   = lerp(G.asc, G.shiftHeld?1:0, 1-Math.pow(G.shiftHeld?0.5:0.9, dt));
+  const asc=G.asc, rj=smooth(clamp(asc,0,1));
+
+  // realm travel — while ascended, journey between realms; the deeper you are the faster
+  if(asc>0.35){
+    G.realmTimer -= dt*(0.4+asc*0.8);
+    if(G.realmTimer<=0){ let nx=G.realm; while(nx===G.realm) nx=ri(1,REALMS.length-1);
+      G.realm=nx; G.realmTimer=rr(7,13); G.travel=1; audio.surge(); }
+  } else if(G.realm!==0 && asc<0.2){ G.realm=0; G.travel=Math.max(G.travel,0.5); }
+  G.travel=Math.max(0,G.travel-dt*0.6);
+  const tv=smooth(G.travel);
+  const rm=G.rm, RT=REALMS[G.realm];
+  for(const k in rm) rm[k]=lerp(rm[k], (RT[k]||0), 0.025);   // ease between realms
+  G.hyper = clamp(tv*0.85 + asc*0.12, 0, 1);                 // radial-streak kept LOW so it stays playable
 
   // pace + trip: trippier the BIGGER you are and the LONGER you ascend
   if(opened) G.tripTime += dt;
-  G.pace = clamp(0.4 + G.tripTime*0.02 + Math.log2(1+player.mass)*0.03, 0.4, 1.8);
-  G.trip = clamp(Math.log2(1+player.mass)*0.1 + G.tripTime*0.006 + trans*0.5, 0, 1.9);
+  G.pace = clamp(0.4 + G.tripTime*0.02 + Math.log2(1+player.mass)*0.03, 0.4, 1.9);
+  G.trip = clamp(Math.log2(1+player.mass)*0.1 + G.tripTime*0.006 + asc*0.6 + tv*0.4, 0, 2.2);
   const trip=G.trip;
 
   // ---- breathing / surge scheduler ----
@@ -841,106 +897,106 @@ function update(dt){
   G.surge=Math.max(0,G.surge-dt*0.22);
   const surge=smooth(G.surge);
 
-  // ---- illusion scheduling — all bloom around the fixation centre; escalate with trip/trans ----
+  // ---- illusions: begin immediately, escalate with trip/ascension ----
   if(opened){
     G.faceTimer -= dt;
-    if(G.faceTimer<=0){ spawnFaceRound(); G.faceTimer = rr(4.5,9)/(0.6+G.pace*0.4+trip*0.7+trans*3); }
+    if(G.faceTimer<=0){ spawnFaceRound(); G.faceTimer = rr(3.5,7)/(0.7+G.pace*0.4+trip*0.7+asc*2); }
+    G.bigFaceTimer -= dt;
+    if(G.bigFaceTimer<=0){ spawnBigFace(); G.bigFaceTimer = rr(6,13)/(0.6+trip*0.5+asc*1.5); }
     G.burnTimer -= dt;
-    if(G.burnTimer<=0){ if(trip>0.1||trans>0.3) spawnBurn(); G.burnTimer = rr(4,8)/(0.5+trip+trans*3); }
+    if(G.burnTimer<=0){ spawnBurn(); G.burnTimer = rr(3.5,7)/(0.6+trip+asc*2.5); }
     G.shadeTimer -= dt;
-    if(G.shadeTimer<=0){ if(trip>0.2||trans>0.4) spawnShade(); G.shadeTimer = rr(8,15)/(0.5+trip*1.2+trans*3); }
+    if(G.shadeTimer<=0){ if(trip>0.15||asc>0.3) spawnShade(); G.shadeTimer = rr(7,13)/(0.5+trip+asc*2.5); }
     G.crawlTimer -= dt;
-    if(G.crawlTimer<=0){ if(trip>0.32||trans>0.5) spawnCrawler(); G.crawlTimer = rr(9,18)/(0.4+trip+trans*3); }
+    if(G.crawlTimer<=0){ if(trip>0.25||asc>0.4) spawnCrawler(); G.crawlTimer = rr(8,16)/(0.5+trip+asc*2.5); }
   }
 
-  // ---- player movement (WASD), snappy & in-control; SHIFT dashes fast ----
-  const spd=player.radius*(1.8+1.6*G.pace)*(1+surge*0.4)*(1 + dash*5 + G.shift*1.2);
+  // ---- player movement (WASD); SHIFT rushes you faster while you ascend ----
+  const spd=player.radius*(1.9+1.6*G.pace)*(1+surge*0.4)*(1 + G.shift*3 + asc*0.8);
   let wvx=0,wvy=0;
   if(kx||ky){ const km=Math.hypot(kx,ky); wvx=kx/km*spd; wvy=ky/km*spd; }
   player.vx=lerp(player.vx,wvx,1-Math.pow(0.0015,dt));
   player.vy=lerp(player.vy,wvy,1-Math.pow(0.0015,dt));
   const shx=-player.vx*dt, shy=-player.vy*dt;
-  player.spin += dt*0.15*(1+surge);
-  // your eyes look where you travel (they settle on the centre when you're still)
+  player.spin += dt*(0.15*(1+surge) + rm.spin*rj);
   player._pmx=lerp(player._pmx, G.W/2 + player.vx*0.12, 0.12);
   player._pmy=lerp(player._pmy, G.H/2 + player.vy*0.12, 0.12);
 
-  // radius/scale from mass (infinite growth; camera falls away). Transcendence pulls you further out.
+  // radius/scale from mass (infinite growth; camera falls away). Ascending pulls you a little further out.
   player.radius = player.R0*Math.sqrt(player.mass/player.mass0);
-  G.scale = G.targetScreenR/player.radius * (1 - trans*0.5);
+  G.scale = G.targetScreenR/player.radius * (1 - asc*0.35);
 
-  // the fixation dot is ALWAYS visible — it is the anchor you stare through. Holding SHIFT
-  // makes it brighter and it swells/pulses as you transcend, never disappearing.
-  cursorEl.style.opacity = (opened ? clamp(0.4 + G.shift*0.55, 0, 1) : 1).toFixed(3);
-  const cs = opened ? (9 + G.shift*10 + trans*7*Math.abs(Math.sin(G.t*3))) : (14+5*Math.sin(G.t*2.2));
+  // the fixation dot is ALWAYS visible; brighter + pulsing while you hold SHIFT (it never disappears)
+  cursorEl.style.opacity = (opened ? clamp(0.4 + G.shift*0.5, 0, 1) : 1).toFixed(3);
+  const cs = opened ? (9 + G.shift*9 + asc*7*Math.abs(Math.sin(G.t*3))) : (14+5*Math.sin(G.t*2.2));
   cursorEl.style.width=cursorEl.style.height=cs.toFixed(1)+'px';
 
   // ---- shift the whole world to keep player centered ----
   for(const b of beings){ b.x+=shx; b.y+=shy; }
   for(const p of parts){ p.x+=shx; p.y+=shy; }
 
-  // ---- creatures ----
+  // ---- creatures (realm overlays a swirl/flow on their motion & speed) ----
   const viewR=Math.hypot(G.W,G.H)/2/G.scale;
+  const swirl=rm.spin*rj, spdMul=1+rm.spd*rj;
   for(let i=beings.length-1;i>=0;i--){
     const b=beings[i];
     b.radius=player.R0*Math.sqrt(b.mass/player.mass0);
-    // behaviors
-    let bx=0,by=0;
-    const d=Math.hypot(b.x,b.y)||1;
+    let bx=0,by=0; const d=Math.hypot(b.x,b.y)||1;
     if(b.behavior==='seek'){ bx=-b.x/d; by=-b.y/d; }
     else if(b.behavior==='flee'){ bx=b.x/d; by=b.y/d; }
     else if(b.behavior==='orbit'){ bx=-b.y/d; by=b.x/d; }
     else { b.wa+=gauss(0,1)*dt*2; bx=Math.cos(b.wa); by=Math.sin(b.wa); }
-    const acc=b.spd*(0.5+0.7*G.pace)*(1+surge*0.6)*(1+rush*2.0);
+    bx += -b.y/d*swirl*1.6; by += b.x/d*swirl*1.6;                     // realm swirl
+    const acc=b.spd*spdMul*(0.5+0.7*G.pace)*(1+surge*0.6)*(1+G.hyper*1.6);
     b.vx=lerp(b.vx, bx*acc, 1-Math.pow(0.02,dt));
     b.vy=lerp(b.vy, by*acc, 1-Math.pow(0.02,dt));
-    b.x+=b.vx*dt; b.y+=b.vy*dt;
-    b.spin+=b.spinV*dt;
+    b.x+=b.vx*dt; b.y+=b.vy*dt; b.spin+=b.spinV*dt;
     b.genome.hue=(b.genome.hue + b.hueDrift*dt*40)%360;
-    // absorb on contact
+    // occasional wisp trail — more life in the field
+    if(srand()<dt*1.5){ parts.push({x:b.x,y:b.y,vx:gauss(0,4),vy:gauss(0,4),life:1,decay:rr(0.8,1.8),
+      r:rr(0.03,0.08)*b.radius,hue:(b.genome.hue+gauss(0,30))%360,kind:'spark'}); }
     const dist=Math.hypot(b.x,b.y);
     if(dist < player.radius*0.82 + b.radius*0.28){ graft(b); beings.splice(i,1); continue; }
-    // cull if wandered absurdly far
     if(dist > viewR*2.2){ beings.splice(i,1); }
   }
-  // keep the world populated (only after the fixation opens)
   if(opened){
     const target = 22 + Math.round(16*G.quality);
     let guard=0;
     while(beings.length<target && guard++<6) spawnBeing();
   }
 
-  // ---- particles ----
+  // ---- particles: motes (parallax depth + realm swirl), sparks, absorb ripples ----
+  const moteRot=(0.05 + rm.flowR*rj*26)*dt, mc=Math.cos(moteRot), ms=Math.sin(moteRot);
   for(let i=parts.length-1;i>=0;i--){
     const p=parts[i];
-    p.x+=p.vx*dt; p.y+=p.vy*dt;
-    if(p.kind==='spark'){ p.vx*=Math.pow(0.1,dt); p.vy*=Math.pow(0.1,dt);
+    if(p.kind==='spark'){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=Math.pow(0.1,dt); p.vy*=Math.pow(0.1,dt);
       p.life-=dt*p.decay; if(p.life<=0){ parts.splice(i,1); continue; } }
-    else { // mote: gentle drift, wrap around the player field
+    else if(p.kind==='ring'){ p.life-=dt*p.decay; if(p.life<=0){ parts.splice(i,1); continue; } }
+    else { // mote: parallax drift + slow realm rotation of the whole field
+      const dep=p.dep||1; p.x+=p.vx*dt*dep; p.y+=p.vy*dt*dep;
+      const nx=p.x*mc-p.y*ms, ny=p.x*ms+p.y*mc; p.x=nx; p.y=ny;
       p.ph+=dt; const dd=Math.hypot(p.x,p.y);
-      if(dd>viewR*1.8){ const a=srand()*TAU,nd=viewR*rr(0.3,0.9);
-        p.x=Math.cos(a)*nd; p.y=Math.sin(a)*nd; }
+      if(dd>viewR*1.8){ const a2=srand()*TAU,nd=viewR*rr(0.3,0.9); p.x=Math.cos(a2)*nd; p.y=Math.sin(a2)*nd; }
     }
   }
 
-  // ---- drive the shader params (smoothed) ----
+  // ---- drive the shader params (realm + travel folded in; blur kept low so it stays playable) ----
   const I=G.intensity;
   G.open = lerp(G.open, opened?1:0, 1-Math.pow(0.05,dt));
-  const amb = G.open;                             // ambient trip only exists AFTER the fixation opens
+  const amb = G.open;
   G.warpSpike*=Math.pow(0.02,dt); G.chromaSpike*=Math.pow(0.05,dt);
   G.hueSpike*=Math.pow(0.15,dt);  G.flashSpike*=Math.pow(0.003,dt);
   G.kick*=Math.pow(0.02,dt);
-  const tgtWarp   = (0.4 + 0.28*G.breath + trip*0.5)*amb + surge*0.7 + G.warpSpike + rush*1.4;
-  const tgtChroma = ((0.35 + trip*0.7)*amb + surge*0.6 + G.chromaSpike + rush*1.8)*I;
-  const tgtDecay  = 0.85 + (surge*0.06 + trip*0.03)*amb + G.kick*0.02 + rush*0.07;
-  const tgtKal    = ((trip*0.3)*amb + surge*0.4 + rush*0.35)*I;
-  const tgtSwirl  = ((Math.sin(G.t*0.13)*0.14 + trip*0.15)*amb + surge*0.25 + rush*1.3)*I;
-  const tgtFeedZ  = (-0.006*amb - G.kick*0.02 + Math.sin(G.t*0.31)*0.004*amb - rush*0.08);
-  const tgtFeedR  = ((0.003 + trip*0.004)*amb + Math.sin(G.t*0.07)*0.004 + surge*0.006 + rush*0.05)*I;
-  const tgtSpiral = (0.45 + trip*0.9)*amb + surge*0.5 + rush*1.4;
-  const tgtSat    = 1.15 + (0.15 + trip*0.7)*amb + rush*0.4;
-  // gentle lerps => illusions morph slowly and naturally into one another, like a real trip
-  G.warp   =lerp(G.warp,tgtWarp, rush>0.01?0.14:0.05);
+  const tgtWarp   = (0.4 + 0.28*G.breath + trip*0.45 + rm.warp*rj)*amb + surge*0.7 + G.warpSpike + tv*1.6;
+  const tgtChroma = ((0.35 + trip*0.6 + rm.chroma*rj)*amb + surge*0.6 + G.chromaSpike + tv*1.6)*I;
+  const tgtDecay  = 0.85 + (surge*0.06 + trip*0.03)*amb + G.kick*0.02 + asc*0.05 + tv*0.05;
+  const tgtKal    = ((trip*0.25 + rm.kal*rj)*amb + surge*0.4 + tv*0.4)*I;
+  const tgtSwirl  = ((Math.sin(G.t*0.13)*0.14 + trip*0.14)*amb + surge*0.25 + asc*0.5 + tv*0.9)*I;
+  const tgtFeedZ  = (-0.006*amb - G.kick*0.02 + Math.sin(G.t*0.31)*0.004*amb + rm.flowZ*rj - tv*0.06);
+  const tgtFeedR  = ((0.003 + trip*0.004 + rm.flowR*rj)*amb + Math.sin(G.t*0.07)*0.004 + surge*0.006 + asc*0.02 + tv*0.04)*I;
+  const tgtSpiral = (0.45 + trip*0.8 + rm.spiral*rj)*amb + surge*0.5 + tv*1.2;
+  const tgtSat    = 1.15 + (0.15 + trip*0.6 + rm.sat*rj)*amb + tv*0.4;
+  G.warp   =lerp(G.warp,tgtWarp, tv>0.02?0.14:0.05);
   G.chroma =lerp(G.chroma,tgtChroma,0.06);
   G.decay  =lerp(G.decay,tgtDecay,0.04);
   G.kaleido=lerp(G.kaleido,tgtKal,0.03);
@@ -949,15 +1005,18 @@ function update(dt){
   G.feedRot =lerp(G.feedRot,tgtFeedR,0.05);
   G.spiral =lerp(G.spiral,tgtSpiral,0.035);
   G.sat    =lerp(G.sat,tgtSat,0.03);
-  G.hue = (G.hue + dt*((0.06+trip*0.12)*amb + surge*0.25 + rush*0.5) + G.hueSpike*dt*3) % TAU;
-  // enlightenment: transcendence slowly floods the frame with light
-  G.flash=lerp(G.flash, G.flashSpike + surge*0.05*I + trans*trans*0.35*I, 0.3);
-  G.invert = (I>0.5 && surge>0.9)? (0.5+0.5*Math.sin(G.t*30))*0.5 : lerp(G.invert,0,0.2);
-  G.grain = 0.04 + surge*0.05 + trip*0.03*amb + rush*0.05;
-  G.vignette = 0.95 - surge*0.2 + rush*0.4;
-  // dizzy blur during the awakening/dash (GPU path only; the 2D fallback owns its filter)
-  if(!Post.is2d) glCanvas.style.filter = rush>0.008 ? `blur(${(rush*rush*6).toFixed(2)}px) saturate(${(1+rush*0.8).toFixed(2)})` : '';
-  veilEl.style.filter = `blur(${(0.7+rush*5).toFixed(2)}px)`;
+  // realm palette rotation blended into the global hue
+  G._hueAcc = (G._hueAcc + dt*((0.06+trip*0.1)*amb + surge*0.25 + asc*0.3) + G.hueSpike*dt*3) % TAU;
+  G.realmHue = lerp(G.realmHue, rm.hueRot*rj, 0.02);
+  G.hue = G._hueAcc + G.realmHue;
+  G.flash=lerp(G.flash, G.flashSpike + surge*0.05*I + tv*0.45*I, 0.3);
+  G.invert = (I>0.5 && (surge>0.9||tv>0.7))? (0.5+0.5*Math.sin(G.t*28))*0.5 : lerp(G.invert,0,0.2);
+  G.grain = 0.04 + surge*0.05 + (trip*0.03 + rm.grain*rj)*amb + tv*0.05;
+  G.vignette = 0.95 - surge*0.2 + (rm.vig*rj)*amb + tv*0.4;
+  // travel gives a brief whoosh of blur; sustained ascension stays legible so you can keep playing
+  const blur = tv*tv*4 + asc*0.5;
+  if(!Post.is2d) glCanvas.style.filter = blur>0.02 ? `blur(${blur.toFixed(2)}px) saturate(${(1+asc*0.4+tv*0.4).toFixed(2)})` : '';
+  veilEl.style.filter = `blur(${(0.7+blur*0.6).toFixed(2)}px)`;
 }
 
 /* =====================================================================
@@ -1089,6 +1148,8 @@ function render(){
     g.addColorStop(0,hsl(bh+i*120,80,20,0.05)); g.addColorStop(1,hsl(bh,70,12,0));
     sctx.fillStyle=g; sctx.fillRect(0,0,w,h);
   }
+  // massive near-invisible faces bleed out of the background here, BEHIND everything else
+  drawBigFaces();
   const opened = G.phase!=='fixate';
   // motes (faint while you're fixating; they swell in once the trip opens)
   const moteA = 0.25+0.75*G.open;
@@ -1113,6 +1174,14 @@ function render(){
     const R=Math.max(0.6,p.r*G.scale);
     sctx.globalAlpha=clamp(p.life,0,1); sctx.fillStyle=hsl(p.hue+bh,95,70,1);
     sctx.beginPath(); sctx.arc(sx,sy,R,0,TAU); sctx.fill();
+  }
+  // absorb shock-rings expanding from the centre
+  for(const p of parts){
+    if(p.kind!=='ring') continue;
+    const R=Math.max(1,(p.r0 + (1-p.life)*player.radius*4.5)*G.scale);
+    sctx.globalAlpha=clamp(p.life,0,1)*0.5; sctx.strokeStyle=hsl(p.hue+bh,90,74,1);
+    sctx.lineWidth=Math.max(1,player.radius*0.05*G.scale*p.life);
+    sctx.beginPath(); sctx.arc(w/2,h/2,R,0,TAU); sctx.stroke();
   }
   if(opened){
     // the player, always centered, drawn last & on top
@@ -1253,7 +1322,7 @@ requestAnimationFrame(loop);
 
 // expose a few handles for debugging / external drivers
 window.G=G; window.player=player; window.beings=beings; window.parts=parts; window.faces=faces;
-window.shades=shades; window.crawlers=crawlers; window.Post=Post;
+window.shades=shades; window.crawlers=crawlers; window.bigFaces=bigFaces; window.Post=Post; window.REALMS=REALMS;
 </script>
 </body>
 </html>
