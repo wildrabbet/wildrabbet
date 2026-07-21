@@ -369,7 +369,15 @@
         // interactive toys
         "present", "chest", "safe", "folder", "loot crate", "jackbox",
         // OS / chat popups
-        "discord", "skype", "mac alert", "win popup", "imessage", "teams"
+        "discord", "skype", "mac alert", "win popup", "imessage", "teams",
+        // meme / ads / cursors
+        "HD loading", "hot singles", "enlarge", "one weird trick", "free iPhone",
+        "Nigerian prince", "clickbait", "rickroll", "among us", "gigachad",
+        "sigma", "NPC", "touch grass", "ratio", "brainrot", "this is fine",
+        "press F", "all your base", "loss", "skibidi", "Ohio", "rizz",
+        "MrBeast", "VBucks", "task failed", "D scimmy", "AGS", "fire cursor",
+        "ice cursor", "banana cursor", "rainbow cursor", "sword cursor",
+        "zoom in", "zoom out"
       ];
 
       const FILLER = [
@@ -857,12 +865,110 @@
         if (Math.random() < 0.08) siteColorTakeover();
       }
 
-      // ===== PERSISTENT CURSOR =====
+      // ===== PERSISTENT CURSOR + TRAILS =====
       let currentCursor = null;
+      let cursorTrailKind = null;
+      let cursorTrailHandler = null;
+      let lastTrailAt = 0;
+
+      function clearCursorTrail() {
+        if (cursorTrailHandler) {
+          document.removeEventListener('pointermove', cursorTrailHandler);
+          cursorTrailHandler = null;
+        }
+        cursorTrailKind = null;
+        document.querySelectorAll('.cursor-trail').forEach(el => el.remove());
+      }
+
+      function setCursorSvg(svgMarkup, hotX, hotY, key) {
+        const url = 'url("data:image/svg+xml,' + encodeURIComponent(svgMarkup) + '") ' + (hotX || 2) + ' ' + (hotY || 2) + ', auto';
+        currentCursor = key;
+        siteBody.style.cursor = url;
+        document.querySelectorAll('a,button,.card,.sticker,.corner,.interactive-toy,.side-floater').forEach(el => {
+          el.style.cursor = url;
+        });
+      }
+
       function setCursor(emoji) {
-        if (currentCursor === emoji) { siteBody.style.cursor = ''; currentCursor = null; return; }
+        clearCursorTrail();
+        if (!emoji || currentCursor === emoji) {
+          siteBody.style.cursor = '';
+          document.querySelectorAll('a,button,.card,.sticker,.corner,.interactive-toy,.side-floater').forEach(el => {
+            el.style.cursor = '';
+          });
+          currentCursor = null;
+          return;
+        }
         currentCursor = emoji;
-        siteBody.style.cursor = 'url("data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'32\' height=\'32\'><text y=\'28\' font-size=\'28\'>'+encodeURIComponent(emoji)+'</text></svg>") 16 16, auto';
+        const url = 'url("data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'32\' height=\'32\'><text y=\'28\' font-size=\'28\'>' + encodeURIComponent(emoji) + '</text></svg>") 16 16, auto';
+        siteBody.style.cursor = url;
+        document.querySelectorAll('a,button,.card,.sticker,.corner,.interactive-toy,.side-floater').forEach(el => {
+          el.style.cursor = url;
+        });
+      }
+
+      function startCursorTrail(kind) {
+        clearCursorTrail();
+        cursorTrailKind = kind;
+        cursorTrailHandler = (ev) => {
+          const now = performance.now();
+          if (now - lastTrailAt < 28) return;
+          lastTrailAt = now;
+          const t = document.createElement('div');
+          t.className = 'cursor-trail trail-' + kind;
+          t.style.left = ev.clientX + 'px';
+          t.style.top = ev.clientY + 'px';
+          if (kind === 'fire') t.textContent = rand(['🔥', '✦', '·']);
+          else if (kind === 'ice') t.textContent = rand(['❄', '·', '✦']);
+          else if (kind === 'rainbow') t.style.background = `hsl(${(now / 4) % 360} 90% 55%)`;
+          else if (kind === 'scimmy') t.textContent = rand(['／', '＼', '—']);
+          else if (kind === 'ags') t.textContent = rand(['✦', '✧', '✧']);
+          else if (kind === 'sword') t.textContent = '·';
+          else if (kind === 'banana') t.textContent = rand(['🍌', '✨']);
+          siteBody.appendChild(t);
+          setTimeout(() => t.remove(), 520);
+        };
+        document.addEventListener('pointermove', cursorTrailHandler, { passive: true });
+      }
+
+      const CURSOR_SCIMMY = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><path d="M6 32 L14 24 L22 10 C26 4 34 6 32 12 L20 28 L12 34 Z" fill="#c0c8d4" stroke="#5a6570" stroke-width="1.2"/><path d="M6 32 L10 34 L8 36 Z" fill="#8a5a2b"/><path d="M14 24 L22 10" stroke="#e8eef5" stroke-width="1.4" fill="none"/></svg>`;
+      const CURSOR_AGS = `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44"><path d="M20 40 L22 8 L24 40 Z" fill="#6a4a20" stroke="#3a2810" stroke-width="1"/><path d="M14 14 L22 4 L30 14 L26 18 L22 10 L18 18 Z" fill="#d8dde8" stroke="#7a8490" stroke-width="1.2"/><path d="M18 16 L26 16" stroke="#f0d060" stroke-width="2"/><circle cx="22" cy="17" r="2.2" fill="#f5d76e"/></svg>`;
+      const CURSOR_SWORD = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36"><path d="M18 2 L20 20 L18 34 L16 20 Z" fill="#d0d6e0" stroke="#555" stroke-width="1"/><path d="M12 22 H24" stroke="#8a5a2b" stroke-width="3"/><path d="M18 2 L19 8" stroke="#fff" stroke-width="1"/></svg>`;
+
+      function setWeaponCursor(kind) {
+        if (currentCursor === kind) {
+          setCursor(null);
+          return;
+        }
+        if (kind === 'scimmy') {
+          setCursorSvg(CURSOR_SCIMMY, 6, 32, 'scimmy');
+          startCursorTrail('scimmy');
+        } else if (kind === 'ags') {
+          setCursorSvg(CURSOR_AGS, 22, 4, 'ags');
+          startCursorTrail('ags');
+        } else if (kind === 'sword') {
+          setCursorSvg(CURSOR_SWORD, 18, 2, 'sword');
+          startCursorTrail('sword');
+        }
+      }
+
+      // ===== PERMANENT ZOOM (box always stays usable) =====
+      let siteZoom = 1;
+      function pinToyBoxVisible() {
+        const wrap = document.querySelector('.toyBoxWrap');
+        if (!wrap) return;
+        wrap.classList.add('ub-box-pinned');
+      }
+      function applyPermanentZoom(factor) {
+        siteZoom = Math.max(0.4, Math.min(4.2, siteZoom * factor));
+        siteBody.classList.add('ub-zoomed');
+        siteBody.style.setProperty('--ub-zoom', String(siteZoom));
+        pinToyBoxVisible();
+        // Keep box physically on-screen even when the rest is tiny/huge
+        const wrap = document.querySelector('.toyBoxWrap');
+        if (wrap) {
+          wrap.style.setProperty('--ub-box-counter', String(1 / siteZoom));
+        }
       }
 
       // ===== PERSISTENT BUBBLES (click-through, stackable intensity) =====
@@ -1064,7 +1170,7 @@
       // ===== FAKE / OS / CHAT POPUPS (always stack) =====
       function makeDraggable(dlg, handle) {
         let dragging = false, ox = 0, oy = 0;
-        const tb = handle || dlg.querySelector('.err-titlebar, .os-titlebar, .chat-titlebar');
+        const tb = handle || dlg.querySelector('.err-titlebar, .os-titlebar, .chat-titlebar, .meme-ad-bar');
         if (!tb) return;
         tb.addEventListener('pointerdown', (ev) => {
           dragging = true;
@@ -1180,8 +1286,159 @@
 
       function spawnChaosPopups(n) {
         n = n || Math.floor(r(2, 5));
-        const makers = [show404Dialog, showMacAlert, showDiscordPopup, showSkypePopup, showImessagePopup, showTeamsPopup];
+        const makers = [show404Dialog, showMacAlert, showDiscordPopup, showSkypePopup, showImessagePopup, showTeamsPopup, showHotSinglesAd, showEnlargeAd, showClickbaitAd, showPrizeAd];
         for (let i = 0; i < n; i++) setTimeout(() => rand(makers)(), i * 140);
+      }
+
+      // ===== MEME / FAKE ADS =====
+      function showHdLoadingOverlay() {
+        let existing = document.querySelector('.hd-loading');
+        if (existing) { existing.remove(); }
+        const el = document.createElement('div');
+        el.className = 'hd-loading';
+        el.innerHTML = `
+          <div class="hd-player">
+            <div class="hd-topbar"><span>🔴 LIVE · HD · 1080p</span><button type="button" class="hd-x">✕</button></div>
+            <div class="hd-stage">
+              <div class="hd-blur"></div>
+              <div class="hd-center">
+                <div class="hd-title">Buffering premium content…</div>
+                <div class="hd-sub">Almost there. Definitely. Trust.</div>
+                <div class="hd-bar"><i class="hd-fill"></i></div>
+                <div class="hd-pct">3%</div>
+              </div>
+            </div>
+            <div class="hd-footer">Sponsored · Not affiliated with anything real · Please keep clicking</div>
+          </div>`;
+        siteBody.appendChild(el);
+        el.querySelector('.hd-x').addEventListener('click', () => el.remove());
+        const fill = el.querySelector('.hd-fill');
+        const pctEl = el.querySelector('.hd-pct');
+        let pct = 2 + Math.random() * 4;
+        const iv = setInterval(() => {
+          if (!el.isConnected) { clearInterval(iv); return; }
+          // asymptote toward ~97%, never finish
+          const room = 97 - pct;
+          pct += Math.max(0.05, room * r(0.01, 0.045));
+          if (pct > 96.7) pct = 96.2 + Math.random() * 0.4;
+          fill.style.width = pct.toFixed(2) + '%';
+          pctEl.textContent = pct.toFixed(1) + '% · est. ' + Math.max(1, Math.floor((100 - pct) * 40)) + ' years';
+          if (Math.random() < 0.08) pctEl.textContent = pct.toFixed(1) + '% · reconnecting…';
+        }, 220);
+      }
+
+      function showHotSinglesAd() {
+        const names = ['Brittany', 'Ashleigh', 'Jade', 'xxxHotLocalxxx', 'NotABot42', 'Mandy', 'your_ex'];
+        const cities = ['your area', '0.3 miles away', 'behind you', 'the group chat', 'Ohio', 'the backrooms'];
+        const dlg = document.createElement('div');
+        dlg.className = 'meme-ad singles-ad';
+        dlg.innerHTML = `
+          <div class="meme-ad-bar"><span>🔥 HOT SINGLES</span><button type="button" class="err-x">✕</button></div>
+          <div class="meme-ad-body">
+            <div class="singles-photo">💋</div>
+            <div class="singles-copy">
+              <b>${rand(names)}</b> is online in <b>${rand(cities)}</b>
+              <p>${rand(['wants to chat NOW', 'says "hey"', 'is not a virus (promise)', 'misses you specifically', 'saw your Useless Box clicks'])}</p>
+              <div class="err-btns">
+                <button type="button" class="err-btn singles-yes">Chat now</button>
+                <button type="button" class="err-btn">I'm married to the box</button>
+              </div>
+            </div>
+          </div>`;
+        dlg.querySelectorAll('.err-x, .err-btn').forEach(b => b.addEventListener('click', () => {
+          if (b.classList.contains('singles-yes')) {
+            showFakePopup('Connection failed', 'Nobody is coming.\n\nError: SOCIAL_LIFE_NOT_FOUND\nSuggestion: click the box instead');
+          }
+          dlg.remove();
+        }));
+        placeDialog(dlg);
+      }
+
+      function showEnlargeAd() {
+        const dlg = document.createElement('div');
+        dlg.className = 'meme-ad enlarge-ad';
+        dlg.innerHTML = `
+          <div class="meme-ad-bar pharma"><span>💊 DOCTORS HATE THIS</span><button type="button" class="err-x">✕</button></div>
+          <div class="meme-ad-body">
+            <div class="enlarge-hero">📈 → 🚀</div>
+            <h3>Enlarge Your… Confidence</h3>
+            <p>One weird pill. Zero results. 400% more popup ads.</p>
+            <ul>
+              <li>✓ Completely fake</li>
+              <li>✓ Not FDA approved (or real)</li>
+              <li>✓ Side effects include shame</li>
+            </ul>
+            <div class="err-btns">
+              <button type="button" class="err-btn enlarge-buy">Buy now — $0.00</button>
+              <button type="button" class="err-btn">No thanks, I'm secure</button>
+            </div>
+          </div>`;
+        dlg.querySelectorAll('.err-x, .err-btn').forEach(b => b.addEventListener('click', () => {
+          if (b.classList.contains('enlarge-buy')) {
+            showFakePopup('Order confirmed', 'Your package of Nothing™ has shipped.\n\nTracking: LOL-000-COPE\nETA: never');
+            applyPermanentZoom(1.08);
+          }
+          dlg.remove();
+        }));
+        placeDialog(dlg);
+      }
+
+      function showClickbaitAd() {
+        const titles = [
+          'You won\'t BELIEVE what this rabbit clicked next',
+          'Doctors HATE this one Useless Box trick',
+          'What happens when you click 1000 times will SHOCK you',
+          'Local man ruins website, becomes legend',
+          'This webpage is not in a relationship with you',
+        ];
+        const dlg = document.createElement('div');
+        dlg.className = 'meme-ad clickbait-ad';
+        dlg.innerHTML = `
+          <div class="meme-ad-bar bait"><span>▶ THUMBNAIL</span><button type="button" class="err-x">✕</button></div>
+          <div class="meme-ad-body">
+            <div class="bait-thumb">😱👉🐇</div>
+            <b>${rand(titles)}</b>
+            <p>${rand(['(gone wrong)', '(gone sexual)', '(emotional)', '(not clickbait)', '(we lied)'])}</p>
+            <div class="err-btns"><button type="button" class="err-btn">Watch</button><button type="button" class="err-btn">Skip ad (lie)</button></div>
+          </div>`;
+        dlg.querySelectorAll('.err-x, .err-btn').forEach(b => b.addEventListener('click', () => dlg.remove()));
+        placeDialog(dlg);
+      }
+
+      function showPrizeAd() {
+        const prizes = ['iPhone 19 Pro Max Ultra', 'Free V-Bucks', 'A real friend', '3 hours of sleep', 'Admin on the Discord', 'MrBeast\'s leftover lunch'];
+        const dlg = document.createElement('div');
+        dlg.className = 'meme-ad prize-ad';
+        dlg.innerHTML = `
+          <div class="meme-ad-bar prize"><span>🎁 CONGRATULATIONS!!!</span><button type="button" class="err-x">✕</button></div>
+          <div class="meme-ad-body">
+            <div class="prize-spin">🎉</div>
+            <b>You are the 1,000,000th visitor!</b>
+            <p>Claim your free <b>${rand(prizes)}</b> before it expires in 0:03</p>
+            <div class="err-btns">
+              <button type="button" class="err-btn prize-claim">CLAIM</button>
+              <button type="button" class="err-btn">I hate fun</button>
+            </div>
+          </div>`;
+        dlg.querySelectorAll('.err-x, .err-btn').forEach(b => b.addEventListener('click', () => {
+          if (b.classList.contains('prize-claim')) showFakePopup('Claim denied', 'Skill issue.\n\nAlso this was never real.');
+          dlg.remove();
+        }));
+        placeDialog(dlg);
+      }
+
+      function showPrinceEmail() {
+        showFakePopup('From: Prince of Somewhere',
+          'Dear Friend,\n\nI am prince with MANY money.\nI need your help transfer $47,000,000 USD.\nPlease send your bank details, mom\'s maiden name, and click count.\n\nBlessings,\nDefinitely Not A Scam');
+      }
+
+      function showMemeBanner(text, cls) {
+        const b = document.createElement('div');
+        b.className = 'meme-banner ' + (cls || '');
+        b.textContent = text;
+        siteBody.appendChild(b);
+        requestAnimationFrame(() => b.classList.add('show'));
+        setTimeout(() => { b.classList.remove('show'); setTimeout(() => b.remove(), 400); }, 2800);
       }
 
       // ===== SHOCKWAVE =====
@@ -1578,8 +1835,8 @@
         "vapor": (e) => { togglePageClass('page-vapor'); beep("triangle",r(300,600),0.12,0.08); siteSparkle(2000); spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"mixed"}); },
         "matrix": (e) => { togglePageClass('page-matrix'); beep("square",r(100,250),0.08,0.12); spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"squares",sizeMin:4,sizeMax:12,durMin:200,durMax:500}); },
         "comic": (e) => { togglePageClass('page-comic'); beep("triangle",r(400,700),0.14,0.09); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"mixed"}); },
-        "tiny": (e) => { togglePageClass('page-tiny'); beep("triangle",r(700,1200),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,12),sizeMin:3,sizeMax:8}); },
-        "HUGE": (e) => { togglePageClass('page-huge'); beep("sine",r(100,200),0.16,0.10); spawnParticles(e.clientX,e.clientY,{count:r(10,16),sizeMin:20,sizeMax:40}); },
+        "tiny": (e) => { applyPermanentZoom(0.85); stackPageClass('page-tiny'); beep("triangle",r(700,1200),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,12),sizeMin:3,sizeMax:8}); },
+        "HUGE": (e) => { applyPermanentZoom(1.18); stackPageClass('page-huge'); beep("sine",r(100,200),0.16,0.10); spawnParticles(e.clientX,e.clientY,{count:r(10,16),sizeMin:20,sizeMax:40}); },
         "upside down": (e) => { togglePageClass('page-upsidedown'); beep("sine",r(200,400),0.14,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18)}); },
         "scramble": (e) => { document.querySelectorAll('.cardTitle').forEach(el=>{const t=el.textContent; el.textContent=t.split('').sort(()=>Math.random()-.5).join('');}); beep("square",r(200,500),0.10,0.10); spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"squares"}); /* scrambled forever */ },
         "typewriter": (e) => { togglePageClass('page-typewriter'); beep("square",r(300,500),0.08,0.10); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
@@ -2559,11 +2816,7 @@
         },
         "infinity zoom": (e) => {
           stackPageClass('page-infinityzoom');
-          let z=1; const iv=setInterval(()=>{
-            z*=1.08; siteBody.style.transition='transform .25s linear';
-            siteBody.style.transform=`scale(${Math.min(z,6)})`;
-            if(z>5){clearInterval(iv); setTimeout(()=>{siteBody.style.transition='transform 1.5s ease';siteBody.style.transform='';},800);}
-          },200);
+          applyPermanentZoom(1.35);
           beep("sine",r(150,400),0.14,0.07);
           spawnParticles(e.clientX,e.clientY,{count:r(16,24),shape:"circles"});
         },
@@ -2608,6 +2861,141 @@
         "win popup": (e) => { for(let i=0;i<r(3,7);i++) setTimeout(show404Dialog, i*120); beep("square",r(100,200),0.12,0.12); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"squares"}); },
         "imessage": (e) => { for(let i=0;i<r(2,5);i++) setTimeout(showImessagePopup, i*160); beep("sine",r(450,750),0.10,0.06); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"hearts"}); },
         "teams": (e) => { for(let i=0;i<r(2,4);i++) setTimeout(showTeamsPopup, i*170); beep("square",r(250,450),0.10,0.09); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+
+        // ===== MEME ADS / CULTURE =====
+        "HD loading": (e) => { showHdLoadingOverlay(); beep("sine",r(200,400),0.14,0.06); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
+        "hot singles": (e) => { for(let i=0;i<r(2,5);i++) setTimeout(showHotSinglesAd, i*180); beep("triangle",r(400,700),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"hearts"}); },
+        "enlarge": (e) => { for(let i=0;i<r(1,3);i++) setTimeout(showEnlargeAd, i*200); applyPermanentZoom(1.12); beep("sine",r(150,300),0.16,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18)}); },
+        "one weird trick": (e) => { showClickbaitAd(); showFakePopup('One Weird Trick', 'Surgeons in your area HATE this Useless Box.\n\nClick here to learn more (do not).'); beep("square",r(200,400),0.10,0.09); },
+        "free iPhone": (e) => { showPrizeAd(); beep("triangle",r(500,800),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"mixed"}); },
+        "Nigerian prince": (e) => { showPrinceEmail(); for(let i=0;i<2;i++) setTimeout(showPrizeAd, 300+i*200); beep("sine",r(250,450),0.12,0.07); },
+        "clickbait": (e) => { for(let i=0;i<r(2,4);i++) setTimeout(showClickbaitAd, i*160); beep("triangle",r(400,700),0.10,0.07); },
+        "rickroll": (e) => {
+          showMemeBanner("Never gonna give you up 🎵", 'rick');
+          showFakePopup('YouTube', '▶ Rick Astley - Never Gonna Give You Up\n\nBuffering… forever.\nAlso you just got rickrolled by a website.');
+          beep("triangle",r(400,600),0.14,0.08); beep("sine",r(500,700),0.12,0.06);
+          spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"mixed"});
+        },
+        "among us": (e) => {
+          showMemeBanner('SUS 📮', 'sus');
+          siteFall(rand(['📮','🔴','🔵','🟢']), 3000);
+          document.querySelectorAll('.cardTitle').forEach(el=>{ if(Math.random()<0.5) el.textContent = el.textContent + ' was not The Impostor'; });
+          beep("square",r(200,400),0.12,0.10);
+          spawnParticles(e.clientX,e.clientY,{count:r(12,18)});
+        },
+        "gigachad": (e) => {
+          showMemeBanner('GIGACHAD 🗿', 'chad');
+          stackPageClass('page-gigachad');
+          document.querySelectorAll('.card,.aboutCard,.heroLeft').forEach(el=>{
+            el.style.transition='filter .5s, transform .5s';
+            el.style.filter='contrast(1.3) saturate(0.7) brightness(1.05)';
+            el.style.transform='scaleY(1.06)';
+          });
+          beep("sine",r(80,140),0.2,0.1);
+          spawnParticles(e.clientX,e.clientY,{count:r(10,16)});
+        },
+        "sigma": (e) => {
+          showMemeBanner('σ grindset activated', 'sigma');
+          showFakePopup('Sigma Rules', '1. Click the box\n2. Don\'t explain the box\n3. Wake up at 4am to click the box\n4. Reject modernity. Embrace blob.');
+          beep("triangle",r(300,500),0.12,0.08);
+        },
+        "NPC": (e) => {
+          stackPageClass('page-npc');
+          const lines = ['yes', 'okay', 'interesting', 'wow', 'as a society', 'that\'s crazy', 'so true'];
+          document.querySelectorAll('.cardDesc,.lede,.aboutCard p').forEach(el=>{ el.textContent = rand(lines); });
+          showMemeBanner('NPC mode: ON', 'npc');
+          beep("square",r(150,250),0.12,0.08);
+        },
+        "touch grass": (e) => {
+          stackPageClass('page-moss');
+          siteFall(rand(['🌿','🌱','🍃','🌾']), 4000);
+          showMemeBanner('go outside (after one more click)', 'grass');
+          beep("sine",r(200,350),0.14,0.06);
+          spawnParticles(e.clientX,e.clientY,{count:r(12,18)});
+        },
+        "ratio": (e) => {
+          showMemeBanner('L + ratio + you fell off', 'ratio');
+          showFakePopup('Twitter', '💀 ratio\'d\n\nlikes: 0\nreplies: everyone dunking\nquote RTs: illegal');
+          beep("square",r(100,200),0.12,0.1);
+        },
+        "brainrot": (e) => {
+          stackPageClass('page-brainrot');
+          const rot = ['skibidi','rizz','Ohio','fanum tax','gyatt','only in Ohio','what the sigma'];
+          document.querySelectorAll('.cardTitle,.tag').forEach(el=>{ el.textContent = rand(rot); });
+          showMemeBanner('brainrot.exe has started', 'rot');
+          siteFall(rand(['🚽','🥶','💀']), 3000);
+          beep("triangle",r(400,900),0.1,0.08);
+        },
+        "this is fine": (e) => {
+          stackPageClass('page-thisisfine');
+          siteBody.style.setProperty('background', 'linear-gradient(180deg,#3a2010,#8a3a10 60%,#ff6a20)', 'important');
+          showMemeBanner('this is fine. 🔥🐕☕', 'fine');
+          siteFall('🔥', 3500);
+          beep("sine",r(150,280),0.16,0.07);
+        },
+        "press F": (e) => {
+          showMemeBanner('F', 'pressf');
+          showFakePopup('Respects', 'You paid respects.\n\nThe box acknowledges your grief.\n(It does not care.)');
+          beep("sine",r(200,300),0.2,0.08);
+        },
+        "all your base": (e) => {
+          showMemeBanner('ALL YOUR BASE ARE BELONG TO US', 'base');
+          document.querySelectorAll('h1,.cardTitle').forEach(el=>{ el.textContent = 'ALL YOUR BASE ARE BELONG TO US'; });
+          beep("square",r(120,220),0.16,0.1);
+        },
+        "loss": (e) => {
+          showMemeBanner('is this loss', 'loss');
+          showFakePopup('loss.jpg', 'is this loss\n\nyes');
+          beep("sine",r(180,280),0.14,0.07);
+        },
+        "skibidi": (e) => {
+          siteFall('🚽', 4000);
+          showMemeBanner('skibidi bop yes yes', 'skibidi');
+          document.querySelectorAll('.card').forEach(c=>{ c.style.transition='transform .4s'; c.style.transform='rotate('+r(-8,8)+'deg)'; });
+          beep("triangle",r(500,900),0.1,0.08);
+        },
+        "Ohio": (e) => {
+          showMemeBanner('only in Ohio 🌽', 'ohio');
+          stackPageClass('page-ohio');
+          siteFall(rand(['🌽','🥶','💀']), 3000);
+          beep("sine",r(250,400),0.12,0.07);
+        },
+        "rizz": (e) => {
+          showMemeBanner('W rizz 😼', 'rizz');
+          siteFall(rand(['💋','✨','😎']), 3000);
+          setCursor('😎');
+          beep("triangle",r(450,750),0.1,0.07);
+          spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"hearts"});
+        },
+        "MrBeast": (e) => {
+          showPrizeAd();
+          showMemeBanner('I GAVE THIS WEBSITE $1,000,000', 'beast');
+          siteFall(rand(['💵','💰','👀']), 3500);
+          beep("square",r(300,500),0.12,0.09);
+        },
+        "VBucks": (e) => {
+          showPrizeAd();
+          showFakePopup('Fortnite Shop', 'Free V-Bucks generator loading…\n\n99%\n98%\n97%\n(virus.exe)');
+          beep("sine",r(400,700),0.1,0.07);
+        },
+        "task failed": (e) => {
+          showMemeBanner('Task failed successfully ✓', 'fail');
+          show404Dialog();
+          beep("triangle",r(350,550),0.12,0.08);
+        },
+
+        // ===== CURSORS =====
+        "D scimmy": (e) => { setWeaponCursor('scimmy'); showMemeBanner('Dragon scimitar equipped', 'rs'); beep("square",r(200,350),0.1,0.1); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"squares"}); },
+        "AGS": (e) => { setWeaponCursor('ags'); showMemeBanner('Armadyl godsword equipped — spec bar loading', 'rs'); beep("triangle",r(250,450),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(12,18),hue:45}); },
+        "fire cursor": (e) => { setCursor('🔥'); startCursorTrail('fire'); beep("sawtooth",r(120,200),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18),hue:20}); },
+        "ice cursor": (e) => { setCursor('❄'); startCursorTrail('ice'); beep("sine",r(500,800),0.12,0.06); spawnParticles(e.clientX,e.clientY,{count:r(12,18),hue:200}); },
+        "banana cursor": (e) => { setCursor('🍌'); startCursorTrail('banana'); beep("triangle",r(400,700),0.1,0.07); spawnParticles(e.clientX,e.clientY,{count:r(10,16),hue:50}); },
+        "rainbow cursor": (e) => { setCursor('🌈'); startCursorTrail('rainbow'); beep("sine",r(400,800),0.1,0.07); spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"mixed"}); },
+        "sword cursor": (e) => { setWeaponCursor('sword'); beep("square",r(180,320),0.1,0.09); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"squares"}); },
+
+        // ===== PERMANENT ZOOM CONTROLS =====
+        "zoom in": (e) => { applyPermanentZoom(1.22); beep("sine",r(400,700),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"circles"}); },
+        "zoom out": (e) => { applyPermanentZoom(0.82); beep("sine",r(250,450),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
       };
 
       // ===== TEXT STYLING HELPERS =====

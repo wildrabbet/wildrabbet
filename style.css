@@ -4438,3 +4438,207 @@ body.page-afterimage{ cursor:none; }
   .interactive-toy{ min-width:72px; padding:10px 12px 8px; }
   .interactive-toy .toy-icon{ font-size:28px; }
 }
+/* ===== MEME ADS + CURSORS + PERM ZOOM ===== */
+body.ub-zoomed{
+  --ub-zoom: 1;
+}
+body.ub-zoomed .wrap,
+body.ub-zoomed .top{
+  transform: scale(var(--ub-zoom, 1));
+  transform-origin: top center;
+  transition: transform .45s cubic-bezier(.2,.8,.2,1);
+}
+body.ub-zoomed .toyBoxWrap.ub-box-pinned{
+  position: fixed !important;
+  z-index: 15000 !important;
+  right: max(10px, 2vw);
+  top: 70px;
+  width: min(420px, 92vw);
+  transform: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+body.ub-zoomed .toyBoxWrap.ub-box-pinned .heroRight{
+  min-height: 240px;
+  transform: none !important;
+  filter: none !important;
+}
+@media (max-width: 820px){
+  body.ub-zoomed .toyBoxWrap.ub-box-pinned{
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: 10px;
+    transform: translateX(-50%) !important;
+    width: min(94vw, 420px);
+  }
+}
+
+.cursor-trail{
+  position: fixed;
+  z-index: 16000;
+  pointer-events: none !important;
+  transform: translate(-50%,-50%);
+  font-size: 14px;
+  animation: trailFade .5s ease forwards;
+  mix-blend-mode: plus-lighter;
+}
+.trail-rainbow{
+  width: 10px; height: 10px; border-radius: 50%;
+  box-shadow: 0 0 10px currentColor;
+}
+.trail-scimmy, .trail-ags, .trail-sword{ font-size: 12px; opacity: .85; color: #c8d0dc; }
+.trail-ags{ color: #f0d060; text-shadow: 0 0 8px rgba(240,200,80,.6); }
+@keyframes trailFade{
+  from{ opacity: .9; transform: translate(-50%,-50%) scale(1); }
+  to{ opacity: 0; transform: translate(-50%,-50%) scale(.4) translateY(-12px); }
+}
+
+.meme-ad, .hd-loading{
+  position: fixed;
+  z-index: 12050;
+  background: #111;
+  color: #eee;
+  border: 2px solid #f0a;
+  border-radius: 8px;
+  box-shadow: 0 18px 50px rgba(0,0,0,.45);
+  min-width: 280px;
+  max-width: 360px;
+  overflow: hidden;
+  font-size: 13px;
+}
+.meme-ad-bar{
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 8px 10px; cursor: move; font-weight: 800;
+  background: linear-gradient(90deg,#ff2d6a,#ff8a00);
+  color: #fff; font-size: 12px;
+}
+.meme-ad-bar.pharma{ background: linear-gradient(90deg,#0a6,#0af); }
+.meme-ad-bar.bait{ background: #c00; }
+.meme-ad-bar.prize{ background: linear-gradient(90deg,#f6c,#fc0); color:#111; }
+.meme-ad-body{ padding: 14px; }
+.meme-ad-body h3{ margin: 0 0 6px; font-size: 16px; }
+.meme-ad-body p{ margin: 6px 0 10px; opacity: .9; line-height: 1.35; }
+.meme-ad-body ul{ margin: 0 0 12px 18px; padding: 0; opacity: .85; }
+.singles-ad{ border-color: #ff4d8a; }
+.singles-ad .meme-ad-body{ display: flex; gap: 12px; align-items: flex-start; }
+.singles-photo{
+  width: 64px; height: 64px; border-radius: 8px; flex-shrink: 0;
+  background: linear-gradient(135deg,#ff7ab2,#ffd0e8); display: grid; place-items: center;
+  font-size: 28px;
+}
+.enlarge-ad{ border-color: #2ad; background: #0a1a22; }
+.enlarge-hero{ font-size: 28px; margin-bottom: 6px; }
+.clickbait-ad{ border-color: #f44; background: #1a0505; }
+.bait-thumb{
+  background: #300; border: 2px solid #f44; border-radius: 6px;
+  padding: 18px; text-align: center; font-size: 28px; margin-bottom: 10px;
+}
+.prize-ad{ border-color: #fc0; background: #1a1400; color: #ffe9a0; }
+.prize-spin{ font-size: 36px; text-align: center; animation: prizeSpin 1s linear infinite; }
+@keyframes prizeSpin{ to{ transform: rotate(360deg); } }
+
+.hd-loading{
+  inset: 0; max-width: none; min-width: 0; border: 0; border-radius: 0;
+  background: rgba(0,0,0,.72); display: grid; place-items: center;
+  z-index: 12500;
+}
+.hd-player{
+  width: min(720px, 94vw); background: #0b0b0f; border: 1px solid #333;
+  border-radius: 10px; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.55);
+}
+.hd-topbar{
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; background: #15151c; font-size: 12px; color: #bbb;
+}
+.hd-x{
+  background: #333; color: #fff; border: 0; border-radius: 4px;
+  width: 28px; height: 24px; cursor: pointer;
+}
+.hd-stage{
+  position: relative; aspect-ratio: 16/9; background: #050508; overflow: hidden;
+}
+.hd-blur{
+  position: absolute; inset: -20px;
+  background:
+    radial-gradient(circle at 30% 40%, #3a1a28, transparent 40%),
+    radial-gradient(circle at 70% 60%, #1a203a, transparent 45%),
+    linear-gradient(135deg,#1a0a12,#0a0a14);
+  filter: blur(28px) saturate(1.4);
+  transform: scale(1.15);
+  animation: hdWobble 4s ease-in-out infinite alternate;
+}
+@keyframes hdWobble{
+  from{ transform: scale(1.1) translateX(-1%); }
+  to{ transform: scale(1.2) translateX(1%); }
+}
+.hd-center{
+  position: absolute; inset: 0; display: grid; place-content: center; gap: 8px;
+  text-align: center; padding: 20px; z-index: 2;
+}
+.hd-title{ font-size: 18px; font-weight: 800; }
+.hd-sub{ font-size: 12px; opacity: .65; }
+.hd-bar{
+  width: min(420px, 70vw); height: 12px; border-radius: 999px;
+  background: #222; border: 1px solid #444; overflow: hidden; margin: 8px auto 0;
+}
+.hd-fill{
+  display: block; height: 100%; width: 3%;
+  background: linear-gradient(90deg,#ff2d6a,#ff8a00,#ffe66a);
+  transition: width .2s linear;
+}
+.hd-pct{ font-size: 12px; opacity: .75; font-variant-numeric: tabular-nums; }
+.hd-footer{ padding: 8px 12px; font-size: 11px; color: #777; background: #101016; }
+
+.meme-banner{
+  position: fixed; left: 50%; top: 16%; transform: translate(-50%,-12px) scale(.92);
+  z-index: 13020; pointer-events: none;
+  padding: 12px 22px; border-radius: 14px;
+  background: rgba(10,10,14,.88); color: #fff; font-weight: 850;
+  font-size: clamp(16px, 3.5vw, 28px); letter-spacing: .01em;
+  opacity: 0; transition: opacity .25s ease, transform .25s ease;
+  border: 1px solid rgba(255,255,255,.12);
+  text-align: center; max-width: 92vw;
+}
+.meme-banner.show{ opacity: 1; transform: translate(-50%,0) scale(1); }
+.meme-banner.rick{ background: linear-gradient(90deg,#5b2,#2a6); }
+.meme-banner.sus{ background: #c00; }
+.meme-banner.chad{ background: #222; border-color: #888; }
+.meme-banner.sigma{ background: #111; letter-spacing: .08em; }
+.meme-banner.npc{ background: #334; }
+.meme-banner.grass{ background: #163; }
+.meme-banner.ratio{ background: #1a1a1a; }
+.meme-banner.rot{ background: #401050; }
+.meme-banner.fine{ background: #5a2a10; }
+.meme-banner.pressf{ font-size: clamp(48px, 12vw, 120px); padding: 8px 28px; }
+.meme-banner.base{ background: #102040; font-size: clamp(14px, 2.6vw, 22px); }
+.meme-banner.loss{ font-family: monospace; }
+.meme-banner.skibidi{ background: #224; }
+.meme-banner.ohio{ background: #245a20; }
+.meme-banner.rizz{ background: #402030; }
+.meme-banner.beast{ background: #083; font-size: clamp(14px, 2.8vw, 22px); }
+.meme-banner.fail{ background: #333; }
+.meme-banner.rs{ background: #3a2a10; border-color: #c9a227; color: #f5e6b0; }
+
+body.page-gigachad{ filter: contrast(1.15) saturate(.85); }
+body.page-npc .cardDesc, body.page-npc .lede{ font-style: italic; opacity: .7; }
+body.page-brainrot{ animation: rotHue 3s linear infinite; }
+@keyframes rotHue{ to{ filter: hue-rotate(360deg); } }
+body.page-thisisfine .card, body.page-thisisfine .aboutCard{
+  border: 2px solid rgba(255,120,40,.45) !important;
+}
+body.page-ohio{
+  background-image: radial-gradient(circle at 20% 20%, rgba(80,180,60,.15), transparent 40%) !important;
+}
+
+/* when permanent zoom is on, disable the old tiny/huge section scales */
+body.ub-zoomed.page-tiny .hero,
+body.ub-zoomed.page-tiny .section,
+body.ub-zoomed.page-huge .hero,
+body.ub-zoomed.page-huge .section{
+  transform: none !important;
+}
+body.ub-zoomed.page-infinityzoom{
+  overflow: visible;
+}
