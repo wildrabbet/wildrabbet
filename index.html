@@ -359,7 +359,17 @@
         "shatter", "wind", "drunk walk", "time warp", "reality break",
         // new toys
         "shockwave", "lightning", "fish tank", "toasters", "portal",
-        "ripple", "pinball", "gooey", "comet", "disco floor"
+        "ripple", "pinball", "gooey", "comet", "disco floor",
+        // shape morphs
+        "oval", "pill", "diamond", "star cut", "hexagon", "squircle",
+        "paper cut", "melt world", "balloonify", "origami",
+        // chaos creatures + trip
+        "cats", "bees", "LSD", "datura", "kaleido trip", "chromatic",
+        "melt screen", "infinity zoom", "fractal", "afterimage",
+        // interactive toys
+        "present", "chest", "safe", "folder", "loot crate", "jackbox",
+        // OS / chat popups
+        "discord", "skype", "mac alert", "win popup", "imessage", "teams"
       ];
 
       const FILLER = [
@@ -783,26 +793,26 @@
       let dvdAnim = null;
 
       function toggleCRT() {
-        if (crtOverlay) { crtOverlay.remove(); crtOverlay = null; siteBody.classList.remove('crt-active'); return; }
-        crtOverlay = document.createElement('div');
-        crtOverlay.className = 'crt-overlay';
-        crtOverlay.innerHTML = '<div class="crt-scanlines"></div><div class="crt-flicker"></div>';
-        siteBody.appendChild(crtOverlay);
+        // stack: add another scanline layer instead of removing
+        const overlay = document.createElement('div');
+        overlay.className = 'crt-overlay';
+        overlay.innerHTML = '<div class="crt-scanlines"></div><div class="crt-flicker"></div>';
+        siteBody.appendChild(overlay);
         siteBody.classList.add('crt-active');
+        crtOverlay = overlay;
       }
 
       function toggle90s() {
-        if (ninetiesOverlay) { ninetiesOverlay.remove(); ninetiesOverlay = null; siteBody.classList.remove('nineties-active'); return; }
-        ninetiesOverlay = document.createElement('div');
-        ninetiesOverlay.className = 'nineties-overlay';
-        // star-field bg
+        const overlay = document.createElement('div');
+        overlay.className = 'nineties-overlay';
         let stars = '';
         for (let i = 0; i < 50; i++) {
           stars += '<div class="nineties-star" style="left:'+r(0,100)+'%;top:'+r(0,100)+'%;animation-delay:'+r(0,3)+'s;font-size:'+r(8,18)+'px;">'+rand(['⭐','✦','★','·'])+'</div>';
         }
-        ninetiesOverlay.innerHTML = stars;
-        siteBody.appendChild(ninetiesOverlay);
+        overlay.innerHTML = stars;
+        siteBody.appendChild(overlay);
         siteBody.classList.add('nineties-active');
+        ninetiesOverlay = overlay;
       }
 
       function toggleDVD() {
@@ -855,28 +865,41 @@
         siteBody.style.cursor = 'url("data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'32\' height=\'32\'><text y=\'28\' font-size=\'28\'>'+encodeURIComponent(emoji)+'</text></svg>") 16 16, auto';
       }
 
-      // ===== PERSISTENT BUBBLES =====
+      // ===== PERSISTENT BUBBLES (click-through, stackable intensity) =====
       let bubblesInterval = null;
       let bubblesContainer = null;
+      let bubblesIntensity = 0;
       function toggleBubbles() {
-        if (bubblesInterval) { clearInterval(bubblesInterval); bubblesInterval=null; if(bubblesContainer){bubblesContainer.remove();bubblesContainer=null;} return; }
-        bubblesContainer = document.createElement('div');
-        bubblesContainer.className = 'bubbles-layer';
-        siteBody.appendChild(bubblesContainer);
-        function spawnBubble() {
-          const b = document.createElement('div');
-          b.className = 'bubble';
-          const size = r(12,50);
-          b.style.width = size+'px'; b.style.height = size+'px';
-          b.style.left = r(0,100)+'%';
-          b.style.animationDuration = r(4,9)+'s';
-          b.style.animationDelay = r(0,0.5)+'s';
-          b.style.opacity = r(0.15,0.5);
-          bubblesContainer.appendChild(b);
-          setTimeout(()=>b.remove(), 10000);
+        bubblesIntensity = Math.min(bubblesIntensity + 1, 8);
+        if (!bubblesContainer) {
+          bubblesContainer = document.createElement('div');
+          bubblesContainer.className = 'bubbles-layer';
+          bubblesContainer.setAttribute('aria-hidden', 'true');
+          siteBody.appendChild(bubblesContainer);
         }
-        for(let i=0;i<15;i++) setTimeout(()=>spawnBubble(), i*150);
-        bubblesInterval = setInterval(()=>{if(bubblesContainer.children.length<40) spawnBubble();}, 400);
+        function spawnBubble() {
+          if (!bubblesContainer) return;
+          const b = document.createElement('div');
+          b.className = 'bubble' + (Math.random() < 0.35 ? ' bubble-shiny' : '');
+          const size = r(10, 28 + bubblesIntensity * 10);
+          b.style.width = size + 'px';
+          b.style.height = size + 'px';
+          b.style.left = r(0, 100) + '%';
+          b.style.animationDuration = r(5, 11 - Math.min(bubblesIntensity, 4)) + 's';
+          b.style.animationDelay = r(0, 0.8) + 's';
+          b.style.opacity = r(0.18, 0.55);
+          b.style.setProperty('--drift', r(-40, 40) + 'px');
+          bubblesContainer.appendChild(b);
+          setTimeout(() => b.remove(), 12000);
+        }
+        const burst = 12 + bubblesIntensity * 6;
+        for (let i = 0; i < burst; i++) setTimeout(spawnBubble, i * 80);
+        if (bubblesInterval) clearInterval(bubblesInterval);
+        const maxKids = 30 + bubblesIntensity * 18;
+        const rate = Math.max(120, 420 - bubblesIntensity * 40);
+        bubblesInterval = setInterval(() => {
+          if (bubblesContainer && bubblesContainer.children.length < maxKids) spawnBubble();
+        }, rate);
       }
 
       // ===== PERSISTENT WAVE =====
@@ -1038,44 +1061,127 @@
         siteBody.appendChild(northernEl);
       }
 
-      // ===== FAKE POPUP (reusable for silly messages) =====
+      // ===== FAKE / OS / CHAT POPUPS (always stack) =====
+      function makeDraggable(dlg, handle) {
+        let dragging = false, ox = 0, oy = 0;
+        const tb = handle || dlg.querySelector('.err-titlebar, .os-titlebar, .chat-titlebar');
+        if (!tb) return;
+        tb.addEventListener('pointerdown', (ev) => {
+          dragging = true;
+          ox = ev.clientX - dlg.offsetLeft;
+          oy = ev.clientY - dlg.offsetTop;
+          dlg.style.zIndex = String(12000 + Math.floor(Math.random() * 200));
+          ev.preventDefault();
+        });
+        const move = (ev) => {
+          if (!dragging) return;
+          dlg.style.left = (ev.clientX - ox) + 'px';
+          dlg.style.top = (ev.clientY - oy) + 'px';
+        };
+        const up = () => { dragging = false; };
+        document.addEventListener('pointermove', move);
+        document.addEventListener('pointerup', up);
+      }
+
+      function placeDialog(dlg) {
+        dlg.style.left = r(5, 62) + '%';
+        dlg.style.top = r(8, 55) + '%';
+        dlg.style.zIndex = String(11000 + document.querySelectorAll('.error-dialog, .os-dialog, .chat-dialog').length);
+        siteBody.appendChild(dlg);
+        makeDraggable(dlg);
+      }
+
       function showFakePopup(title, text) {
         const dlg = document.createElement('div');
         dlg.className = 'error-dialog';
-        dlg.innerHTML = '<div class="err-titlebar"><span class="err-icon">⚠️</span> <span>'+title+'</span><button class="err-x" onclick="this.closest(\'.error-dialog\').remove()">✕</button></div><div class="err-body"><div class="err-row"><span class="err-warn">⚠</span><pre class="err-text">'+text+'</pre></div><div class="err-btns"><button class="err-btn" onclick="this.closest(\'.error-dialog\').remove()">OK</button><button class="err-btn" onclick="this.closest(\'.error-dialog\').remove()">I Accept My Fate</button></div></div>';
-        dlg.style.left = r(10,50)+'%';
-        dlg.style.top = r(15,40)+'%';
-        siteBody.appendChild(dlg);
-        let dragging=false, ox=0, oy=0;
-        const tb = dlg.querySelector('.err-titlebar');
-        tb.addEventListener('pointerdown',(ev)=>{dragging=true;ox=ev.clientX-dlg.offsetLeft;oy=ev.clientY-dlg.offsetTop;ev.preventDefault();});
-        document.addEventListener('pointermove',(ev)=>{if(!dragging)return;dlg.style.left=ev.clientX-ox+'px';dlg.style.top=ev.clientY-oy+'px';});
-        document.addEventListener('pointerup',()=>{dragging=false;});
+        dlg.innerHTML = '<div class="err-titlebar"><span class="err-icon">⚠️</span> <span>'+title+'</span><button class="err-x" type="button">✕</button></div><div class="err-body"><div class="err-row"><span class="err-warn">⚠</span><pre class="err-text">'+text+'</pre></div><div class="err-btns"><button class="err-btn" type="button">OK</button><button class="err-btn" type="button">I Accept My Fate</button></div></div>';
+        dlg.querySelectorAll('.err-x, .err-btn').forEach(b => b.addEventListener('click', () => dlg.remove()));
+        placeDialog(dlg);
       }
 
-      // ===== 404 ERROR DIALOG =====
       function show404Dialog() {
-        const existing = document.querySelector('.error-dialog');
-        if (existing) { existing.remove(); return; }
-        const dlg = document.createElement('div');
-        dlg.className = 'error-dialog';
         const msgs = [
           {title:'wildrabbet.exe', text:'An error has occurred in wildrabbet.exe. The program will now close.\n\nError 0x80004005: Unspecified error\nCause: You clicked the wrong thing'},
           {title:'Error', text:'This program has performed an illegal operation and will be shut down.\n\nIf the problem persists, contact wildrabbet support (do not contact wildrabbet support).'},
           {title:'wildrabbet - Application Error', text:'The instruction at 0x00000000 referenced memory at 0xDEADBEEF.\nThe memory could not be "read".\n\nClick OK to terminate the application.'},
           {title:'Fatal Error', text:'A problem has been detected and wildrabbet has been shut down to prevent damage to your computer.\n\n*** STOP: 0x0000BOOP (0x00000042)\n\nTechnical information: you clicked too hard'},
+          {title:'Windows Security', text:'Your PC is at risk!\n\nThreat detected: USELESS_BOX_WORM.Click\nSeverity: Critical\n\nRecommended action: Keep clicking.'},
+          {title:'System Restore', text:'Windows has recovered from an unexpected shutdown.\n\nCause: chaos overflow in module RABBET.DLL'},
         ];
         const msg = rand(msgs);
-        dlg.innerHTML = '<div class="err-titlebar"><span class="err-icon">⚠️</span> <span>'+msg.title+'</span><button class="err-x" onclick="this.closest(\'.error-dialog\').remove()">✕</button></div><div class="err-body"><div class="err-row"><span class="err-warn">⚠</span><pre class="err-text">'+msg.text+'</pre></div><div class="err-btns"><button class="err-btn" onclick="this.closest(\'.error-dialog\').remove()">OK</button><button class="err-btn" onclick="this.closest(\'.error-dialog\').remove()">Cancel</button></div></div>';
-        dlg.style.left = r(10,50)+'%';
-        dlg.style.top = r(15,40)+'%';
-        siteBody.appendChild(dlg);
-        // make draggable
-        let dragging=false, ox=0, oy=0;
-        const tb = dlg.querySelector('.err-titlebar');
-        tb.addEventListener('pointerdown',(ev)=>{dragging=true;ox=ev.clientX-dlg.offsetLeft;oy=ev.clientY-dlg.offsetTop;ev.preventDefault();});
-        document.addEventListener('pointermove',(ev)=>{if(!dragging)return;dlg.style.left=ev.clientX-ox+'px';dlg.style.top=ev.clientY-oy+'px';});
-        document.addEventListener('pointerup',()=>{dragging=false;});
+        const dlg = document.createElement('div');
+        dlg.className = 'error-dialog';
+        dlg.innerHTML = '<div class="err-titlebar"><span class="err-icon">⚠️</span> <span>'+msg.title+'</span><button class="err-x" type="button">✕</button></div><div class="err-body"><div class="err-row"><span class="err-warn">⚠</span><pre class="err-text">'+msg.text+'</pre></div><div class="err-btns"><button class="err-btn" type="button">OK</button><button class="err-btn" type="button">Cancel</button></div></div>';
+        dlg.querySelectorAll('.err-x, .err-btn').forEach(b => b.addEventListener('click', () => dlg.remove()));
+        placeDialog(dlg);
+      }
+
+      function showMacAlert() {
+        const msgs = [
+          {title:'Finder wants to make changes.', body:'macOS would like to rearrange your windows into a pile.\n\nEnter your password to allow this.', btn:'Allow'},
+          {title:'The application “Safari” quit unexpectedly.', body:'Click Reopen to open the application again. This report will be sent to wildrabbet.'},
+          {title:'Your disk is almost full.', body:'You have 12 MB remaining. Useless Box cache: 418 GB of vibes.'},
+          {title:'AirDrop', body:'“chaos.dmg” is ready to be received from Nearby Rabbit.'},
+        ];
+        const msg = rand(msgs);
+        const dlg = document.createElement('div');
+        dlg.className = 'os-dialog mac-dialog';
+        dlg.innerHTML = '<div class="os-titlebar mac-bar"><span class="mac-dots"><i></i><i></i><i></i></span><span>'+msg.title+'</span></div><div class="os-body"><div class="mac-icon">⚠️</div><pre class="err-text">'+msg.body+'</pre><div class="err-btns"><button class="err-btn mac-btn" type="button">'+(msg.btn||'OK')+'</button><button class="err-btn mac-btn" type="button">Cancel</button></div></div>';
+        dlg.querySelectorAll('.err-btn, .mac-dots').forEach(b => b.addEventListener('click', () => dlg.remove()));
+        placeDialog(dlg);
+      }
+
+      function showDiscordPopup() {
+        const msgs = [
+          {user:'rabbet', text:'yo who broke the website'},
+          {user:'System', text:'@everyone Useless Box has been granted Administrator privileges'},
+          {user:'modbot', text:'User clicked too hard. Timeout: forever.'},
+          {user:'friend', text:'join vc we are doing nothing'},
+        ];
+        const msg = rand(msgs);
+        const dlg = document.createElement('div');
+        dlg.className = 'chat-dialog discord-dialog';
+        dlg.innerHTML = '<div class="chat-titlebar discord-bar"><span># general</span><button class="err-x" type="button">✕</button></div><div class="chat-body"><div class="chat-row"><div class="chat-avatar">🐇</div><div><div class="chat-user">'+msg.user+' <span class="chat-time">Today at '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})+'</span></div><div class="chat-text">'+msg.text+'</div></div></div><div class="chat-input">Message #general</div></div>';
+        dlg.querySelector('.err-x').addEventListener('click', () => dlg.remove());
+        placeDialog(dlg);
+      }
+
+      function showSkypePopup() {
+        const dlg = document.createElement('div');
+        dlg.className = 'chat-dialog skype-dialog';
+        const who = rand(['Mom', 'Boss', 'Unknown Number', 'IT Support', 'ex']);
+        dlg.innerHTML = '<div class="chat-titlebar skype-bar"><span>📞 Incoming call</span><button class="err-x" type="button">✕</button></div><div class="chat-body skype-body"><div class="skype-avatar">👤</div><div class="skype-name">'+who+'</div><div class="skype-sub">Skype · ringing…</div><div class="err-btns"><button class="err-btn skype-decline" type="button">Decline</button><button class="err-btn skype-accept" type="button">Accept</button></div></div>';
+        dlg.querySelectorAll('.err-x, .err-btn').forEach(b => b.addEventListener('click', () => dlg.remove()));
+        placeDialog(dlg);
+      }
+
+      function showImessagePopup() {
+        const texts = [
+          'i saw what you clicked',
+          'why is your screen like that',
+          'are you okay??',
+          'this is your sign to click again',
+          'delivered',
+        ];
+        const dlg = document.createElement('div');
+        dlg.className = 'chat-dialog imessage-dialog';
+        dlg.innerHTML = '<div class="chat-titlebar imessage-bar"><span>Messages</span><button class="err-x" type="button">✕</button></div><div class="chat-body"><div class="imsg-bubble">'+rand(texts)+'</div><div class="imsg-meta">Delivered</div></div>';
+        dlg.querySelector('.err-x').addEventListener('click', () => dlg.remove());
+        placeDialog(dlg);
+      }
+
+      function showTeamsPopup() {
+        const dlg = document.createElement('div');
+        dlg.className = 'chat-dialog teams-dialog';
+        dlg.innerHTML = '<div class="chat-titlebar teams-bar"><span>Microsoft Teams</span><button class="err-x" type="button">✕</button></div><div class="chat-body"><div class="teams-banner">You have a new meeting: “Synergy Sync Standup Retro”</div><div class="err-btns"><button class="err-btn" type="button">Join</button><button class="err-btn" type="button">Ignore Forever</button></div></div>';
+        dlg.querySelectorAll('.err-x, .err-btn').forEach(b => b.addEventListener('click', () => dlg.remove()));
+        placeDialog(dlg);
+      }
+
+      function spawnChaosPopups(n) {
+        n = n || Math.floor(r(2, 5));
+        const makers = [show404Dialog, showMacAlert, showDiscordPopup, showSkypePopup, showImessagePopup, showTeamsPopup];
+        for (let i = 0; i < n; i++) setTimeout(() => rand(makers)(), i * 140);
       }
 
       // ===== SHOCKWAVE =====
@@ -1575,7 +1681,7 @@
         "oil spill": (e) => { togglePageClass('page-oilspill'); beep("sine",r(150,300),0.14,0.07); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"circles"}); },
         "stickers": (e) => { const emojis=['⭐','🔥','💯','✅','❤️','🎵','💀','🤡','👀','🫠','💅','🧠']; for(let i=0;i<r(6,12);i++){const s=document.createElement('div');s.className='page-sticker';s.textContent=rand(emojis);s.style.left=r(5,90)+'%';s.style.top=r(10,85)+'%';s.style.transform='rotate('+r(-30,30)+'deg) scale('+r(0.8,1.6)+')';siteBody.appendChild(s);/* stickers stay */} beep("sine",r(400,700),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
         "crop circles": (e) => { for(let i=0;i<r(4,8);i++){const c=document.createElement('div');c.className='crop-circle';const size=r(40,120);c.style.width=size+'px';c.style.height=size+'px';c.style.left=r(5,85)+'%';c.style.top=r(10,80)+'%';siteBody.appendChild(c);setTimeout(()=>c.remove(),r(4000,8000));} beep("sine",r(300,500),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"circles"}); },
-        "windows error": (e) => { for(let i=0;i<r(3,6);i++) setTimeout(()=>show404Dialog(),i*200); beep("square",r(100,200),0.12,0.12); },
+        "windows error": (e) => { spawnChaosPopups(Math.floor(r(4,8))); beep("square",r(100,200),0.12,0.12); },
         "dialup": (e) => { togglePageClass('page-dialup'); beep("square",r(800,1200),0.06,0.08); beep("sine",r(1000,1500),0.04,0.06); beep("square",r(600,900),0.05,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,14),shape:"squares"}); },
         "jumpscare": (e) => { const js=document.createElement('div');js.className='jumpscare';js.textContent=rand(['👁️','💀','🫣','👻','🤡']);siteBody.appendChild(js); beep("square",r(40,80),0.20,0.16); setTimeout(()=>js.remove(),600); spawnParticles(e.clientX,e.clientY,{count:r(20,30),shape:"mixed",durMin:200,durMax:500}); },
         "swap": (e) => { const cards=Array.from(document.querySelectorAll('.card')); if(cards.length>1){const a=Math.floor(Math.random()*cards.length); let b=a; while(b===a)b=Math.floor(Math.random()*cards.length); const parentA=cards[a].parentNode; const nextA=cards[a].nextSibling; parentA.insertBefore(cards[a],cards[b]); parentA.insertBefore(cards[b],nextA); [cards[a],cards[b]].forEach(c=>{c.style.transition='transform .4s ease';c.style.transform='scale(0.9) rotate('+r(-3,3)+'deg)';setTimeout(()=>c.style.transform='',500);});} beep("triangle",r(300,500),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
@@ -1599,7 +1705,7 @@
         "marquee text": (e) => { togglePageClass('page-marqueetext'); beep("triangle",r(300,500),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
         "sidebar": (e) => { togglePageClass('page-sidebar'); beep("sine",r(300,500),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
         "progress": (e) => { let bar=document.querySelector('.fake-progress'); if(bar){bar.remove();return;} bar=document.createElement('div');bar.className='fake-progress';bar.innerHTML='<div class="fp-fill"></div><div class="fp-text">'+rand(['Downloading more RAM...','Installing common sense...','Defragmenting vibes...','Compiling spaghetti code...','Uploading your browsing history...','Reticulating splines...','Generating excuses...','Calibrating chaos engine...','Syncing brain cells...','Buffering the void...'])+' 0%</div>';siteBody.appendChild(bar); let pct=0; const iv=setInterval(()=>{pct+=r(0.2,2.5); if(pct>99.5){pct=99.5+Math.random()*0.4;} bar.querySelector('.fp-fill').style.width=pct+'%'; bar.querySelector('.fp-text').textContent=(pct>99?'Almost done... ':'Downloading more RAM... ')+Math.floor(pct)+'%';},200); beep("sine",r(300,500),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
-        "popups": (e) => { for(let i=0;i<r(4,8);i++) setTimeout(()=>show404Dialog(),i*150); beep("square",r(100,200),0.12,0.12); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"squares"}); },
+        "popups": (e) => { spawnChaosPopups(Math.floor(r(5,10))); beep("square",r(100,200),0.12,0.12); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"squares"}); },
         "tooltip hell": (e) => { document.querySelectorAll('.card,.aboutCard,.heroLeft,.btn,.tag,.nav a').forEach(el=>{const tips=['don\'t click this','or this','why are you hovering','stop','go away','no','this does nothing','(it does something)','help','the box sees you','🐇','bottom text']; el.title=rand(tips);}); beep("sine",r(300,500),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
 
         // ===== FULL-SCREEN OVERLAY EFFECTS =====
@@ -2318,6 +2424,190 @@
         "gooey": (e) => { toggleGoo(); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"circles",sizeMin:14,sizeMax:30,durMin:700,durMax:1200}); beep("sine",r(160,280),0.24,0.07); },
         "comet": (e) => { toggleComet(); spawnParticles(e.clientX,e.clientY,{count:r(12,20),durMin:500,durMax:900}); beep("triangle",r(600,1000),0.12,0.06); },
         "disco floor": (e) => { toggleDiscoFloor(); flashOverlay("bonk"); beep("square",r(200,400),0.10,0.07); },
+
+        // ===== SHAPE MORPHS =====
+        "oval": (e) => {
+          document.querySelectorAll('.card,.aboutCard,.heroLeft,.heroRight,.btn,.tag').forEach(el=>{
+            el.style.transition='border-radius 1s ease, transform 1s ease';
+            el.style.borderRadius='50%';
+            el.style.transform=`scale(${r(0.92,1.08)})`;
+          });
+          toyBox.style.transition='border-radius 1s ease'; toyBox.style.borderRadius='50%';
+          beep("sine",r(220,400),0.16,0.07);
+          spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"circles"});
+        },
+        "pill": (e) => {
+          document.querySelectorAll('.card,.aboutCard,.heroLeft,.btn,.tag,.nav a').forEach(el=>{
+            el.style.transition='border-radius .8s ease, transform .8s ease';
+            el.style.borderRadius='999px';
+            el.style.transform=`scaleY(${r(0.85,1.1)})`;
+          });
+          beep("sine",r(300,500),0.12,0.07);
+          spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"circles"});
+        },
+        "diamond": (e) => {
+          document.querySelectorAll('.card,.aboutCard,.heroLeft,.heroRight').forEach(el=>{
+            el.style.transition='clip-path .9s ease, transform .9s ease';
+            el.style.clipPath='polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)';
+            el.style.transform=`rotate(${r(-8,8)}deg) scale(0.92)`;
+          });
+          beep("triangle",r(400,700),0.12,0.08);
+          spawnParticles(e.clientX,e.clientY,{count:r(14,20),shape:"squares"});
+        },
+        "star cut": (e) => {
+          document.querySelectorAll('.card,.aboutCard').forEach(el=>{
+            el.style.transition='clip-path 1s ease';
+            el.style.clipPath='polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
+          });
+          beep("triangle",r(500,900),0.10,0.07);
+          spawnParticles(e.clientX,e.clientY,{count:r(16,24),shape:"mixed"});
+        },
+        "hexagon": (e) => {
+          document.querySelectorAll('.card,.aboutCard,.heroLeft,.heroRight').forEach(el=>{
+            el.style.transition='clip-path .9s ease';
+            el.style.clipPath='polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)';
+          });
+          beep("square",r(200,400),0.12,0.09);
+          spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"squares"});
+        },
+        "squircle": (e) => {
+          document.querySelectorAll('.card,.aboutCard,.heroLeft,.heroRight,.btn').forEach(el=>{
+            el.style.transition='border-radius .8s ease';
+            el.style.borderRadius='28%';
+          });
+          beep("sine",r(280,480),0.12,0.07);
+          spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"circles"});
+        },
+        "paper cut": (e) => {
+          document.querySelectorAll('.card,.aboutCard,.heroLeft').forEach(el=>{
+            el.style.transition='clip-path 1s ease, filter 1s ease';
+            el.style.clipPath=`polygon(${r(0,8)}% ${r(0,6)}%, ${r(92,100)}% ${r(0,8)}%, ${r(90,100)}% ${r(90,100)}%, ${r(0,10)}% ${r(88,100)}%)`;
+            el.style.filter='drop-shadow(3px 4px 0 rgba(0,0,0,.15))';
+          });
+          beep("square",r(180,320),0.10,0.09);
+          spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"squares"});
+        },
+        "melt world": (e) => {
+          stackPageClass('page-meltworld');
+          document.querySelectorAll('.card,.aboutCard,.heroLeft,.heroRight,h1,h2').forEach((el,i)=>{
+            el.style.transition=`border-radius ${r(1,2.5)}s ease ${i*0.05}s, transform ${r(1,2)}s ease`;
+            el.style.borderRadius=`${r(30,60)}% ${r(30,70)}% ${r(40,70)}% ${r(30,60)}% / ${r(40,70)}% ${r(30,60)}% ${r(40,70)}% ${r(30,50)}%`;
+            el.style.transform=`scaleY(${r(0.85,1.2)}) translateY(${r(0,20)}px)`;
+          });
+          beep("sine",r(80,160),0.22,0.08);
+          spawnParticles(e.clientX,e.clientY,{count:r(14,22),durMin:900,durMax:1600,dyDown:220,dyUp:40});
+        },
+        "balloonify": (e) => {
+          document.querySelectorAll('.card,.aboutCard,.heroLeft,.btn,.tag').forEach(el=>{
+            el.style.transition='transform 1.2s cubic-bezier(.2,.8,.2,1), border-radius 1.2s';
+            el.style.borderRadius='50%';
+            el.style.transform=`scale(${r(1.1,1.45)}) translateY(${r(-30,-5)}px)`;
+          });
+          siteFall(rand(['🎈','🎈','✨']),3500);
+          beep("sine",r(400,700),0.14,0.07);
+          spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"circles"});
+        },
+        "origami": (e) => {
+          document.querySelectorAll('.card,.aboutCard').forEach(el=>{
+            el.style.transition='transform 1s ease, clip-path 1s ease';
+            el.style.transform=`perspective(600px) rotateY(${r(-35,35)}deg) rotateX(${r(-20,20)}deg)`;
+            el.style.clipPath=`polygon(0 0, 100% 0, 100% ${r(70,100)}%, ${r(0,30)}% 100%, 0 ${r(60,100)}%)`;
+          });
+          beep("triangle",r(350,600),0.12,0.08);
+          spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"squares"});
+        },
+
+        // ===== CREATURES + TRIP =====
+        "cats": (e) => { spawnFleeCats(); beep("triangle",r(500,900),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"hearts"}); },
+        "bees": (e) => { spawnBeeSwarm(); beep("square",r(400,700),0.08,0.06); spawnParticles(e.clientX,e.clientY,{count:r(12,18),hue:45}); },
+        "LSD": (e) => {
+          stackPageClass('page-lsd');
+          startTripOverlay('lsd', 14000);
+          siteSparkle(4000);
+          beep("sine",r(200,600),0.16,0.08); beep("triangle",r(400,900),0.12,0.06);
+          spawnParticles(e.clientX,e.clientY,{count:r(22,34),shape:"mixed",durMin:700,durMax:1400});
+        },
+        "datura": (e) => {
+          stackPageClass('page-datura');
+          startTripOverlay('datura', 16000);
+          siteFlash('rgba(180,255,120,.25)', 400);
+          beep("sine",r(40,100),0.22,0.10); beep("sine",r(60,140),0.18,0.08);
+          spawnParticles(e.clientX,e.clientY,{count:r(16,24),shape:"circles",hue:100,durMin:1000,durMax:2000});
+        },
+        "kaleido trip": (e) => {
+          stackPageClass('page-kaleidotrip');
+          startTripOverlay('kaleido', 12000);
+          beep("triangle",r(300,700),0.14,0.08);
+          spawnParticles(e.clientX,e.clientY,{count:r(20,30),shape:"mixed"});
+        },
+        "chromatic": (e) => {
+          stackPageClass('page-chromatic');
+          document.querySelectorAll('.card,.aboutCard,.heroLeft,.heroRight,h1').forEach(el=>{
+            el.style.textShadow = '-3px 0 #f0f, 3px 0 #0ff';
+            el.style.filter = (el.style.filter||'') + ' drop-shadow(-2px 0 #f0f) drop-shadow(2px 0 #0ff)';
+          });
+          beep("square",r(200,500),0.10,0.10);
+          spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"squares"});
+        },
+        "melt screen": (e) => {
+          stackPageClass('page-meltscreen');
+          siteBody.style.transition='filter 2s';
+          siteBody.style.filter=((siteBody.style.filter||'')+' url(#none)').replace('url(#none)','');
+          siteBody.style.setProperty('--melt', '1');
+          beep("sine",r(80,180),0.2,0.08);
+          spawnParticles(e.clientX,e.clientY,{count:r(12,18),durMin:1200,durMax:2200,dyDown:280});
+        },
+        "infinity zoom": (e) => {
+          stackPageClass('page-infinityzoom');
+          let z=1; const iv=setInterval(()=>{
+            z*=1.08; siteBody.style.transition='transform .25s linear';
+            siteBody.style.transform=`scale(${Math.min(z,6)})`;
+            if(z>5){clearInterval(iv); setTimeout(()=>{siteBody.style.transition='transform 1.5s ease';siteBody.style.transform='';},800);}
+          },200);
+          beep("sine",r(150,400),0.14,0.07);
+          spawnParticles(e.clientX,e.clientY,{count:r(16,24),shape:"circles"});
+        },
+        "fractal": (e) => {
+          stackPageClass('page-fractal');
+          startTripOverlay('fractal', 10000);
+          beep("triangle",r(250,550),0.12,0.08);
+          spawnParticles(e.clientX,e.clientY,{count:r(18,28),shape:"mixed"});
+        },
+        "afterimage": (e) => {
+          stackPageClass('page-afterimage');
+          const ghost = document.createElement('div');
+          ghost.className = 'afterimage-layer';
+          ghost.style.backgroundImage = 'none';
+          siteBody.appendChild(ghost);
+          const move = (ev) => {
+            const g = document.createElement('div');
+            g.className = 'afterimage-blob';
+            g.style.left = ev.clientX+'px'; g.style.top = ev.clientY+'px';
+            g.style.background = `hsla(${accentHue()+r(-40,80)} 90% 60% / .35)`;
+            ghost.appendChild(g);
+            setTimeout(()=>g.remove(), 900);
+          };
+          document.addEventListener('mousemove', move);
+          setTimeout(()=>{ document.removeEventListener('mousemove', move); ghost.remove(); }, 8000);
+          beep("sine",r(300,600),0.12,0.06);
+          spawnParticles(e.clientX,e.clientY,{count:r(12,18)});
+        },
+
+        // ===== INTERACTIVE TOYS =====
+        "present": (e) => { spawnInteractiveToy('present'); beep("triangle",r(400,700),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"mixed"}); },
+        "chest": (e) => { spawnInteractiveToy('chest'); beep("square",r(180,320),0.14,0.10); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"squares"}); },
+        "safe": (e) => { spawnInteractiveToy('safe'); beep("square",r(120,220),0.12,0.11); spawnParticles(e.clientX,e.clientY,{count:r(8,14),shape:"squares"}); },
+        "folder": (e) => { spawnInteractiveToy('folder'); beep("sine",r(300,500),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,12)}); },
+        "loot crate": (e) => { spawnInteractiveToy('crate'); beep("triangle",r(250,450),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18)}); },
+        "jackbox": (e) => { spawnInteractiveToy('jack'); beep("square",r(200,400),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"mixed"}); },
+
+        // ===== OS / CHAT POPUPS =====
+        "discord": (e) => { for(let i=0;i<r(2,5);i++) setTimeout(showDiscordPopup, i*160); beep("sine",r(400,700),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "skype": (e) => { for(let i=0;i<r(2,4);i++) setTimeout(showSkypePopup, i*180); beep("triangle",r(500,800),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "mac alert": (e) => { for(let i=0;i<r(2,5);i++) setTimeout(showMacAlert, i*150); beep("sine",r(350,550),0.12,0.07); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "win popup": (e) => { for(let i=0;i<r(3,7);i++) setTimeout(show404Dialog, i*120); beep("square",r(100,200),0.12,0.12); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"squares"}); },
+        "imessage": (e) => { for(let i=0;i<r(2,5);i++) setTimeout(showImessagePopup, i*160); beep("sine",r(450,750),0.10,0.06); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"hearts"}); },
+        "teams": (e) => { for(let i=0;i<r(2,4);i++) setTimeout(showTeamsPopup, i*170); beep("square",r(250,450),0.10,0.09); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
       };
 
       // ===== TEXT STYLING HELPERS =====
@@ -2399,7 +2689,7 @@
       }
 
       // helper for page-level toggle classes
-      const PAGE_CLASSES = ['page-tilt','page-blur','page-pixel','page-mirror','page-float','page-bw','page-vapor','page-matrix','page-comic','page-tiny','page-huge','page-upsidedown','page-typewriter','page-party','page-slowmo','page-fastfwd','page-static','page-moo','page-pirate','page-cursed','page-uwu','page-loading','page-hack','page-ghosted','page-thicc','page-smear','page-oldtv','page-windows','page-acid','page-orbit','page-wave','page-neon','page-sunset','page-aurora','page-underwater','page-retro','page-newspaper','page-bubblegum','page-moss','page-midnight','page-cozy','page-broken','page-dizzy','page-stretch','page-squish','page-wobble','page-breathe','page-gradient','page-spotlight','page-velvet','page-fog','page-dream','page-rainbow','page-galaxy','page-campfire','page-glass','page-chalk','page-blueprint','page-casino','page-jungle','page-candy','page-xray','page-thermal','page-emboss','page-paper','page-hologram','page-warp','page-marquee','page-rubbery','page-negative','page-elastic','page-drunk','page-ascii','page-heartbeat','page-cinema','page-oilspill','page-dialup','page-fisheye','page-marqueetext','page-sidebar','page-wavytext','page-blackhole','page-anime','page-win95','page-deepfry','page-microwave','page-possessed','page-void','page-feverdream','page-cottagecore','page-liminal','page-backrooms','page-vaporwave','page-y2k','page-silenthill','page-barbie','page-mc','page-terminal','page-soapopera'];
+      const PAGE_CLASSES = ['page-tilt','page-blur','page-pixel','page-mirror','page-float','page-bw','page-vapor','page-matrix','page-comic','page-tiny','page-huge','page-upsidedown','page-typewriter','page-party','page-slowmo','page-fastfwd','page-static','page-moo','page-pirate','page-cursed','page-uwu','page-loading','page-hack','page-ghosted','page-thicc','page-smear','page-oldtv','page-windows','page-acid','page-orbit','page-wave','page-neon','page-sunset','page-aurora','page-underwater','page-retro','page-newspaper','page-bubblegum','page-moss','page-midnight','page-cozy','page-broken','page-dizzy','page-stretch','page-squish','page-wobble','page-breathe','page-gradient','page-spotlight','page-velvet','page-fog','page-dream','page-rainbow','page-galaxy','page-campfire','page-glass','page-chalk','page-blueprint','page-casino','page-jungle','page-candy','page-xray','page-thermal','page-emboss','page-paper','page-hologram','page-warp','page-marquee','page-rubbery','page-negative','page-elastic','page-drunk','page-ascii','page-heartbeat','page-cinema','page-oilspill','page-dialup','page-fisheye','page-marqueetext','page-sidebar','page-wavytext','page-blackhole','page-anime','page-win95','page-deepfry','page-microwave','page-possessed','page-void','page-feverdream','page-cottagecore','page-liminal','page-backrooms','page-vaporwave','page-y2k','page-silenthill','page-barbie','page-mc','page-terminal','page-soapopera','page-lsd','page-datura','page-kaleidotrip','page-chromatic','page-meltscreen','page-meltworld','page-infinityzoom','page-fractal','page-afterimage'];
       // ===== ENHANCED THEME SYSTEM =====
       // Tracks all active page-level themes and blends colors
       const activeThemes = new Set();
@@ -2535,25 +2825,279 @@
       }
 
       function togglePageClass(cls) {
-        const isAdding = !siteBody.classList.contains(cls);
-        siteBody.classList.toggle(cls);
+        // ALWAYS STACK — never remove. Refresh the page to reset.
+        const isNew = !siteBody.classList.contains(cls);
+        siteBody.classList.add(cls);
+        activeThemes.add(cls);
 
-        if (isAdding) {
-          activeThemes.add(cls);
-        } else {
-          activeThemes.delete(cls);
-        }
+        const key = cls.replace(/^page-/, '');
+        const n = (parseInt(siteBody.dataset['i_'+key] || '0', 10) || 0) + 1;
+        siteBody.dataset['i_'+key] = String(n);
+        siteBody.style.setProperty('--stack-'+key, String(n));
 
-        // If it's a color theme, recompute blended inline styles
         if (COLOR_THEMES[cls]) {
           applyBlendedTheme();
         }
+        if (isNew) themeKick(null, true);
       }
+      // alias used by newer effects
+      function stackPageClass(cls) { togglePageClass(cls); }
 
       // page-level quake
       function quakeShake() {
         siteBody.classList.add('page-quake');
         setTimeout(()=>siteBody.classList.remove('page-quake'),800);
+      }
+
+      // ===== CURRENT EFFECT LABEL (no COMBO popups) =====
+      let effectToastEl = null;
+      function announceEffect(word) {
+        if (!word) return;
+        if (!effectToastEl) {
+          effectToastEl = document.createElement('div');
+          effectToastEl.className = 'effect-toast';
+          effectToastEl.setAttribute('aria-live', 'polite');
+          siteBody.appendChild(effectToastEl);
+        }
+        effectToastEl.textContent = word;
+        effectToastEl.classList.remove('pop');
+        void effectToastEl.offsetWidth;
+        effectToastEl.classList.add('pop', 'show');
+      }
+
+      function announceMilestone(n) {
+        const el = document.createElement('div');
+        el.className = 'milestone-toast';
+        el.textContent = n.toLocaleString() + ' clicks!';
+        siteBody.appendChild(el);
+        requestAnimationFrame(() => el.classList.add('show'));
+        setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 500); }, 2800);
+        beep('triangle', 520, 0.12, 0.08);
+        beep('sine', 780, 0.10, 0.06);
+      }
+
+      // ===== CATS THAT FLEE THE CURSOR =====
+      let catLayer = null;
+      let catRaf = null;
+      let cats = [];
+      let mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2;
+      document.addEventListener('mousemove', (ev) => { mouseX = ev.clientX; mouseY = ev.clientY; }, { passive: true });
+
+      function spawnFleeCats() {
+        if (!catLayer) {
+          catLayer = document.createElement('div');
+          catLayer.className = 'creature-layer cats-layer';
+          siteBody.appendChild(catLayer);
+        }
+        const faces = ['🐈','🐱','🙀','😼','🐈‍⬛','😺'];
+        for (let i = 0; i < Math.floor(r(4, 8)); i++) {
+          const el = document.createElement('div');
+          el.className = 'flee-cat';
+          el.textContent = rand(faces);
+          el.style.fontSize = r(22, 42) + 'px';
+          catLayer.appendChild(el);
+          cats.push({
+            el,
+            x: r(40, window.innerWidth - 40),
+            y: r(40, window.innerHeight - 40),
+            vx: 0, vy: 0,
+            life: 14000 + r(0, 6000)
+          });
+        }
+        if (!catRaf) {
+          const start = performance.now();
+          const loop = (t) => {
+            cats = cats.filter(c => {
+              const dx = c.x - mouseX, dy = c.y - mouseY;
+              const dist = Math.max(Math.sqrt(dx*dx + dy*dy), 1);
+              if (dist < 220) {
+                const force = (220 - dist) / 220;
+                c.vx += (dx / dist) * force * 2.8;
+                c.vy += (dy / dist) * force * 2.8;
+              }
+              c.vx += r(-0.15, 0.15); c.vy += r(-0.15, 0.15);
+              c.vx *= 0.92; c.vy *= 0.92;
+              c.x = Math.max(10, Math.min(window.innerWidth - 10, c.x + c.vx));
+              c.y = Math.max(10, Math.min(window.innerHeight - 10, c.y + c.vy));
+              c.el.style.left = c.x + 'px';
+              c.el.style.top = c.y + 'px';
+              c.el.style.transform = `scaleX(${c.vx < 0 ? -1 : 1}) rotate(${c.vx * 2}deg)`;
+              c.life -= 16;
+              if (c.life <= 0) { c.el.remove(); return false; }
+              return true;
+            });
+            if (cats.length) catRaf = requestAnimationFrame(loop);
+            else { catRaf = null; if (catLayer && !catLayer.children.length) { catLayer.remove(); catLayer = null; } }
+          };
+          catRaf = requestAnimationFrame(loop);
+        }
+      }
+
+      // ===== BEES THAT FOLLOW THEN BUZZ OFF =====
+      let beeLayer = null;
+      let beeRaf = null;
+      let bees = [];
+      function spawnBeeSwarm() {
+        if (!beeLayer) {
+          beeLayer = document.createElement('div');
+          beeLayer.className = 'creature-layer bees-layer';
+          siteBody.appendChild(beeLayer);
+        }
+        const count = Math.floor(r(18, 32));
+        for (let i = 0; i < count; i++) {
+          const el = document.createElement('div');
+          el.className = 'bee';
+          el.textContent = '🐝';
+          el.style.fontSize = r(14, 26) + 'px';
+          beeLayer.appendChild(el);
+          bees.push({
+            el,
+            x: r(0, window.innerWidth),
+            y: r(0, window.innerHeight),
+            vx: r(-1, 1), vy: r(-1, 1),
+            phase: 'follow',
+            born: performance.now(),
+            followUntil: performance.now() + r(5000, 9000),
+            fillUntil: performance.now() + r(9000, 13000)
+          });
+        }
+        if (!beeRaf) {
+          const loop = (t) => {
+            bees = bees.filter(b => {
+              if (t < b.followUntil) {
+                b.phase = 'follow';
+                const dx = mouseX - b.x, dy = mouseY - b.y;
+                b.vx += dx * 0.0022 + r(-0.4, 0.4);
+                b.vy += dy * 0.0022 + r(-0.4, 0.4);
+              } else if (t < b.fillUntil) {
+                b.phase = 'fill';
+                b.vx += r(-0.6, 0.6);
+                b.vy += r(-0.6, 0.6);
+              } else {
+                b.phase = 'buzzoff';
+                b.vx += r(-0.2, 0.2);
+                b.vy -= 0.35;
+              }
+              b.vx *= 0.94; b.vy *= 0.94;
+              b.x += b.vx; b.y += b.vy;
+              if (b.phase !== 'buzzoff') {
+                b.x = Math.max(-20, Math.min(window.innerWidth + 20, b.x));
+                b.y = Math.max(-20, Math.min(window.innerHeight + 20, b.y));
+              }
+              b.el.style.left = b.x + 'px';
+              b.el.style.top = b.y + 'px';
+              b.el.style.transform = `rotate(${Math.atan2(b.vy, b.vx) * 57.3}deg)`;
+              if (b.phase === 'buzzoff' && (b.y < -80 || b.x < -80 || b.x > window.innerWidth + 80)) {
+                b.el.remove(); return false;
+              }
+              return true;
+            });
+            if (bees.length) beeRaf = requestAnimationFrame(loop);
+            else { beeRaf = null; if (beeLayer && !beeLayer.children.length) { beeLayer.remove(); beeLayer = null; } }
+          };
+          beeRaf = requestAnimationFrame(loop);
+        }
+      }
+
+      // ===== TRIPPY OVERLAYS =====
+      function startTripOverlay(kind, duration) {
+        const layer = document.createElement('div');
+        layer.className = 'trip-overlay trip-' + kind;
+        layer.setAttribute('aria-hidden', 'true');
+        siteBody.appendChild(layer);
+        setTimeout(() => { layer.classList.add('fade'); setTimeout(() => layer.remove(), 700); }, duration || 12000);
+      }
+
+      // ===== INTERACTIVE CLICK-TO-OPEN TOYS =====
+      const TOY_DEFS = {
+        present: { cls: 'toy-present', closed: '🎁', open: '✨', label: 'tap to open' },
+        chest:   { cls: 'toy-chest', closed: '📦', open: '💎', label: 'open chest' },
+        safe:    { cls: 'toy-safe', closed: '🗄️', open: '💵', label: 'crack safe' },
+        folder:  { cls: 'toy-folder', closed: '📁', open: '📄', label: 'open folder' },
+        crate:   { cls: 'toy-crate', closed: '🧰', open: '🎲', label: 'loot crate' },
+        jack:    { cls: 'toy-jack', closed: '🧃', open: '🤡', label: '??? ' },
+      };
+
+      function spawnInteractiveToy(kind) {
+        const def = TOY_DEFS[kind] || TOY_DEFS.present;
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'interactive-toy ' + def.cls;
+        el.innerHTML = '<span class="toy-icon">'+def.closed+'</span><span class="toy-hint">'+def.label+'</span>';
+        el.style.left = r(8, 82) + '%';
+        el.style.top = r(12, 72) + '%';
+        el.style.setProperty('--spin', r(-12, 12) + 'deg');
+        siteBody.appendChild(el);
+
+        const TOY_WORDS = new Set(['present','chest','safe','folder','loot crate','jackbox']);
+        let opened = false;
+        el.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          if (opened) return;
+          opened = true;
+          el.classList.add('opened');
+          el.querySelector('.toy-icon').textContent = def.open;
+          el.querySelector('.toy-hint').textContent = 'opened!';
+          beep('triangle', r(400, 900), 0.12, 0.08);
+          // Surprise payload — stacks with everything
+          const surprise = rand(ACTION_WORDS.filter(w => isActionWord(w) && !TOY_WORDS.has(w)));
+          const fake = { clientX: ev.clientX, clientY: ev.clientY };
+          const action = ACTIONS[surprise];
+          if (action) {
+            announceEffect(surprise);
+            action(fake);
+          }
+          spawnParticles(ev.clientX, ev.clientY, { count: r(18, 28), shape: 'mixed', durMin: 500, durMax: 1100 });
+          siteFall(rand(['✦','★','✨','💥','🎊']), 2500);
+          setTimeout(() => { el.classList.add('bye'); setTimeout(() => el.remove(), 500); }, 1800);
+        });
+        // auto-despawn if ignored
+        setTimeout(() => { if (!opened && el.isConnected) { el.classList.add('bye'); setTimeout(() => el.remove(), 500); } }, 45000);
+      }
+
+      // ===== SIDE FLOATERS (outside the box, 3x when clicked) =====
+      let sideLayer = null;
+      function ensureSideLayer() {
+        if (sideLayer) return sideLayer;
+        sideLayer = document.createElement('div');
+        sideLayer.className = 'side-floater-layer';
+        siteBody.appendChild(sideLayer);
+        return sideLayer;
+      }
+
+      function spawnSideFloater(word) {
+        const layer = ensureSideLayer();
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'side-floater' + (isActionWord(word) ? ' isAction' : '');
+        btn.textContent = word;
+        btn.dataset.word = word;
+        btn.dataset.sidePower = '3';
+        const side = Math.random() < 0.5 ? 'left' : 'right';
+        btn.dataset.side = side;
+        btn.style.top = r(12, 78) + '%';
+        if (side === 'left') btn.style.left = r(4, 14) + 'px';
+        else btn.style.right = r(4, 14) + 'px';
+        btn.style.setProperty('--tilt', r(-10, 10) + 'deg');
+        layer.appendChild(btn);
+
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          triggerWord(btn.dataset.word, e, 3);
+          btn.classList.add('spent');
+          setTimeout(() => btn.remove(), 280);
+        });
+        setTimeout(() => { if (btn.isConnected) { btn.classList.add('spent'); setTimeout(() => btn.remove(), 400); } }, 12000);
+      }
+
+      function refreshSideFloaters() {
+        // chance to spawn 1–3 side options after a click
+        if (Math.random() < 0.55) {
+          const n = Math.floor(r(1, 3.2));
+          for (let i = 0; i < n; i++) {
+            setTimeout(() => spawnSideFloater(pickWord()), i * 90);
+          }
+        }
       }
 
       function isActionWord(w) {
@@ -2571,11 +3115,12 @@
       }
 
       function maybeShowCorner(btn) {
-        if (Math.random() < 0.25) {
+        if (Math.random() < 0.35) {
           btn.hidden = false;
           const word = pickWord();
           btn.textContent = word;
           btn.dataset.word = word;
+          btn.dataset.sidePower = '3';
           btn.classList.toggle('isAction', isActionWord(word));
         } else {
           btn.hidden = true;
@@ -2604,15 +3149,29 @@
           s.classList.toggle('isAction', isActionWord(word));
           positionSticker(s);
         });
+        refreshSideFloaters();
       }
 
-      function triggerWord(word, e) {
+      function triggerWord(word, e, magnitude) {
         const w = (word || "").trim();
+        const mag = Math.max(1, magnitude || 1);
+        announceEffect(w || '???');
         const action = ACTIONS[w];
-        if (action) action(e);
-        else doGenericClick(e);
+        if (action) {
+          action(e);
+          // magnified side/corner hits: fire again for residual chaos
+          for (let i = 1; i < mag; i++) {
+            setTimeout(() => action(e), i * 70);
+          }
+        } else {
+          doGenericClick(e);
+        }
         updateStats();
         if (typeof ubOnClick === 'function') ubOnClick(w, e, !!action);
+        // milestone every 1000 personal clicks
+        if (clickCount > 0 && clickCount % 1000 === 0) {
+          announceMilestone(clickCount);
+        }
         maybeColorTakeover();
         refreshTextAndPositions();
         const rect = toyBox.getBoundingClientRect();
@@ -2620,11 +3179,12 @@
         gravBall.style.top = (e.clientY - rect.top) + "px";
       }
 
-      // Pick a random word currently visible on screen
+      // Pick a random word currently visible on screen (stickers, corners, side floaters)
       function getRandomVisibleWord() {
         const visible = [];
         stickers.forEach(s => { if (s.dataset.word) visible.push(s.dataset.word); });
         corners.forEach(c => { if (!c.hidden && c.dataset.word) visible.push(c.dataset.word); });
+        document.querySelectorAll('.side-floater').forEach(s => { if (s.dataset.word) visible.push(s.dataset.word); });
         return visible.length ? rand(visible) : rand(ACTION_WORDS);
       }
 
@@ -2639,7 +3199,7 @@
 
       const COMBO_WINDOW = 1300;   // ms before a streak dies
       const FEVER_COMBO  = 15;     // streak needed to ignite fever mode
-      const MILESTONES = [10,25,50,100,200,350,500,750,1000,1500,2000,3000,5000,7500,10000,25000,50000,100000];
+      const MILESTONES = [10,25,50,100,200,350,500,750,1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,15000,20000,25000,50000,100000];
 
       let combo = 0, bestCombo = 0;
       let lastClickAt = 0;
@@ -2764,7 +3324,8 @@
           if (clickCount >= m && milestoneSeen < m){
             milestoneSeen = m;
             try { localStorage.setItem('ub:msSeen', String(m)); } catch(e){}
-            banner(m.toLocaleString() + ' CLICKS!');
+            banner(m.toLocaleString() + ' clicks!');
+            if (m >= 1000 && m % 1000 === 0) announceMilestone(m);
             siteFall(rand(['🎉','🎊','⭐','🏆','✨']), 3500);
             for (let i=0;i<4;i++) setTimeout(() => spawnParticles(window.innerWidth/2 + r(-120,120), window.innerHeight*0.35, {count:r(12,20), shape:'mixed', dxMax:250, dyUp:300}), i*100);
             beep('triangle', 660, 0.14, 0.09); beep('sine', 880, 0.16, 0.07);
@@ -2831,23 +3392,13 @@
         updateCPS();
         clickRing(e.clientX, e.clientY);
 
-        // floating feedback number
-        const crit = Math.random() < (0.05 + combo * 0.01);
-        if (crit){
-          ubPop(e.clientX, e.clientY, rand(['CRIT!','+BOOM','MEGA','✦x10','NICE']), { crit:true, size:r(26,36) });
-          spawnParticles(e.clientX, e.clientY, { count:r(16,26), shape:'mixed', durMin:400, durMax:900 });
-          beep('triangle', r(700,1100), 0.10, 0.09);
-        } else {
-          const label = combo >= 3 ? ('x' + combo) : '+1';
-          ubPop(e.clientX, e.clientY, label, { size: Math.min(38, 16 + combo) });
-        }
+        // (no floating +1 / COMBO shout popups — current streak lives in the combo pill)
 
-        // combo shout milestones
-        if (combo === 5)  shout('COMBO!');
-        if (combo === 10){ shout('ON FIRE! 🔥'); achieve('combo10', 'Combo x10 — on fire!'); }
-        if (combo === 25){ shout('UNSTOPPABLE ⚡', { color:'#ffd23f' }); achieve('combo25', 'Combo x25 — unstoppable!'); }
-        if (combo === 50){ shout('GODLIKE 👑', { color:'#ffd23f' }); achieve('combo50', 'Combo x50 — GODLIKE!'); }
-        if (combo === 100){ shout('IMPOSSIBLE 🌈', { color:'#ff5ad4' }); achieve('combo100', 'Combo x100 — how?!'); }
+        // soft achievements for high streaks (toast only, no screen shout)
+        if (combo === 10) achieve('combo10', 'Combo x10 — on fire!');
+        if (combo === 25) achieve('combo25', 'Combo x25 — unstoppable!');
+        if (combo === 50) achieve('combo50', 'Combo x50 — GODLIKE!');
+        if (combo === 100) achieve('combo100', 'Combo x100 — how?!');
 
         // fever
         if (combo >= FEVER_COMBO && !feverActive) enterFever();
@@ -3424,20 +3975,21 @@
       toyBox.addEventListener('pointerdown', (e) => {
         const t = e.target;
         if (t && (t.matches?.('[data-sticker]') || t.matches?.('[data-corner]'))) return;
-        triggerWord(getRandomVisibleWord(), e);
+        triggerWord(getRandomVisibleWord(), e, 1);
       });
 
       stickers.forEach(s => {
         s.addEventListener('click', (e) => {
           e.stopPropagation();
-          triggerWord(s.dataset.word, e);
+          triggerWord(s.dataset.word, e, 1);
         });
       });
 
       corners.forEach(c => {
         c.addEventListener('click', (e) => {
           e.stopPropagation();
-          triggerWord(c.dataset.word, e);
+          // side/corner options are 3x
+          triggerWord(c.dataset.word, e, 3);
         });
       });
 
@@ -3446,7 +3998,7 @@
           e.preventDefault();
           const rect = toyBox.getBoundingClientRect();
           const fake = { clientX: rect.left + rect.width * 0.5, clientY: rect.top + rect.height * 0.55 };
-          triggerWord(getRandomVisibleWord(), fake);
+          triggerWord(getRandomVisibleWord(), fake, 1);
         }
       });
 
