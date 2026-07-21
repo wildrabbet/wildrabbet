@@ -3168,10 +3168,6 @@
         }
         updateStats();
         if (typeof ubOnClick === 'function') ubOnClick(w, e, !!action);
-        // milestone every 1000 personal clicks
-        if (clickCount > 0 && clickCount % 1000 === 0) {
-          announceMilestone(clickCount);
-        }
         maybeColorTakeover();
         refreshTextAndPositions();
         const rect = toyBox.getBoundingClientRect();
