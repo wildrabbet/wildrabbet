@@ -4642,3 +4642,56 @@ body.ub-zoomed.page-huge .section{
 body.ub-zoomed.page-infinityzoom{
   overflow: visible;
 }
+
+/* YouTube / Wiki / RabbitGPT windows */
+.yt-window, .wiki-window, .gpt-window{
+  position:fixed; z-index:12100; width:min(420px,92vw);
+  background:#111; color:#eee; border-radius:10px; overflow:hidden;
+  box-shadow:0 22px 60px rgba(0,0,0,.45); border:1px solid #333;
+  font-size:13px;
+}
+.yt-titlebar, .wiki-titlebar, .gpt-titlebar{
+  display:flex; align-items:center; gap:8px; padding:8px 10px;
+  background:#1c1c1f; cursor:move; font-weight:700; font-size:12px;
+}
+.yt-dots{ display:flex; gap:5px; margin-right:4px; }
+.yt-dots i{ width:10px; height:10px; border-radius:50%; background:#ff5f57; display:block; }
+.yt-dots i:nth-child(2){ background:#febc2e; }
+.yt-dots i:nth-child(3){ background:#28c840; }
+.yt-body, .wiki-body, .gpt-body{ padding:10px; }
+.yt-player{ position:relative; aspect-ratio:16/9; background:#000; border-radius:6px; overflow:hidden; }
+.yt-player iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
+.yt-meta{ margin:10px 0 6px; }
+.yt-sub{ opacity:.6; font-size:11px; margin-top:4px; }
+.wiki-titlebar{ background:#eaecf0; color:#202122; }
+.wiki-window{ background:#fff; color:#202122; border-color:#a2a9b1; width:min(460px,94vw); }
+.wiki-loading{ opacity:.7; margin-bottom:8px; }
+.wiki-article{ display:flex; gap:12px; align-items:flex-start; margin-bottom:10px; }
+.wiki-thumb{ width:96px; height:96px; object-fit:cover; border-radius:4px; flex-shrink:0; background:#eaecf0; }
+.wiki-h{ margin:0 0 6px; font-size:16px; font-family:Georgia, serif; }
+.wiki-extract{ margin:0; line-height:1.45; font-size:13px; }
+.gpt-window{ width:min(400px,94vw); background:#212121; border-color:#333; }
+.gpt-titlebar{ background:#000; }
+.gpt-log{
+  height:220px; overflow:auto; background:#171717; border-radius:8px;
+  padding:10px; display:flex; flex-direction:column; gap:8px; margin-bottom:10px;
+}
+.gpt-msg{ line-height:1.4; white-space:pre-wrap; }
+.gpt-user{ color:#cce; }
+.gpt-bot{ color:#d4f5d4; }
+.gpt-compose{ display:flex; gap:8px; }
+.gpt-input{
+  flex:1; border-radius:8px; border:1px solid #444; background:#0d0d0d;
+  color:#eee; padding:8px 10px; font:inherit;
+}
+.gpt-foot{ margin-top:8px; font-size:11px; opacity:.55; }
+.gpt-paywall{
+  margin-top:10px; padding:12px; border-radius:8px;
+  background:#2a1010; border:1px solid #833; text-align:center;
+}
+.gpt-wallet{
+  display:block; margin:8px 0; padding:8px; border-radius:6px;
+  background:#0d0d0d; word-break:break-all; font-size:11px; color:#f5d76e;
+}
+.gpt-tiny{ font-size:11px; opacity:.65; }
+.cookie-ad{ border-color:#c90; }

@@ -377,7 +377,7 @@
         "press F", "all your base", "loss", "skibidi", "Ohio", "rizz",
         "MrBeast", "VBucks", "task failed", "D scimmy", "AGS", "fire cursor",
         "ice cursor", "banana cursor", "rainbow cursor", "sword cursor",
-        "zoom in", "zoom out"
+        "zoom in", "zoom out", "wikipedia", "RabbitGPT", "cookies", "survey", "update"
       ];
 
       const FILLER = [
@@ -1167,10 +1167,10 @@
         siteBody.appendChild(northernEl);
       }
 
-      // ===== FAKE / OS / CHAT POPUPS (always stack) =====
+      // ===== DIALOGS / OS / CHAT / MEME POPUPS (always stack) =====
       function makeDraggable(dlg, handle) {
         let dragging = false, ox = 0, oy = 0;
-        const tb = handle || dlg.querySelector('.err-titlebar, .os-titlebar, .chat-titlebar, .meme-ad-bar');
+        const tb = handle || dlg.querySelector('.err-titlebar, .os-titlebar, .chat-titlebar, .meme-ad-bar, .yt-titlebar, .wiki-titlebar, .gpt-titlebar');
         if (!tb) return;
         tb.addEventListener('pointerdown', (ev) => {
           dragging = true;
@@ -1192,72 +1192,165 @@
       function placeDialog(dlg) {
         dlg.style.left = r(5, 62) + '%';
         dlg.style.top = r(8, 55) + '%';
-        dlg.style.zIndex = String(11000 + document.querySelectorAll('.error-dialog, .os-dialog, .chat-dialog').length);
+        dlg.style.zIndex = String(11000 + document.querySelectorAll('.error-dialog, .os-dialog, .chat-dialog, .meme-ad, .yt-window, .wiki-window, .gpt-window').length);
         siteBody.appendChild(dlg);
         makeDraggable(dlg);
       }
 
-      function showFakePopup(title, text) {
+      function btnHtml(buttons) {
+        return '<div class="err-btns">' + buttons.map(b =>
+          '<button type="button" class="err-btn' + (b.cls ? ' ' + b.cls : '') + '" data-act="' + (b.act || 'close') + '">' + b.label + '</button>'
+        ).join('') + '</div>';
+      }
+
+      function wireActs(dlg, handlers) {
+        handlers = handlers || {};
+        dlg.querySelectorAll('.err-x').forEach(b => b.addEventListener('click', () => dlg.remove()));
+        dlg.querySelectorAll('[data-act]').forEach(b => {
+          b.addEventListener('click', () => {
+            const act = b.getAttribute('data-act');
+            if (typeof handlers[act] === 'function') handlers[act](b, dlg);
+            else dlg.remove();
+          });
+        });
+      }
+
+      function showFakePopup(title, text, buttons, handlers) {
+        buttons = buttons || [
+          { label: 'OK', act: 'close' },
+          { label: 'Dismiss', act: 'close' }
+        ];
         const dlg = document.createElement('div');
         dlg.className = 'error-dialog';
-        dlg.innerHTML = '<div class="err-titlebar"><span class="err-icon">⚠️</span> <span>'+title+'</span><button class="err-x" type="button">✕</button></div><div class="err-body"><div class="err-row"><span class="err-warn">⚠</span><pre class="err-text">'+text+'</pre></div><div class="err-btns"><button class="err-btn" type="button">OK</button><button class="err-btn" type="button">I Accept My Fate</button></div></div>';
-        dlg.querySelectorAll('.err-x, .err-btn').forEach(b => b.addEventListener('click', () => dlg.remove()));
+        dlg.innerHTML = '<div class="err-titlebar"><span class="err-icon">⚠️</span> <span>' + title + '</span><button class="err-x" type="button">✕</button></div><div class="err-body"><div class="err-row"><span class="err-warn">⚠</span><pre class="err-text">' + text + '</pre></div>' + btnHtml(buttons) + '</div>';
+        wireActs(dlg, handlers);
         placeDialog(dlg);
+        return dlg;
       }
 
       function show404Dialog() {
         const msgs = [
-          {title:'wildrabbet.exe', text:'An error has occurred in wildrabbet.exe. The program will now close.\n\nError 0x80004005: Unspecified error\nCause: You clicked the wrong thing'},
-          {title:'Error', text:'This program has performed an illegal operation and will be shut down.\n\nIf the problem persists, contact wildrabbet support (do not contact wildrabbet support).'},
-          {title:'wildrabbet - Application Error', text:'The instruction at 0x00000000 referenced memory at 0xDEADBEEF.\nThe memory could not be "read".\n\nClick OK to terminate the application.'},
-          {title:'Fatal Error', text:'A problem has been detected and wildrabbet has been shut down to prevent damage to your computer.\n\n*** STOP: 0x0000BOOP (0x00000042)\n\nTechnical information: you clicked too hard'},
-          {title:'Windows Security', text:'Your PC is at risk!\n\nThreat detected: USELESS_BOX_WORM.Click\nSeverity: Critical\n\nRecommended action: Keep clicking.'},
-          {title:'System Restore', text:'Windows has recovered from an unexpected shutdown.\n\nCause: chaos overflow in module RABBET.DLL'},
+          {
+            title: 'wildrabbet.exe',
+            text: 'An error has occurred in wildrabbet.exe.\n\nError 0x80004005: Unspecified error\nModule: BLOB.DLL',
+            buttons: [{ label: 'End Task', act: 'close' }, { label: 'Debug', act: 'debug' }, { label: 'Ignore', act: 'close' }],
+            handlers: { debug: () => showFakePopup('Debugger', 'Breakpoint hit at 0xDEADBEEF.\nRegisters: all vibes.\nStack: spaghetti.', [{ label: 'Continue', act: 'close' }, { label: 'Step Over', act: 'close' }]) }
+          },
+          {
+            title: 'Illegal Operation',
+            text: 'This program has performed an illegal operation and will be shut down.\n\nDetails: YOU_CLICKED_THAT',
+            buttons: [{ label: 'Shut Down', act: 'close' }, { label: 'Details >>', act: 'details' }],
+            handlers: { details: () => showFakePopup('Details', 'EAX=0 EBX=1 ECX=chaos\nException: ACCESS_DENIED_TO_FUN', [{ label: 'Close', act: 'close' }]) }
+          },
+          {
+            title: 'Application Error',
+            text: 'The instruction at 0x00000000 referenced memory at 0xDEADBEEF.\nThe memory could not be "read".',
+            buttons: [{ label: 'Terminate', act: 'close' }, { label: 'Retry', act: 'retry' }],
+            handlers: { retry: (_b, dlg) => { dlg.remove(); setTimeout(show404Dialog, 200); } }
+          },
+          {
+            title: 'STOP: 0x0000BOOP',
+            text: 'A problem has been detected and wildrabbet has been shut down to prevent damage to your computer.\n\nTechnical information: too much juice',
+            buttons: [{ label: 'Restart', act: 'close' }, { label: 'Safe Mode', act: 'safe' }],
+            handlers: { safe: () => showFakePopup('Safe Mode', 'Safe Mode loaded with 3 drivers and 0 friends.', [{ label: 'Exit Safe Mode', act: 'close' }]) }
+          },
+          {
+            title: 'Windows Security',
+            text: 'Threat detected: USELESS_BOX_WORM.Click\nSeverity: Critical\nStatus: Quarantine failed',
+            buttons: [{ label: 'Remove Threat', act: 'close' }, { label: 'Allow Always', act: 'allow' }, { label: 'Scan Again', act: 'scan' }],
+            handlers: {
+              allow: () => showFakePopup('Exception Added', 'USELESS_BOX_WORM.Click is now trusted.', [{ label: 'Great', act: 'close' }]),
+              scan: (_b, dlg) => { dlg.remove(); setTimeout(show404Dialog, 250); }
+            }
+          },
+          {
+            title: 'System Restore',
+            text: 'Windows recovered from an unexpected shutdown.\n\nCause: chaos overflow in RABBET.DLL',
+            buttons: [{ label: 'Restore Point', act: 'restore' }, { label: 'Continue Anyway', act: 'close' }],
+            handlers: { restore: () => showFakePopup('Restore', 'Restoring… 14%\nRestoring… 14%\nRestoring… 14%', [{ label: 'Cancel Restore', act: 'close' }]) }
+          },
         ];
         const msg = rand(msgs);
         const dlg = document.createElement('div');
         dlg.className = 'error-dialog';
-        dlg.innerHTML = '<div class="err-titlebar"><span class="err-icon">⚠️</span> <span>'+msg.title+'</span><button class="err-x" type="button">✕</button></div><div class="err-body"><div class="err-row"><span class="err-warn">⚠</span><pre class="err-text">'+msg.text+'</pre></div><div class="err-btns"><button class="err-btn" type="button">OK</button><button class="err-btn" type="button">Cancel</button></div></div>';
-        dlg.querySelectorAll('.err-x, .err-btn').forEach(b => b.addEventListener('click', () => dlg.remove()));
+        dlg.innerHTML = '<div class="err-titlebar"><span class="err-icon">⚠️</span> <span>' + msg.title + '</span><button class="err-x" type="button">✕</button></div><div class="err-body"><div class="err-row"><span class="err-warn">⚠</span><pre class="err-text">' + msg.text + '</pre></div>' + btnHtml(msg.buttons) + '</div>';
+        wireActs(dlg, Object.assign({ close: (_b, d) => d.remove() }, msg.handlers || {}));
         placeDialog(dlg);
       }
 
       function showMacAlert() {
         const msgs = [
-          {title:'Finder wants to make changes.', body:'macOS would like to rearrange your windows into a pile.\n\nEnter your password to allow this.', btn:'Allow'},
-          {title:'The application “Safari” quit unexpectedly.', body:'Click Reopen to open the application again. This report will be sent to wildrabbet.'},
-          {title:'Your disk is almost full.', body:'You have 12 MB remaining. Useless Box cache: 418 GB of vibes.'},
-          {title:'AirDrop', body:'“chaos.dmg” is ready to be received from Nearby Rabbit.'},
+          {
+            title: 'Finder wants to make changes.',
+            body: 'macOS would like to rearrange your windows into a pile.\n\nAuthentication is required.',
+            buttons: [{ label: 'Allow', act: 'allow', cls: 'mac-btn' }, { label: 'Deny', act: 'close', cls: 'mac-btn' }, { label: 'Use Touch ID', act: 'touch', cls: 'mac-btn' }],
+            handlers: { allow: () => { document.querySelectorAll('.card').forEach(c => { c.style.transform = 'rotate(' + r(-8, 8) + 'deg)'; }); }, touch: () => showFakePopup('Touch ID', 'No fingers detected.\nTry again with more fingers.', [{ label: 'Try Again', act: 'close' }, { label: 'Use Password', act: 'close' }]) }
+          },
+          {
+            title: '“Safari” quit unexpectedly.',
+            body: 'Click Reopen to open the application again. This report will be sent to Apple.',
+            buttons: [{ label: 'Reopen', act: 'reopen', cls: 'mac-btn' }, { label: 'Ignore', act: 'close', cls: 'mac-btn' }, { label: 'Report…', act: 'report', cls: 'mac-btn' }],
+            handlers: { reopen: () => showFakePopup('Safari', 'Restoring 47 tabs from 2019…', [{ label: 'Force Quit', act: 'close' }]), report: () => showFakePopup('Problem Report', 'Sending 12 MB of mystery logs…\nDone.', [{ label: 'OK', act: 'close' }]) }
+          },
+          {
+            title: 'Your disk is almost full.',
+            body: 'You have 12 MB remaining.\nUseless Box cache: 418 GB of vibes.',
+            buttons: [{ label: 'Manage Storage…', act: 'manage', cls: 'mac-btn' }, { label: 'Empty Trash', act: 'trash', cls: 'mac-btn' }, { label: 'Later', act: 'close', cls: 'mac-btn' }],
+            handlers: { manage: () => showFakePopup('Storage', 'Recommendations:\n• Delete System (12 GB)\n• Keep Memes (400 GB)', [{ label: 'Optimize', act: 'close' }, { label: 'Cancel', act: 'close' }]), trash: () => showFakePopup('Trash', 'Trash emptied.\n418 GB remain somehow.', [{ label: 'OK', act: 'close' }]) }
+          },
+          {
+            title: 'AirDrop',
+            body: '“chaos.dmg” is ready to be received from Nearby Rabbit.',
+            buttons: [{ label: 'Accept', act: 'accept', cls: 'mac-btn' }, { label: 'Decline', act: 'close', cls: 'mac-btn' }],
+            handlers: { accept: () => showFakePopup('Installing chaos.dmg', 'Verifying…\nMounting…\nOpening…\nWelcome to Chaos.', [{ label: 'Open', act: 'close' }, { label: 'Eject', act: 'close' }]) }
+          },
         ];
         const msg = rand(msgs);
         const dlg = document.createElement('div');
         dlg.className = 'os-dialog mac-dialog';
-        dlg.innerHTML = '<div class="os-titlebar mac-bar"><span class="mac-dots"><i></i><i></i><i></i></span><span>'+msg.title+'</span></div><div class="os-body"><div class="mac-icon">⚠️</div><pre class="err-text">'+msg.body+'</pre><div class="err-btns"><button class="err-btn mac-btn" type="button">'+(msg.btn||'OK')+'</button><button class="err-btn mac-btn" type="button">Cancel</button></div></div>';
-        dlg.querySelectorAll('.err-btn, .mac-dots').forEach(b => b.addEventListener('click', () => dlg.remove()));
+        dlg.innerHTML = '<div class="os-titlebar mac-bar"><span class="mac-dots"><i></i><i></i><i></i></span><span>' + msg.title + '</span></div><div class="os-body"><div class="mac-icon">⚠️</div><pre class="err-text">' + msg.body + '</pre>' + btnHtml(msg.buttons) + '</div>';
+        wireActs(dlg, Object.assign({ close: (_b, d) => d.remove() }, msg.handlers || {}));
         placeDialog(dlg);
       }
 
       function showDiscordPopup() {
         const msgs = [
-          {user:'rabbet', text:'yo who broke the website'},
-          {user:'System', text:'@everyone Useless Box has been granted Administrator privileges'},
-          {user:'modbot', text:'User clicked too hard. Timeout: forever.'},
-          {user:'friend', text:'join vc we are doing nothing'},
+          { user: 'rabbet', text: 'yo who broke the website' },
+          { user: 'System', text: '@everyone Useless Box has been granted Administrator privileges' },
+          { user: 'modbot', text: 'User clicked too hard. Timeout: forever.' },
+          { user: 'friend', text: 'join vc we are doing nothing' },
+          { user: 'pin-bot', text: 'Pinned: please stop summoning dialogs' },
         ];
         const msg = rand(msgs);
         const dlg = document.createElement('div');
         dlg.className = 'chat-dialog discord-dialog';
-        dlg.innerHTML = '<div class="chat-titlebar discord-bar"><span># general</span><button class="err-x" type="button">✕</button></div><div class="chat-body"><div class="chat-row"><div class="chat-avatar">🐇</div><div><div class="chat-user">'+msg.user+' <span class="chat-time">Today at '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})+'</span></div><div class="chat-text">'+msg.text+'</div></div></div><div class="chat-input">Message #general</div></div>';
-        dlg.querySelector('.err-x').addEventListener('click', () => dlg.remove());
+        dlg.innerHTML = '<div class="chat-titlebar discord-bar"><span># general</span><button class="err-x" type="button">✕</button></div><div class="chat-body"><div class="chat-row"><div class="chat-avatar">🐇</div><div><div class="chat-user">' + msg.user + ' <span class="chat-time">Today at ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '</span></div><div class="chat-text">' + msg.text + '</div></div></div><div class="err-btns" style="margin-top:10px">' +
+          '<button type="button" class="err-btn" data-act="reply">Reply</button>' +
+          '<button type="button" class="err-btn" data-act="react">React 💀</button>' +
+          '<button type="button" class="err-btn" data-act="mute">Mute Channel</button>' +
+          '</div></div>';
+        wireActs(dlg, {
+          reply: () => showFakePopup('Reply', 'Message sent to #general:\n"noted"', [{ label: 'Send Another', act: 'close' }, { label: 'Done', act: 'close' }]),
+          react: (_b, d) => { const t = d.querySelector('.chat-text'); if (t) t.textContent += '  💀 3'; },
+          mute: (_b, d) => { d.remove(); showFakePopup('Muted', '#general muted for 24 hours.\nYou will still see everything.', [{ label: 'Unmute', act: 'close' }, { label: 'OK', act: 'close' }]); }
+        });
         placeDialog(dlg);
       }
 
       function showSkypePopup() {
         const dlg = document.createElement('div');
         dlg.className = 'chat-dialog skype-dialog';
-        const who = rand(['Mom', 'Boss', 'Unknown Number', 'IT Support', 'ex']);
-        dlg.innerHTML = '<div class="chat-titlebar skype-bar"><span>📞 Incoming call</span><button class="err-x" type="button">✕</button></div><div class="chat-body skype-body"><div class="skype-avatar">👤</div><div class="skype-name">'+who+'</div><div class="skype-sub">Skype · ringing…</div><div class="err-btns"><button class="err-btn skype-decline" type="button">Decline</button><button class="err-btn skype-accept" type="button">Accept</button></div></div>';
-        dlg.querySelectorAll('.err-x, .err-btn').forEach(b => b.addEventListener('click', () => dlg.remove()));
+        const who = rand(['Mom', 'Boss', 'Unknown Number', 'IT Support', 'ex', 'Spam Likely']);
+        dlg.innerHTML = '<div class="chat-titlebar skype-bar"><span>📞 Incoming call</span><button class="err-x" type="button">✕</button></div><div class="chat-body skype-body"><div class="skype-avatar">👤</div><div class="skype-name">' + who + '</div><div class="skype-sub">Skype · ringing…</div>' + btnHtml([
+          { label: 'Decline', act: 'decline', cls: 'skype-decline' },
+          { label: 'Accept', act: 'accept', cls: 'skype-accept' },
+          { label: 'Video', act: 'video', cls: 'skype-accept' }
+        ]) + '</div>';
+        wireActs(dlg, {
+          decline: (_b, d) => d.remove(),
+          accept: (_b, d) => { d.remove(); showFakePopup('Call connected', 'Connected to ' + who + '.\nAudio: [static]\n' + who + ': "hello??"', [{ label: 'Hang Up', act: 'close' }, { label: 'Mute', act: 'close' }]); },
+          video: (_b, d) => { d.remove(); showFakePopup('Video Call', 'Camera not found.\nFalling back to interpretive dance.', [{ label: 'End Call', act: 'close' }]); }
+        });
         placeDialog(dlg);
       }
 
@@ -1266,34 +1359,43 @@
           'i saw what you clicked',
           'why is your screen like that',
           'are you okay??',
-          'this is your sign to click again',
+          'where are you',
           'delivered',
+          'ok weird',
         ];
         const dlg = document.createElement('div');
         dlg.className = 'chat-dialog imessage-dialog';
-        dlg.innerHTML = '<div class="chat-titlebar imessage-bar"><span>Messages</span><button class="err-x" type="button">✕</button></div><div class="chat-body"><div class="imsg-bubble">'+rand(texts)+'</div><div class="imsg-meta">Delivered</div></div>';
-        dlg.querySelector('.err-x').addEventListener('click', () => dlg.remove());
+        dlg.innerHTML = '<div class="chat-titlebar imessage-bar"><span>Messages</span><button class="err-x" type="button">✕</button></div><div class="chat-body"><div class="imsg-bubble">' + rand(texts) + '</div><div class="imsg-meta">Delivered</div>' + btnHtml([
+          { label: 'Reply…', act: 'reply' },
+          { label: 'Leave on Read', act: 'close' },
+          { label: 'React ❤️', act: 'heart' }
+        ]) + '</div>';
+        wireActs(dlg, {
+          reply: (_b, d) => { d.remove(); showFakePopup('New Message', 'iMessage to Unknown:\n"it\'s a long story"', [{ label: 'Send', act: 'close' }, { label: 'Delete', act: 'close' }]); },
+          heart: (_b, d) => { const m = d.querySelector('.imsg-meta'); if (m) m.textContent = 'Loved'; }
+        });
         placeDialog(dlg);
       }
 
       function showTeamsPopup() {
         const dlg = document.createElement('div');
         dlg.className = 'chat-dialog teams-dialog';
-        dlg.innerHTML = '<div class="chat-titlebar teams-bar"><span>Microsoft Teams</span><button class="err-x" type="button">✕</button></div><div class="chat-body"><div class="teams-banner">You have a new meeting: “Synergy Sync Standup Retro”</div><div class="err-btns"><button class="err-btn" type="button">Join</button><button class="err-btn" type="button">Ignore Forever</button></div></div>';
-        dlg.querySelectorAll('.err-x, .err-btn').forEach(b => b.addEventListener('click', () => dlg.remove()));
+        dlg.innerHTML = '<div class="chat-titlebar teams-bar"><span>Microsoft Teams</span><button class="err-x" type="button">✕</button></div><div class="chat-body"><div class="teams-banner">You have a new meeting: “Synergy Sync Standup Retro”</div>' + btnHtml([
+          { label: 'Join now', act: 'join' },
+          { label: 'RSVP Maybe', act: 'maybe' },
+          { label: 'Decline', act: 'close' }
+        ]) + '</div>';
+        wireActs(dlg, {
+          join: (_b, d) => { d.remove(); showFakePopup('In meeting', 'You are muted.\nSomeone is sharing a blank slide.\nChat: "can you hear me"', [{ label: 'Leave', act: 'close' }, { label: 'Unmute', act: 'close' }]); },
+          maybe: (_b, d) => { d.remove(); showFakePopup('Calendar', 'Marked as Tentative.\nReminder set for never.', [{ label: 'OK', act: 'close' }]); }
+        });
         placeDialog(dlg);
       }
 
-      function spawnChaosPopups(n) {
-        n = n || Math.floor(r(2, 5));
-        const makers = [show404Dialog, showMacAlert, showDiscordPopup, showSkypePopup, showImessagePopup, showTeamsPopup, showHotSinglesAd, showEnlargeAd, showClickbaitAd, showPrizeAd];
-        for (let i = 0; i < n; i++) setTimeout(() => rand(makers)(), i * 140);
-      }
-
-      // ===== MEME / FAKE ADS =====
+      // ===== MEME / ADS =====
       function showHdLoadingOverlay() {
         let existing = document.querySelector('.hd-loading');
-        if (existing) { existing.remove(); }
+        if (existing) existing.remove();
         const el = document.createElement('div');
         el.className = 'hd-loading';
         el.innerHTML = `
@@ -1303,33 +1405,42 @@
               <div class="hd-blur"></div>
               <div class="hd-center">
                 <div class="hd-title">Buffering premium content…</div>
-                <div class="hd-sub">Almost there. Definitely. Trust.</div>
+                <div class="hd-sub">Connection unstable · retrying segment</div>
                 <div class="hd-bar"><i class="hd-fill"></i></div>
                 <div class="hd-pct">3%</div>
+                <div class="err-btns" style="margin-top:12px">
+                  <button type="button" class="err-btn" data-act="hd-skip">Skip intro</button>
+                  <button type="button" class="err-btn" data-act="hd-quality">360p</button>
+                  <button type="button" class="err-btn" data-act="hd-close">Close</button>
+                </div>
               </div>
             </div>
-            <div class="hd-footer">Sponsored · Not affiliated with anything real · Please keep clicking</div>
+            <div class="hd-footer">Premium Stream · 1080p selected · Ads: 0 remaining</div>
           </div>`;
         siteBody.appendChild(el);
-        el.querySelector('.hd-x').addEventListener('click', () => el.remove());
         const fill = el.querySelector('.hd-fill');
         const pctEl = el.querySelector('.hd-pct');
         let pct = 2 + Math.random() * 4;
         const iv = setInterval(() => {
           if (!el.isConnected) { clearInterval(iv); return; }
-          // asymptote toward ~97%, never finish
           const room = 97 - pct;
           pct += Math.max(0.05, room * r(0.01, 0.045));
           if (pct > 96.7) pct = 96.2 + Math.random() * 0.4;
           fill.style.width = pct.toFixed(2) + '%';
-          pctEl.textContent = pct.toFixed(1) + '% · est. ' + Math.max(1, Math.floor((100 - pct) * 40)) + ' years';
+          pctEl.textContent = pct.toFixed(1) + '% · ' + Math.max(1, Math.floor((100 - pct) * 40)) + 's remaining';
           if (Math.random() < 0.08) pctEl.textContent = pct.toFixed(1) + '% · reconnecting…';
         }, 220);
+        wireActs(el, {
+          'hd-skip': () => { pctEl.textContent = 'Skipping… still buffering'; },
+          'hd-quality': (b) => { b.textContent = b.textContent === '360p' ? '144p' : '360p'; pct = Math.min(pct, 40); },
+          'hd-close': (_b, d) => d.remove(),
+          close: (_b, d) => d.remove()
+        });
       }
 
       function showHotSinglesAd() {
-        const names = ['Brittany', 'Ashleigh', 'Jade', 'xxxHotLocalxxx', 'NotABot42', 'Mandy', 'your_ex'];
-        const cities = ['your area', '0.3 miles away', 'behind you', 'the group chat', 'Ohio', 'the backrooms'];
+        const names = ['Brittany', 'Ashleigh', 'Jade', 'Mandy', 'Crystal', 'your_ex', 'Sam'];
+        const cities = ['your area', '0.3 miles away', 'downtown', 'the group chat', 'Ohio', 'the next tab'];
         const dlg = document.createElement('div');
         dlg.className = 'meme-ad singles-ad';
         dlg.innerHTML = `
@@ -1338,19 +1449,18 @@
             <div class="singles-photo">💋</div>
             <div class="singles-copy">
               <b>${rand(names)}</b> is online in <b>${rand(cities)}</b>
-              <p>${rand(['wants to chat NOW', 'says "hey"', 'is not a virus (promise)', 'misses you specifically', 'saw your Useless Box clicks'])}</p>
-              <div class="err-btns">
-                <button type="button" class="err-btn singles-yes">Chat now</button>
-                <button type="button" class="err-btn">I'm married to the box</button>
-              </div>
+              <p>${rand(['wants to chat NOW', 'says "hey"', 'just logged on', 'misses you specifically', 'sent you a wink'])}</p>
+              ${btnHtml([
+                { label: 'Chat now', act: 'chat' },
+                { label: 'View profile', act: 'profile' },
+                { label: 'Not interested', act: 'close' }
+              ])}
             </div>
           </div>`;
-        dlg.querySelectorAll('.err-x, .err-btn').forEach(b => b.addEventListener('click', () => {
-          if (b.classList.contains('singles-yes')) {
-            showFakePopup('Connection failed', 'Nobody is coming.\n\nError: SOCIAL_LIFE_NOT_FOUND\nSuggestion: click the box instead');
-          }
-          dlg.remove();
-        }));
+        wireActs(dlg, {
+          chat: (_b, d) => { d.remove(); showFakePopup('Chat', 'Connecting to ' + rand(names) + '…\nUser is typing…\nUser went offline.', [{ label: 'Message later', act: 'close' }, { label: 'Find others', act: 'more' }], { more: () => showHotSinglesAd() }); },
+          profile: () => showFakePopup('Profile', 'Age: 22\nStatus: online\nInterests: windows, dialogs, chaos\nLast seen: just now', [{ label: 'Send wink', act: 'close' }, { label: 'Block', act: 'close' }])
+        });
         placeDialog(dlg);
       }
 
@@ -1362,24 +1472,22 @@
           <div class="meme-ad-body">
             <div class="enlarge-hero">📈 → 🚀</div>
             <h3>Enlarge Your… Confidence</h3>
-            <p>One weird pill. Zero results. 400% more popup ads.</p>
+            <p>Clinically discussed. Internet famous. Limited stock.</p>
             <ul>
-              <li>✓ Completely fake</li>
-              <li>✓ Not FDA approved (or real)</li>
-              <li>✓ Side effects include shame</li>
+              <li>✓ Fast shipping</li>
+              <li>✓ Discrete packaging</li>
+              <li>✓ Results may vary wildly</li>
             </ul>
-            <div class="err-btns">
-              <button type="button" class="err-btn enlarge-buy">Buy now — $0.00</button>
-              <button type="button" class="err-btn">No thanks, I'm secure</button>
-            </div>
+            ${btnHtml([
+              { label: 'Order now — $19.99', act: 'buy' },
+              { label: 'Learn more', act: 'more' },
+              { label: 'No thanks', act: 'close' }
+            ])}
           </div>`;
-        dlg.querySelectorAll('.err-x, .err-btn').forEach(b => b.addEventListener('click', () => {
-          if (b.classList.contains('enlarge-buy')) {
-            showFakePopup('Order confirmed', 'Your package of Nothing™ has shipped.\n\nTracking: LOL-000-COPE\nETA: never');
-            applyPermanentZoom(1.08);
-          }
-          dlg.remove();
-        }));
+        wireActs(dlg, {
+          buy: (_b, d) => { d.remove(); applyPermanentZoom(1.08); showFakePopup('Order #88421', 'Payment authorized.\nShips in 3–5 business myths.\nTracking: PKG-ZOOM-001', [{ label: 'Track package', act: 'close' }, { label: 'Buy more', act: 'again' }], { again: () => showEnlargeAd() }); },
+          more: () => showFakePopup('Clinical Notes', 'In a study of 12 people who definitely existed, 11 reported feeling slightly taller online.', [{ label: 'Order anyway', act: 'buy' }, { label: 'Back', act: 'close' }], { buy: () => { applyPermanentZoom(1.08); } })
+        });
         placeDialog(dlg);
       }
 
@@ -1387,49 +1495,307 @@
         const titles = [
           'You won\'t BELIEVE what this rabbit clicked next',
           'Doctors HATE this one Useless Box trick',
-          'What happens when you click 1000 times will SHOCK you',
+          'What happens at 1000 clicks will SHOCK you',
           'Local man ruins website, becomes legend',
-          'This webpage is not in a relationship with you',
+          'Top 10 dialogs that haunt PCs at 3AM',
         ];
         const dlg = document.createElement('div');
         dlg.className = 'meme-ad clickbait-ad';
         dlg.innerHTML = `
-          <div class="meme-ad-bar bait"><span>▶ THUMBNAIL</span><button type="button" class="err-x">✕</button></div>
+          <div class="meme-ad-bar bait"><span>▶ Recommended</span><button type="button" class="err-x">✕</button></div>
           <div class="meme-ad-body">
             <div class="bait-thumb">😱👉🐇</div>
             <b>${rand(titles)}</b>
-            <p>${rand(['(gone wrong)', '(gone sexual)', '(emotional)', '(not clickbait)', '(we lied)'])}</p>
-            <div class="err-btns"><button type="button" class="err-btn">Watch</button><button type="button" class="err-btn">Skip ad (lie)</button></div>
+            <p>${rand(['12M views', 'Trending #3', 'Gone wrong', 'Emotional', 'Must watch'])}</p>
+            ${btnHtml([
+              { label: 'Watch now', act: 'watch' },
+              { label: 'Save for later', act: 'save' },
+              { label: 'Not interested', act: 'close' }
+            ])}
           </div>`;
-        dlg.querySelectorAll('.err-x, .err-btn').forEach(b => b.addEventListener('click', () => dlg.remove()));
+        wireActs(dlg, {
+          watch: (_b, d) => { d.remove(); showRickrollWindow(); },
+          save: (_b, d) => { d.remove(); showFakePopup('Saved', 'Added to Watch Later (47,291 items).', [{ label: 'Open playlist', act: 'close' }, { label: 'OK', act: 'close' }]); }
+        });
         placeDialog(dlg);
       }
 
       function showPrizeAd() {
-        const prizes = ['iPhone 19 Pro Max Ultra', 'Free V-Bucks', 'A real friend', '3 hours of sleep', 'Admin on the Discord', 'MrBeast\'s leftover lunch'];
+        const prizes = ['iPhone 19 Pro Max Ultra', 'Free V-Bucks', 'Admin on the Discord', 'MrBeast leftover lunch', '3 hours of sleep', 'RGB RAM'];
         const dlg = document.createElement('div');
         dlg.className = 'meme-ad prize-ad';
         dlg.innerHTML = `
           <div class="meme-ad-bar prize"><span>🎁 CONGRATULATIONS!!!</span><button type="button" class="err-x">✕</button></div>
           <div class="meme-ad-body">
             <div class="prize-spin">🎉</div>
-            <b>You are the 1,000,000th visitor!</b>
-            <p>Claim your free <b>${rand(prizes)}</b> before it expires in 0:03</p>
-            <div class="err-btns">
-              <button type="button" class="err-btn prize-claim">CLAIM</button>
-              <button type="button" class="err-btn">I hate fun</button>
-            </div>
+            <b>You are visitor #${(1000000 + Math.floor(Math.random() * 9000)).toLocaleString()}!</b>
+            <p>Claim your free <b>${rand(prizes)}</b> before the timer hits zero.</p>
+            ${btnHtml([
+              { label: 'CLAIM PRIZE', act: 'claim' },
+              { label: 'Spin again', act: 'spin' },
+              { label: 'Decline', act: 'close' }
+            ])}
           </div>`;
-        dlg.querySelectorAll('.err-x, .err-btn').forEach(b => b.addEventListener('click', () => {
-          if (b.classList.contains('prize-claim')) showFakePopup('Claim denied', 'Skill issue.\n\nAlso this was never real.');
-          dlg.remove();
-        }));
+        wireActs(dlg, {
+          claim: (_b, d) => { d.remove(); showFakePopup('Claim Center', 'Verifying human…\nSelect all traffic lights…\nPrize held for review.', [{ label: 'Appeal', act: 'close' }, { label: 'Close', act: 'close' }]); },
+          spin: (_b, d) => { d.remove(); showPrizeAd(); }
+        });
         placeDialog(dlg);
       }
 
       function showPrinceEmail() {
-        showFakePopup('From: Prince of Somewhere',
-          'Dear Friend,\n\nI am prince with MANY money.\nI need your help transfer $47,000,000 USD.\nPlease send your bank details, mom\'s maiden name, and click count.\n\nBlessings,\nDefinitely Not A Scam');
+        showFakePopup(
+          'Inbox — Prince of Somewhere',
+          'Dear Friend,\n\nI am prince with MANY money.\nI need your trusted assistance to transfer $47,000,000 USD.\nReply with your bank details and mother\'s maiden name.\n\nBlessings,\nHRH Okoro of Somewhere',
+          [
+            { label: 'Reply with details', act: 'reply' },
+            { label: 'Mark as spam', act: 'spam' },
+            { label: 'Forward to IRS', act: 'irs' }
+          ],
+          {
+            reply: () => showFakePopup('Sent', 'Email queued.\nOutbox: 1\nRegret: immediate', [{ label: 'Unsend', act: 'close' }, { label: 'OK', act: 'close' }]),
+            spam: () => showFakePopup('Spam', 'Moved to Spam.\n1,204 similar messages remain.', [{ label: 'Empty Spam', act: 'close' }, { label: 'OK', act: 'close' }]),
+            irs: () => showFakePopup('Forwarded', 'Message forwarded to tips@irs.gov\nSubject: "interesting email"', [{ label: 'Done', act: 'close' }])
+          }
+        );
+      }
+
+      // ===== RICKROLL YOUTUBE WINDOW =====
+      function showRickrollWindow() {
+        const dlg = document.createElement('div');
+        dlg.className = 'yt-window';
+        dlg.innerHTML = `
+          <div class="yt-titlebar"><span class="yt-dots"><i></i><i></i><i></i></span><span>YouTube — Rick Astley</span><button type="button" class="err-x">✕</button></div>
+          <div class="yt-body">
+            <div class="yt-player">
+              <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&controls=1" title="YouTube video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+            </div>
+            <div class="yt-meta">
+              <b>Rick Astley - Never Gonna Give You Up (Official Music Video)</b>
+              <div class="yt-sub">${(Math.floor(r(1400, 1600))).toLocaleString()}M views · Oct 25, 2009</div>
+            </div>
+            ${btnHtml([
+              { label: 'Like', act: 'like' },
+              { label: 'Share', act: 'share' },
+              { label: 'Next video', act: 'next' },
+              { label: 'Close', act: 'close' }
+            ])}
+          </div>`;
+        wireActs(dlg, {
+          like: (b) => { b.textContent = 'Liked ✓'; },
+          share: () => showFakePopup('Share', 'Link copied:\nhttps://youtu.be/dQw4w9WgXcQ', [{ label: 'Open chat', act: 'close' }, { label: 'Done', act: 'close' }]),
+          next: (_b, d) => { const f = d.querySelector('iframe'); if (f) f.src = 'https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1'; }
+        });
+        placeDialog(dlg);
+      }
+
+      // ===== RANDOM WIKIPEDIA =====
+      function showWikipediaWindow() {
+        const dlg = document.createElement('div');
+        dlg.className = 'wiki-window';
+        dlg.innerHTML = `
+          <div class="wiki-titlebar"><span>Wikipedia</span><button type="button" class="err-x">✕</button></div>
+          <div class="wiki-body">
+            <div class="wiki-loading">Fetching a random article…</div>
+          </div>`;
+        placeDialog(dlg);
+        wireActs(dlg, {});
+        fetch('https://en.wikipedia.org/api/rest_v1/page/random/summary')
+          .then(r => r.ok ? r.json() : Promise.reject())
+          .then(data => {
+            if (!dlg.isConnected) return;
+            const title = data.title || 'Unknown';
+            const extract = data.extract || 'No summary available.';
+            const url = (data.content_urls && data.content_urls.desktop && data.content_urls.desktop.page) || ('https://en.wikipedia.org/wiki/' + encodeURIComponent(title));
+            const thumb = data.thumbnail && data.thumbnail.source;
+            dlg.querySelector('.wiki-body').innerHTML = `
+              <div class="wiki-article">
+                ${thumb ? '<img class="wiki-thumb" src="' + thumb + '" alt="">' : ''}
+                <div>
+                  <h3 class="wiki-h">${title}</h3>
+                  <p class="wiki-extract">${extract.slice(0, 520)}${extract.length > 520 ? '…' : ''}</p>
+                </div>
+              </div>
+              ${btnHtml([
+                { label: 'Open article', act: 'open' },
+                { label: 'Another random', act: 'reroll' },
+                { label: 'Close', act: 'close' }
+              ])}`;
+            wireActs(dlg, {
+              open: () => window.open(url, '_blank', 'noopener'),
+              reroll: (_b, d) => { d.remove(); showWikipediaWindow(); }
+            });
+          })
+          .catch(() => {
+            if (!dlg.isConnected) return;
+            dlg.querySelector('.wiki-body').innerHTML = `
+              <div class="wiki-loading">Could not reach Wikipedia. Showing offline stub.</div>
+              <h3 class="wiki-h">Blob (disambiguation)</h3>
+              <p class="wiki-extract">A blob is an amorphous mass. In computing, BLOB may refer to a binary large object. In this website, it refers to the glowing circles behind the Useless Box.</p>
+              ${btnHtml([{ label: 'Try again', act: 'reroll' }, { label: 'Close', act: 'close' }])}`;
+            wireActs(dlg, { reroll: (_b, d) => { d.remove(); showWikipediaWindow(); } });
+          });
+      }
+
+      // ===== RABBITGPT =====
+      const RABBIT_GPT_REPLIES = [
+        'As an AI rabbit, I find that fascinating. Have you considered clicking something shiny?',
+        'Interesting question. My training data strongly suggests the answer is "blob".',
+        'I\'m not saying chaos is the solution… but my confidence interval includes chaos.',
+        'Let me think step-by-step:\n1) You asked\n2) I answered\n3) Somewhere, a dialog opened',
+        'Good point. Would you like me to elaborate, summarize, or summon another window?',
+        'According to my sources (vibes), you\'re doing great.',
+        'I can help with that. Or I can pretend to help while looking wise. Both work.',
+        'Parsing complete. Recommendation: more popups.',
+      ];
+      const FAKE_BTC = 'bc1q7rabb3tgptw4ll3t9x0r4nd0m1n9k8j7h6g5f4e3';
+
+      function showRabbitGptWindow() {
+        const dlg = document.createElement('div');
+        dlg.className = 'gpt-window';
+        let turns = 0;
+        let locked = false;
+        dlg.innerHTML = `
+          <div class="gpt-titlebar"><span>🐇 RabbitGPT</span><button type="button" class="err-x">✕</button></div>
+          <div class="gpt-body">
+            <div class="gpt-log" id="gptLog"></div>
+            <div class="gpt-compose">
+              <input class="gpt-input" type="text" placeholder="Message RabbitGPT…" maxlength="240" />
+              <button type="button" class="err-btn gpt-send" data-act="send">Send</button>
+            </div>
+            <div class="gpt-foot">Free tier · ${3} messages remaining</div>
+          </div>`;
+        placeDialog(dlg);
+        const log = dlg.querySelector('#gptLog');
+        const input = dlg.querySelector('.gpt-input');
+        const foot = dlg.querySelector('.gpt-foot');
+
+        function addMsg(role, text) {
+          const row = document.createElement('div');
+          row.className = 'gpt-msg gpt-' + role;
+          row.textContent = (role === 'user' ? 'You: ' : 'RabbitGPT: ') + text;
+          log.appendChild(row);
+          log.scrollTop = log.scrollHeight;
+        }
+
+        function showPaywall() {
+          locked = true;
+          input.disabled = true;
+          foot.textContent = 'USAGE LIMIT REACHED';
+          const wall = document.createElement('div');
+          wall.className = 'gpt-paywall';
+          wall.innerHTML = `
+            <b>USAGE LIMIT REACHED</b>
+            <p>You have used your free RabbitGPT messages.</p>
+            <p>To continue, send <b>0.1728 BTC</b> to:</p>
+            <code class="gpt-wallet">${FAKE_BTC}</code>
+            <p class="gpt-tiny">Network: Bitcoin · Confirmations required: 1 · ETA: pending</p>
+            ${btnHtml([
+              { label: 'Copy address', act: 'copy' },
+              { label: 'I paid', act: 'paid' },
+              { label: 'Close', act: 'close' }
+            ])}`;
+          dlg.querySelector('.gpt-body').appendChild(wall);
+          wireActs(wall, {
+            copy: (b) => { try { navigator.clipboard.writeText(FAKE_BTC); } catch (e) {} b.textContent = 'Copied'; },
+            paid: () => showFakePopup('Payment check', 'No incoming transaction found for\n' + FAKE_BTC + '\n\nStatus: waiting…', [{ label: 'Check again', act: 'close' }, { label: 'Cancel', act: 'close' }]),
+            close: (_b, _w) => dlg.remove()
+          });
+        }
+
+        addMsg('bot', 'Hi. I\'m RabbitGPT. Ask me anything. Or nothing. I\'m flexible.');
+
+        function send() {
+          if (locked) return;
+          const text = (input.value || '').trim();
+          if (!text) return;
+          input.value = '';
+          addMsg('user', text);
+          turns++;
+          const left = Math.max(0, 3 - turns);
+          foot.textContent = left ? ('Free tier · ' + left + ' message' + (left === 1 ? '' : 's') + ' remaining') : 'Free tier · 0 messages remaining';
+          setTimeout(() => {
+            if (!dlg.isConnected) return;
+            if (turns >= 3) {
+              addMsg('bot', 'One moment— verifying entitlement…');
+              setTimeout(() => { if (dlg.isConnected) showPaywall(); }, 500);
+              return;
+            }
+            addMsg('bot', rand(RABBIT_GPT_REPLIES));
+          }, 350 + Math.random() * 500);
+        }
+
+        dlg.querySelector('.gpt-send').addEventListener('click', send);
+        input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') send(); });
+        wireActs(dlg, {});
+        setTimeout(() => input.focus(), 50);
+      }
+
+      function showCookieBanner() {
+        const dlg = document.createElement('div');
+        dlg.className = 'meme-ad cookie-ad';
+        dlg.innerHTML = `
+          <div class="meme-ad-bar"><span>🍪 Cookie Preferences</span><button type="button" class="err-x">✕</button></div>
+          <div class="meme-ad-body">
+            <p>We use cookies to remember that you like popups, measure popup velocity, and invent new popups.</p>
+            ${btnHtml([
+              { label: 'Accept all', act: 'all' },
+              { label: 'Essential only', act: 'ess' },
+              { label: 'Customize', act: 'custom' }
+            ])}
+          </div>`;
+        wireActs(dlg, {
+          all: (_b, d) => { d.remove(); showFakePopup('Saved', 'Preferences saved: ALL.\nYou may receive additional dialogs.', [{ label: 'OK', act: 'close' }]); },
+          ess: (_b, d) => d.remove(),
+          custom: (_b, d) => { d.remove(); showFakePopup('Customize', '☐ Marketing  ☐ Analytics  ☑ Chaos  ☑ More Chaos', [{ label: 'Save choices', act: 'close' }, { label: 'Reject all', act: 'close' }]); }
+        });
+        placeDialog(dlg);
+      }
+
+      function showSurveyPopup() {
+        const dlg = document.createElement('div');
+        dlg.className = 'meme-ad';
+        dlg.innerHTML = `
+          <div class="meme-ad-bar bait"><span>📋 Quick Survey</span><button type="button" class="err-x">✕</button></div>
+          <div class="meme-ad-body">
+            <b>How is your experience?</b>
+            <p>1 question. Definitely 1 question.</p>
+            ${btnHtml([
+              { label: 'Amazing', act: 'a' },
+              { label: 'Chaotic', act: 'a' },
+              { label: 'Skip', act: 'close' }
+            ])}
+          </div>`;
+        wireActs(dlg, {
+          a: (_b, d) => { d.remove(); showFakePopup('Thanks!', 'Response recorded.\nFollow-up 1/12: Would you recommend us to a friend?', [{ label: 'Yes', act: 'close' }, { label: 'Already did', act: 'close' }, { label: 'Unsubscribe', act: 'close' }]); }
+        });
+        placeDialog(dlg);
+      }
+
+      function showUpdatePopup() {
+        showFakePopup(
+          'Software Update',
+          'wildrabbet 6.9.0 is ready.\n\nWhat\'s new:\n• More dialogs\n• Fewer escape routes\n• Improved blob physics',
+          [
+            { label: 'Install tonight', act: 'night' },
+            { label: 'Install now', act: 'now' },
+            { label: 'Remind me in 1 hour', act: 'close' }
+          ],
+          {
+            night: () => showFakePopup('Scheduled', 'Update scheduled for 3:00 AM.\nYour PC will restart into vibes.', [{ label: 'OK', act: 'close' }]),
+            now: () => showFakePopup('Installing', 'Installing… 27%\nDo not turn off your computer.\n(Turning it off won\'t help anyway.)', [{ label: 'Background', act: 'close' }])
+          }
+        );
+      }
+
+      function spawnChaosPopups(n) {
+        n = n || Math.floor(r(2, 5));
+        const makers = [
+          show404Dialog, showMacAlert, showDiscordPopup, showSkypePopup, showImessagePopup, showTeamsPopup,
+          showHotSinglesAd, showEnlargeAd, showClickbaitAd, showPrizeAd, showCookieBanner, showSurveyPopup,
+          showUpdatePopup, showWikipediaWindow, showRabbitGptWindow, showRickrollWindow
+        ];
+        for (let i = 0; i < n; i++) setTimeout(() => rand(makers)(), i * 140);
       }
 
       function showMemeBanner(text, cls) {
@@ -1981,7 +2347,7 @@
         "internet moment": (e) => { togglePageClass('page-dialup'); toggleCRT(); show404Dialog(); beep("square",r(200,400),0.10,0.10); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"squares"}); },
         "W behavior": (e) => { document.querySelectorAll('.card').forEach((c,i)=>{c.style.transition='transform .6s ease';c.style.transform='rotate('+r(-25,25)+'deg) translate('+r(-50,50)+'px,'+r(-40,40)+'px) scale('+r(0.7,1.3)+')';}); siteFlash('rgba(255,215,0,.3)',300); beep("triangle",r(500,900),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(20,30),shape:"mixed"}); },
         "tiny chaos": (e) => { document.querySelectorAll('.card,.aboutCard,.heroLeft,.btn,.tag,.nav a,.emoji').forEach(el=>{el.style.transition='all .5s ease';el.style.transform='rotate('+r(-8,8)+'deg) translate('+r(-12,12)+'px,'+r(-8,8)+'px)';el.style.opacity=r(0.4,1).toFixed(2);}); beep("square",r(300,600),0.10,0.10); spawnParticles(e.clientX,e.clientY,{count:r(14,22)}); },
-        "unlicensed fun": (e) => { showFakePopup('⚠️ Unlicensed Fun Detected','Your fun license has expired.\n\nPlease purchase a Fun License™ to continue.\n\nPrice: $4,999.99/month\n(soul not included)'); beep("square",r(200,400),0.12,0.10); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "unlicensed fun": (e) => { showFakePopup('Fun License Manager','Your Fun License™ expired yesterday.\n\nPlan: Chaos Pro\nPrice: $4,999.99/month\nSeats: 1 soul',[{label:'Renew now',act:'buy'},{label:'Downgrade',act:'down'},{label:'Not now',act:'close'}],{buy:()=>showFakePopup('Checkout','Card ending 4242 charged.\nReceipt emailed to nowhere@void',[ {label:'Download invoice',act:'close'},{label:'Done',act:'close'} ]),down:()=>showFakePopup('Downgraded','You are now on Free Sadness.\nPopups: still enabled.',[{label:'OK',act:'close'}])}); beep("square",r(200,400),0.12,0.10); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
         "no thoughts": (e) => { togglePageClass('page-nothoughts'); beep("sine",r(150,280),0.18,0.06); spawnParticles(e.clientX,e.clientY,{count:r(6,10),durMin:1200,durMax:2000}); },
         "just vibes": (e) => { togglePageClass('page-justvibes'); togglePlasma(); beep("sine",r(250,450),0.14,0.06); spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"circles",durMin:800,durMax:1500}); },
         "certified moment": (e) => { document.querySelectorAll('.card').forEach(c=>{let s=c.querySelector('.stamp-mark');if(!s){s=document.createElement('div');s.className='stamp-mark';s.textContent='CERTIFIED ✓';s.style.transform='rotate('+r(-20,-5)+'deg)';s.style.color='hsl(140 70% 35%)';c.appendChild(s);}}); beep("triangle",r(400,600),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(12,18)}); },
@@ -1990,7 +2356,7 @@
         "vibe check": (e) => { const vibes=['immaculate','questionable','cursed','chaotic good','neutral evil','absolutely not','approved','pending review','failed','transcendent']; document.querySelectorAll('.card').forEach(c=>{let v=c.querySelector('.vibe-badge');if(v)v.remove(); v=document.createElement('div');v.className='vibe-badge';v.textContent='vibe: '+rand(vibes);c.appendChild(v);}); beep("triangle",r(400,700),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"mixed"}); },
         "smooth brain": (e) => { document.querySelectorAll('.card,.aboutCard,.heroLeft,.heroRight').forEach(c=>{c.style.transition='border-radius 1s ease';c.style.borderRadius='50%';}); beep("sine",r(200,350),0.16,0.07); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"circles"}); },
         "big mood": (e) => { const moods=['😤','😭','🥺','😍','💀','🤡','😳','🫠','😶‍🌫️','🥴']; document.querySelectorAll('.emoji').forEach(el=>{el.textContent=rand(moods);}); siteBody.style.transition='transform .5s'; siteBody.style.transform='scale(1.03)'; beep("sine",r(200,400),0.14,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"hearts"}); },
-        "rent free": (e) => { showFakePopup('🏠 Eviction Notice','This thought is living in your head RENT FREE.\n\nAmount owed: $0.00\nDuration: forever\nEviction status: DENIED\n\nPlease accept this certified brainworm.'); togglePageClass('page-braintickle'); beep("sine",r(300,500),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "rent free": (e) => { showFakePopup('🏠 Eviction Notice','Occupant: that thought\nAddress: your head\nAmount owed: $0.00\nStatus: DENIED — tenant is rent-free forever',[{label:'Appeal',act:'appeal'},{label:'Accept brainworm',act:'close'},{label:'Call landlord',act:'call'}],{appeal:()=>showFakePopup('Appeal','Denied. The thought stays.',[{label:'OK',act:'close'}]),call:()=>showFakePopup('Calling…','Landlord: "figure it out"\n*click*',[{label:'Hang up',act:'close'}])}); togglePageClass('page-braintickle'); beep("sine",r(300,500),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
         "why": (e) => { const whyLayer=document.createElement('div');whyLayer.className='why-layer';for(let i=0;i<60;i++){const w=document.createElement('div');w.className='why-text';w.textContent='why';w.style.left=r(0,100)+'%';w.style.top=r(0,100)+'%';w.style.fontSize=r(10,40)+'px';w.style.opacity=r(0.1,0.5);w.style.transform='rotate('+r(-30,30)+'deg)';whyLayer.appendChild(w);}siteBody.appendChild(whyLayer); beep("sine",r(150,300),0.16,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
         "lol ok": (e) => { document.querySelectorAll('.card').forEach((c,i)=>{c.style.transition='all .6s ease';c.style.transform='perspective(400px) rotateX('+r(-15,15)+'deg) rotateY('+r(-15,15)+'deg) translate('+r(-30,30)+'px,'+r(-20,20)+'px)';c.style.filter='hue-rotate('+r(0,360)+'deg)';}); beep("triangle",r(300,600),0.10,0.09); spawnParticles(e.clientX,e.clientY,{count:r(14,22)}); },
         "based": (e) => { togglePageClass('page-based'); siteFall(rand(['👑','💪','🗿','⚡']),3500); siteSparkle(2500); beep("triangle",r(400,700),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(18,28),shape:"mixed"}); },
@@ -2866,13 +3232,13 @@
         "HD loading": (e) => { showHdLoadingOverlay(); beep("sine",r(200,400),0.14,0.06); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
         "hot singles": (e) => { for(let i=0;i<r(2,5);i++) setTimeout(showHotSinglesAd, i*180); beep("triangle",r(400,700),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"hearts"}); },
         "enlarge": (e) => { for(let i=0;i<r(1,3);i++) setTimeout(showEnlargeAd, i*200); applyPermanentZoom(1.12); beep("sine",r(150,300),0.16,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18)}); },
-        "one weird trick": (e) => { showClickbaitAd(); showFakePopup('One Weird Trick', 'Surgeons in your area HATE this Useless Box.\n\nClick here to learn more (do not).'); beep("square",r(200,400),0.10,0.09); },
+        "one weird trick": (e) => { showClickbaitAd(); showFakePopup('Sponsored', 'Surgeons in your area HATE this Useless Box.\n\nRead the full guide before your friends do.', [{ label: 'Read article', act: 'read' }, { label: 'Hide ad', act: 'close' }], { read: () => showRickrollWindow() }); beep("square",r(200,400),0.10,0.09); },
         "free iPhone": (e) => { showPrizeAd(); beep("triangle",r(500,800),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"mixed"}); },
         "Nigerian prince": (e) => { showPrinceEmail(); for(let i=0;i<2;i++) setTimeout(showPrizeAd, 300+i*200); beep("sine",r(250,450),0.12,0.07); },
         "clickbait": (e) => { for(let i=0;i<r(2,4);i++) setTimeout(showClickbaitAd, i*160); beep("triangle",r(400,700),0.10,0.07); },
         "rickroll": (e) => {
           showMemeBanner("Never gonna give you up 🎵", 'rick');
-          showFakePopup('YouTube', '▶ Rick Astley - Never Gonna Give You Up\n\nBuffering… forever.\nAlso you just got rickrolled by a website.');
+          showRickrollWindow();
           beep("triangle",r(400,600),0.14,0.08); beep("sine",r(500,700),0.12,0.06);
           spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"mixed"});
         },
@@ -2896,7 +3262,7 @@
         },
         "sigma": (e) => {
           showMemeBanner('σ grindset activated', 'sigma');
-          showFakePopup('Sigma Rules', '1. Click the box\n2. Don\'t explain the box\n3. Wake up at 4am to click the box\n4. Reject modernity. Embrace blob.');
+          showFakePopup('Sigma Rules', '1. Protect your peace\n2. Wake up early\n3. Touch the box\n4. Log off emotionally', [{ label: 'I am him', act: 'close' }, { label: 'Print poster', act: 'close' }]);
           beep("triangle",r(300,500),0.12,0.08);
         },
         "NPC": (e) => {
@@ -2909,13 +3275,13 @@
         "touch grass": (e) => {
           stackPageClass('page-moss');
           siteFall(rand(['🌿','🌱','🍃','🌾']), 4000);
-          showMemeBanner('go outside (after one more click)', 'grass');
+          showMemeBanner('go outside', 'grass');
           beep("sine",r(200,350),0.14,0.06);
           spawnParticles(e.clientX,e.clientY,{count:r(12,18)});
         },
         "ratio": (e) => {
           showMemeBanner('L + ratio + you fell off', 'ratio');
-          showFakePopup('Twitter', '💀 ratio\'d\n\nlikes: 0\nreplies: everyone dunking\nquote RTs: illegal');
+          showFakePopup('Post analytics', '💀 ratio\'d\n\nlikes: 0\nreplies: everyone dunking\nquote RTs: illegal numbers', [{ label: 'Delete tweet', act: 'close' }, { label: 'Ratio them back', act: 'close' }, { label: 'Log off', act: 'close' }]);
           beep("square",r(100,200),0.12,0.1);
         },
         "brainrot": (e) => {
@@ -2935,7 +3301,7 @@
         },
         "press F": (e) => {
           showMemeBanner('F', 'pressf');
-          showFakePopup('Respects', 'You paid respects.\n\nThe box acknowledges your grief.\n(It does not care.)');
+          showFakePopup('Respects paid', 'A moment of silence has been observed.\nThe chat scrolled anyway.', [{ label: 'Press F again', act: 'again' }, { label: 'Continue', act: 'close' }], { again: () => showMemeBanner('F', 'pressf') });
           beep("sine",r(200,300),0.2,0.08);
         },
         "all your base": (e) => {
@@ -2945,7 +3311,7 @@
         },
         "loss": (e) => {
           showMemeBanner('is this loss', 'loss');
-          showFakePopup('loss.jpg', 'is this loss\n\nyes');
+          showFakePopup('loss.jpg', '|  ||\n||  |_\n\nis this loss\nyes', [{ label: 'Yes', act: 'close' }, { label: 'Always has been', act: 'close' }]);
           beep("sine",r(180,280),0.14,0.07);
         },
         "skibidi": (e) => {
@@ -2975,7 +3341,7 @@
         },
         "VBucks": (e) => {
           showPrizeAd();
-          showFakePopup('Fortnite Shop', 'Free V-Bucks generator loading…\n\n99%\n98%\n97%\n(virus.exe)');
+          showFakePopup('Item Shop', 'Free V-Bucks generator\nStatus: validating…\nProgress: 99%\nStill 99%', [{ label: 'Generate', act: 'gen' }, { label: 'Cancel', act: 'close' }], { gen: () => showFakePopup('Generator', 'Almost done.\nPlease complete 1 survey.', [{ label: 'Take survey', act: 'surv' }, { label: 'Close', act: 'close' }], { surv: () => showSurveyPopup() }) });
           beep("sine",r(400,700),0.1,0.07);
         },
         "task failed": (e) => {
@@ -2983,7 +3349,11 @@
           show404Dialog();
           beep("triangle",r(350,550),0.12,0.08);
         },
-
+        "wikipedia": (e) => { showWikipediaWindow(); beep("sine",r(300,500),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
+        "RabbitGPT": (e) => { showRabbitGptWindow(); beep("triangle",r(400,700),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "cookies": (e) => { showCookieBanner(); beep("sine",r(350,550),0.10,0.06); },
+        "survey": (e) => { showSurveyPopup(); beep("triangle",r(400,600),0.10,0.07); },
+        "update": (e) => { showUpdatePopup(); beep("square",r(200,400),0.10,0.09); },
         // ===== CURSORS =====
         "D scimmy": (e) => { setWeaponCursor('scimmy'); showMemeBanner('Dragon scimitar equipped', 'rs'); beep("square",r(200,350),0.1,0.1); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"squares"}); },
         "AGS": (e) => { setWeaponCursor('ags'); showMemeBanner('Armadyl godsword equipped — spec bar loading', 'rs'); beep("triangle",r(250,450),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(12,18),hue:45}); },
