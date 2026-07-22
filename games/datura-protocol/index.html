@@ -17,16 +17,7 @@
   canvas{ position:fixed; inset:0; display:block; }
   #gl{ z-index:1; }
   #veil{ z-index:2; pointer-events:none; }
-  /* the fixation reticle — locked dead centre, crisp and stable so it's always easy to hold your
-     gaze on while the periphery goes wild. difference-blend keeps it readable over ANY colour. */
-  #cursor{
-    position:fixed; z-index:6; left:50%; top:50%; width:16px; height:16px;
-    transform:translate(-50%,-50%); border-radius:50%; pointer-events:none;
-    border:1.5px solid rgba(255,255,255,.92); mix-blend-mode:difference;
-    box-shadow:0 0 6px rgba(255,255,255,.5); will-change:opacity,width,height;
-  }
-  #cursor::after{ content:''; position:absolute; left:50%; top:50%; width:4px; height:4px;
-    transform:translate(-50%,-50%); border-radius:50%; background:#fff; }
+  /* no crosshair — the mandala's dilating pupil IS the fixation point */
 
   /* ---------- HUD ---------- */
   #hud{ position:fixed; z-index:5; inset:0; pointer-events:none; }
@@ -51,7 +42,7 @@
           align-items:center; justify-content:center; text-align:center; gap:24px;
           background:radial-gradient(ellipse at 50% 40%,rgba(40,10,60,.35),rgba(5,2,10,.9) 70%);
           cursor:pointer; transition:opacity .8s; }
-  #intro.gone{ opacity:0; pointer-events:none; }
+  #intro.gone{ opacity:0; pointer-events:none; visibility:hidden; transition:opacity .8s, visibility 0s .85s; }
   #intro h1{ font-size:min(15vw,120px); font-weight:400; letter-spacing:.06em; line-height:.9;
              color:#fff; text-shadow:0 0 40px rgba(200,80,255,.8),0 0 120px rgba(120,40,220,.6);
              animation:breathe 5s ease-in-out infinite; }
@@ -72,7 +63,6 @@
 <body>
 <canvas id="gl"></canvas>
 <canvas id="veil"></canvas>
-<div id="cursor"></div>
 
 <div id="intro">
   <h1>DATURA<span>PROTOCOL</span></h1>
@@ -138,7 +128,8 @@ const G = {
   // THE GAME: grow -> evolve (stages) -> transcend (rebirth) -> deeper cycle, forever.
   trip:0, tripTime:0, open:0, phase:'fixate', fixate:1.5,
   cycle:1, depth:0, stage:0, evoProg:0, transReady:false, transCharge:0, drainCD:0,
-  shiftHeld:false, shift:0, asc:0, travel:0, realm:0,
+  shiftHeld:false, shift:0, asc:0, travel:0, realm:0, biome:null,
+  eyeTimer:7, eyeDilate:0, phos:0,
   rm:{hueRot:0,sat:0,warp:0,chroma:0,kal:0,spiral:0,flowZ:0,flowR:0,spin:0,spd:0,grain:0,vig:0},
   // event impulses (decay over time)
   kick:0, hueSpike:0, warpSpike:0, chromaSpike:0, flashSpike:0, surge:0,
@@ -162,7 +153,7 @@ const Post = (()=>{
 
   const POST = `precision highp float; varying vec2 vUv;
     uniform sampler2D uScene, uPrev; uniform vec2 uRes; uniform float uTime;
-    uniform float uWarp,uChroma,uHue,uDecay,uFeedZoom,uFeedRot,uKaleido,uBreath,uSwirl,uSpiral,uHyper,uSat;
+    uniform float uWarp,uChroma,uHue,uDecay,uFeedZoom,uFeedRot,uKaleido,uBreath,uSwirl,uSpiral,uHyper,uSat,uPhos;
     mat2 rot(float a){ float s=sin(a),c=cos(a); return mat2(c,-s,s,c);}
     vec3 hueRot(vec3 col,float a){ const vec3 k=vec3(0.57735); float c=cos(a),s=sin(a);
       return col*c + cross(k,col)*s + k*dot(k,col)*(1.0-c);}
@@ -199,6 +190,11 @@ const Post = (()=>{
       // endless logarithmic spiral arms locked to the tunnel — one direction, forever
       float arms = sin(ang*5.0 + log(r+0.04)*8.0 - uTime*(0.6+uHyper*2.2));
       col += arms * (0.022 + 0.05*uHyper) * (0.5+uSpiral) * cm;
+      // entoptic phosphenes: slow breathing concentric rings + a faint lattice shimmer,
+      // radiating from the fixation point — the classic closed-eye hallucination
+      float ph1 = sin(r*34.0 - uTime*1.7) * (0.6+0.4*sin(ang*3.0 + uTime*0.31));
+      float ph2 = sin(r*11.0 - uTime*0.55 + sin(ang*6.0)*0.8);
+      col += (ph1*0.7 + ph2*0.45) * uPhos * cm;
       gl_FragColor=vec4(clamp(col,0.0,1.0),1.0);
     }`;
 
@@ -295,6 +291,7 @@ const Post = (()=>{
     gl.uniform1f(U(progPost,'uSpiral'),u.spiral);
     gl.uniform1f(U(progPost,'uHyper'),u.hyper);
     gl.uniform1f(U(progPost,'uSat'),u.sat);
+    gl.uniform1f(U(progPost,'uPhos'),u.phos);
     gl.drawArrays(gl.TRIANGLES,0,3);
     // pass 2 -> screen (present)
     gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,W,H);
@@ -417,8 +414,9 @@ function buildBody(genome, nParts, deep){
 const beings=[];
 function spawnBeing(){
   const g=makeGenome();
-  // relative mass: mostly-smaller, sometimes far bigger -> no size drop-off ever
-  let ratio=Math.exp(gauss(-0.35,0.95));
+  // relative mass: mostly-smaller, sometimes far bigger -> no size drop-off ever.
+  // The biome sets predator pressure (mean of the distribution).
+  let ratio=Math.exp(gauss(G.biome?G.biome.predBias:-0.35,0.95));
   ratio=clamp(ratio,0.05,4.2);
   const isLeviathan = ratio>2.4;
   const mass=player.mass*ratio;
@@ -428,7 +426,7 @@ function spawnBeing(){
   const viewR=Math.hypot(G.W,G.H)/2/G.scale;
   const a=srand()*TAU, d=viewR*rr(1.05,1.5);
   const behavior = isLeviathan ? 'drift' : pick(['seek','seek','wander','orbit','seek','flee']);
-  const spd = player.radius * (isLeviathan? rr(0.4,0.9) : rr(1.3,3.6)) * (behavior==='flee'?1.4:1);
+  const spd = player.radius * (isLeviathan? rr(0.4,0.9) : rr(1.3,3.6)) * (behavior==='flee'?1.4:1) * (G.biome?G.biome.spd:1);
   const va=srand()*TAU;
   beings.push({
     x:Math.cos(a)*d, y:Math.sin(a)*d,
@@ -503,6 +501,81 @@ function graft(b){
    ===================================================================== */
 function stageThreshold(s){ return Math.pow(3, s+1); }   // 3, 9, 27, 81, 243
 
+/* ---------- BIOMES (roguelike): every metamorphosis carries you into a new,
+   procedurally-rolled biome — a visual realm PLUS its own game settings
+   (population, predator pressure, speed) and its own illusion mix. Five biomes
+   per incarnation, a fresh roll every time, deeper jitter every cycle: the run
+   never repeats. ---------- */
+function makeBiome(depth){
+  const idx=ri(1,REALMS.length-1);                 // visual archetype (palette/flow/spin)
+  const j=(v,s)=>v*(1+gauss(0,s));
+  return {
+    idx,
+    // gameplay
+    spawnTarget: Math.round(clamp(j(24,0.22)+depth*1.2, 14, 46)),      // barren <-> teeming
+    predBias: clamp(-0.38 + gauss(0,0.14) + depth*0.015, -0.75, 0.1),  // predator pressure
+    spd: clamp(j(1,0.25)*(1+depth*0.03), 0.6, 2.2),                    // tempo of the fauna
+    // illusion mix — which hallucinations this biome favours
+    ill:{ face:j(1,0.45), burn:j(1,0.45), shade:j(1,0.55), crawl:j(1,0.55),
+          big:j(1,0.45), eye:j(1,0.5) },
+  };
+}
+function enterBiome(){
+  G.biome=makeBiome(G.depth);
+  G.realm=G.biome.idx;
+  G.travel=1;                                       // the crossing whoosh
+  audio.surge();
+}
+
+/* ---------- EYE EXPANSIONS: a vast iris blooms out of the fixation point and
+   dilates past you — fibers, ring and pupil-edge — while the mandala's own
+   pupil dilates in sympathy. ---------- */
+const eyeWaves=[];
+function spawnEyeWave(){
+  if(eyeWaves.length>=2) return;
+  eyeWaves.push({ t0:G.t, dur:rr(2.4,4), hue:pick([26,36,116,205,212,275]),
+    sat:rr(30,62), fib:ri(28,46), ph:srand()*TAU });
+  G.eyeDilate=1;
+}
+function drawEyeWaves(){
+  if(!eyeWaves.length) return;
+  const w=G.W,h=G.H,cx=w/2,cy=h/2, maxR=Math.hypot(w,h)*0.62;
+  sctx.save(); sctx.globalCompositeOperation='lighter'; sctx.lineCap='round';
+  for(let i=eyeWaves.length-1;i>=0;i--){
+    const e=eyeWaves[i]; const u=(G.t-e.t0)/e.dur;
+    if(u>=1){ eyeWaves.splice(i,1); continue; }
+    const R=Math.pow(u,0.62)*maxR + 30;
+    const fade=Math.sin(Math.PI*Math.min(1,u*1.15));
+    const bw=R*0.22;                                  // iris band width
+    // iris band
+    sctx.globalAlpha=0.16*fade;
+    sctx.strokeStyle=hsl(e.hue,e.sat,52,1); sctx.lineWidth=bw;
+    sctx.beginPath(); sctx.arc(cx,cy,R,0,TAU); sctx.stroke();
+    // iris fibers — radial striations across the band
+    sctx.globalAlpha=0.2*fade; sctx.lineWidth=Math.max(1,R*0.012);
+    for(let k=0;k<e.fib;k++){
+      const a=e.ph + k/e.fib*TAU + u*0.6;
+      const r0=R-bw*0.48, r1=R+bw*0.48*rr(0.7,1);
+      sctx.strokeStyle=hsl((e.hue+((k*13)%3)*14)%360, e.sat, 44+((k*7)%3)*14, 1);
+      sctx.beginPath();
+      sctx.moveTo(cx+Math.cos(a)*r0, cy+Math.sin(a)*r0);
+      sctx.lineTo(cx+Math.cos(a)*r1, cy+Math.sin(a)*r1);
+      sctx.stroke();
+    }
+    // pupil edge — the dark inner rim that makes it read as an EYE
+    sctx.globalCompositeOperation='source-over';
+    sctx.globalAlpha=0.3*fade;
+    sctx.strokeStyle='rgba(3,1,6,0.95)'; sctx.lineWidth=bw*0.35;
+    sctx.beginPath(); sctx.arc(cx,cy,R-bw*0.62,0,TAU); sctx.stroke();
+    sctx.globalCompositeOperation='lighter';
+    // limbal ring — bright outer edge
+    sctx.globalAlpha=0.22*fade;
+    sctx.strokeStyle=hsl(e.hue,e.sat+20,70,1); sctx.lineWidth=Math.max(1,bw*0.12);
+    sctx.beginPath(); sctx.arc(cx,cy,R+bw*0.55,0,TAU); sctx.stroke();
+  }
+  sctx.restore(); sctx.globalAlpha=1; sctx.globalCompositeOperation='source-over';
+}
+
 function evolve(){
   // a metamorphosis: symmetry deepens, a new organ system blooms across the body
   G.stage++;
@@ -518,6 +591,8 @@ function evolve(){
   G.flashSpike=Math.min(0.9,G.flashSpike+0.35*G.intensity);
   burst(0,0,player.radius*1.2,player.hue,40);
   parts.push({x:0,y:0,life:1,decay:0.8,r0:player.radius*0.8,hue:player.hue,kind:'ring'});
+  enterBiome();          // every metamorphosis crosses into a new biome
+  spawnEyeWave();        // the world opens an eye as you change
   audio.evolve();
 }
 
@@ -525,8 +600,7 @@ function rebirth(){
   // transcendence completes: a new incarnation, a new realm, deeper in — forever
   G.cycle++; G.depth=Math.min(12,G.depth+1);
   G.stage=0; G.transReady=false; G.transCharge=0; G.evoProg=0;
-  let nx=G.realm; while(nx===G.realm) nx=ri(1,REALMS.length-1); G.realm=nx;
-  G.travel=1;
+  enterBiome();
   // carry echoes of what you were into the next life
   const echoes=[];
   for(let i=0;i<Math.min(2,player.parts.length);i++){
@@ -977,19 +1051,23 @@ function update(dt){
   G.surge=Math.max(0,G.surge-dt*0.22);
   const surge=smooth(G.surge);
 
-  // ---- illusions: begin immediately, escalate with trip/ascension ----
+  // ---- illusions: begin immediately, escalate with trip/ascension, mixed per-biome ----
   if(opened){
+    const bi=G.biome?G.biome.ill:{face:1,burn:1,shade:1,crawl:1,big:1,eye:1};
     G.faceTimer -= dt;
-    if(G.faceTimer<=0){ spawnFaceRound(); G.faceTimer = rr(3.5,7)/(0.7+G.pace*0.4+trip*0.7+asc*2); }
+    if(G.faceTimer<=0){ spawnFaceRound(); G.faceTimer = rr(3.5,7)/((0.7+G.pace*0.4+trip*0.7+asc*2)*bi.face); }
     G.bigFaceTimer -= dt;
-    if(G.bigFaceTimer<=0){ spawnBigFace(); G.bigFaceTimer = rr(6,13)/(0.6+trip*0.5+asc*1.5); }
+    if(G.bigFaceTimer<=0){ spawnBigFace(); G.bigFaceTimer = rr(6,13)/((0.6+trip*0.5+asc*1.5)*bi.big); }
     G.burnTimer -= dt;
-    if(G.burnTimer<=0){ spawnBurn(); G.burnTimer = rr(3.5,7)/(0.6+trip+asc*2.5); }
+    if(G.burnTimer<=0){ spawnBurn(); G.burnTimer = rr(3.5,7)/((0.6+trip+asc*2.5)*bi.burn); }
     G.shadeTimer -= dt;
-    if(G.shadeTimer<=0){ if(trip>0.15||asc>0.3) spawnShade(); G.shadeTimer = rr(7,13)/(0.5+trip+asc*2.5); }
+    if(G.shadeTimer<=0){ if(trip>0.15||asc>0.3) spawnShade(); G.shadeTimer = rr(7,13)/((0.5+trip+asc*2.5)*bi.shade); }
     G.crawlTimer -= dt;
-    if(G.crawlTimer<=0){ if(trip>0.25||asc>0.4) spawnCrawler(); G.crawlTimer = rr(8,16)/(0.5+trip+asc*2.5); }
+    if(G.crawlTimer<=0){ if(trip>0.25||asc>0.4) spawnCrawler(); G.crawlTimer = rr(8,16)/((0.5+trip+asc*2.5)*bi.crawl); }
+    G.eyeTimer -= dt;
+    if(G.eyeTimer<=0){ if(trip>0.1) spawnEyeWave(); G.eyeTimer = rr(9,17)/((0.5+trip*0.8+asc)*bi.eye); }
   }
+  G.eyeDilate=Math.max(0,G.eyeDilate-dt*0.45);
 
   // ---- player movement (WASD); SHIFT rushes you faster while you ascend ----
   const spd=player.radius*(1.9+1.6*G.pace)*(1+surge*0.4)*(1 + G.shift*3 + asc*0.8);
@@ -1013,10 +1091,6 @@ function update(dt){
   } else G.evoProg=1;
   G.drainCD=Math.max(0,G.drainCD-dt);
 
-  // the fixation reticle is ALWAYS clearly visible and stays calm so you can hold your gaze on it
-  cursorEl.style.opacity = (opened ? 0.85 : 1).toFixed(2);
-  const cs = 16 + (opened ? G.shift*4 : 6*Math.abs(Math.sin(G.t*2.2)));
-  cursorEl.style.width=cursorEl.style.height=cs.toFixed(1)+'px';
 
   // ---- shift the whole world to keep player centered ----
   for(const b of beings){ b.x+=shx; b.y+=shy; }
@@ -1051,7 +1125,7 @@ function update(dt){
     if(dist > viewR*2.2){ beings.splice(i,1); }
   }
   if(opened){
-    const target = 22 + Math.round(16*G.quality);
+    const target = (G.biome?G.biome.spawnTarget:22) + Math.round(10*G.quality);
     let guard=0;
     while(beings.length<target && guard++<6) spawnBeing();
   }
@@ -1105,6 +1179,7 @@ function update(dt){
   G.invert = (I>0.5 && (surge>0.9||tv>0.7))? (0.5+0.5*Math.sin(G.t*28))*0.5 : lerp(G.invert,0,0.2);
   G.grain = 0.04 + surge*0.05 + (trip*0.03 + rm.grain*rj)*amb + tv*0.05;
   G.vignette = 0.95 - surge*0.2 + (rm.vig*rj)*amb + tv*0.4;
+  G.phos = ((0.014 + trip*0.02 + G.eyeDilate*0.03)*amb + tv*0.04)*I;   // breathing-wall phosphenes
   // travel gives a brief whoosh of blur; sustained ascension stays legible so you can keep playing
   const blur = tv*tv*4 + asc*0.5;
   if(!Post.is2d) glCanvas.style.filter = blur>0.02 ? `blur(${blur.toFixed(2)}px) saturate(${(1+asc*0.4+tv*0.4).toFixed(2)})` : '';
@@ -1335,7 +1410,8 @@ function drawMandala(){
   sctx.fillStyle=cg; sctx.beginPath(); sctx.arc(cx,cy,R*0.3,0,TAU); sctx.fill();
   sctx.globalCompositeOperation='source-over';
   sctx.globalAlpha=0.9; sctx.fillStyle='rgba(5,2,8,0.9)';
-  sctx.beginPath(); sctx.arc(cx,cy,R*0.085*(1+0.3*Math.sin(t*1.3)),0,TAU); sctx.fill();
+  // the pupil dilates with eye-expansion events and the depth of the trip
+  sctx.beginPath(); sctx.arc(cx,cy,R*0.085*(1+0.3*Math.sin(t*1.3))*(1+G.eyeDilate*1.9+G.trip*0.14),0,TAU); sctx.fill();
   // progress arc -> next metamorphosis; a full pulsing halo when transcendence is ready
   sctx.globalCompositeOperation='lighter';
   sctx.lineCap='round';
@@ -1370,6 +1446,8 @@ function render(){
   }
   // massive near-invisible faces bleed out of the background here, BEHIND everything else
   drawBigFaces();
+  // vast irises dilating out of the fixation point
+  drawEyeWaves();
   const opened = G.phase!=='fixate';
   // motes (faint while you're fixating; they swell in once the trip opens)
   const moteA = 0.25+0.75*G.open;
@@ -1480,7 +1558,6 @@ const audio=(()=>{
    INPUT
    ===================================================================== */
 const keys=new Set();
-const cursorEl=document.getElementById('cursor');
 // The pointer does NOTHING — you are locked to the centre. WASD moves the world; SHIFT is
 // a controlled dash while moving, and transcendence while held still.
 addEventListener('pointerdown',()=>{ audio.on(); },{passive:true});
@@ -1531,7 +1608,7 @@ function start(){
   try{ const el=document.documentElement;
     (el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen||function(){}).call(el); }catch(e){}
   initPlayer(); seedMotes();
-  // beings are NOT spawned yet — the first 10s is pure fixation on the centre dot
+  G.biome=makeBiome(0); G.realm=G.biome.idx;   // every run begins in a random biome
   document.getElementById('intro').classList.add('gone');
   audio.on();
   setTimeout(resize,80);   // re-measure once fullscreen has settled
@@ -1548,7 +1625,8 @@ requestAnimationFrame(loop);
 
 // expose a few handles for debugging / external drivers
 window.G=G; window.player=player; window.beings=beings; window.parts=parts; window.faces=faces;
-window.shades=shades; window.crawlers=crawlers; window.bigFaces=bigFaces; window.Post=Post; window.REALMS=REALMS;
+window.shades=shades; window.crawlers=crawlers; window.bigFaces=bigFaces; window.eyeWaves=eyeWaves;
+window.Post=Post; window.REALMS=REALMS;
 </script>
 </body>
 </html>
