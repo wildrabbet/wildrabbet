@@ -1039,7 +1039,7 @@ function buildSnakes(){
 }
 function drawSnakes(){
   if(!snakeCfg) return;
-  const vis=clamp((G.trip-0.22)*1.5,0,1)*(1-G.hyper)*0.72*G.intensity;
+  const vis=clamp((G.trip-0.22)*1.5,0,1)*(1-G.hyper)*(0.72+0.28*G.med)*G.intensity;
   if(vis<=0.02) return;
   const w=G.W,h=G.H, mn=Math.min(w,h)/2;
   snakeCfg.rot += G.dt*0.01;      // barely moving — the spin is yours
@@ -1296,7 +1296,7 @@ function update(dt){
   for(const g2 of gates){ g2.x+=shx; g2.y+=shy; }
 
   // ---- reality gates: two futures surface as the metamorphosis ripens; steer into one ----
-  if(opened && !G.transReady && G.evoProg>0.7 && gates.length===0) spawnGates();
+  if(opened && !G.transReady && G.evoProg>0.7 && gates.length===0 && G.med<0.4) spawnGates();
   for(let i=gates.length-1;i>=0;i--){
     const g2=gates[i], d2=Math.hypot(g2.x,g2.y);
     if(d2 < g2.r + player.radius*0.6){
@@ -1322,7 +1322,9 @@ function update(dt){
     else if(b.behavior==='orbit'){ bx=-b.y/d; by=b.x/d; }
     else { b.wa+=gauss(0,1)*dt*2; bx=Math.cos(b.wa); by=Math.sin(b.wa); }
     bx += -b.y/d*swirl*1.6; by += b.x/d*swirl*1.6;                     // realm swirl
-    const acc=b.spd*spdMul*(0.5+0.7*G.pace)*(1+surge*0.6)*(1+G.hyper*1.6);
+    // meditation: the world respectfully recedes — everything slows and drifts back
+    bx += b.x/d*G.med*1.2; by += b.y/d*G.med*1.2;
+    const acc=b.spd*spdMul*(0.5+0.7*G.pace)*(1+surge*0.6)*(1+G.hyper*1.6)*(1-G.med*0.85);
     b.vx=lerp(b.vx, bx*acc, 1-Math.pow(0.02,dt));
     b.vy=lerp(b.vy, by*acc, 1-Math.pow(0.02,dt));
     b.x+=b.vx*dt; b.y+=b.vy*dt; b.spin+=b.spinV*dt;
@@ -1331,14 +1333,15 @@ function update(dt){
     if(srand()<dt*1.5){ parts.push({x:b.x,y:b.y,vx:gauss(0,4),vy:gauss(0,4),life:1,decay:rr(0.8,1.8),
       r:rr(0.03,0.08)*b.radius,hue:(b.genome.hue+gauss(0,30))%360,kind:'spark'}); }
     const dist=Math.hypot(b.x,b.y);
-    if(dist < player.radius*0.82 + b.radius*0.28){
+    if(dist < player.radius*0.82 + b.radius*0.28 && G.med<0.5){
       // smaller -> food you become. Bigger -> a predator that feeds on YOU: dodge it.
+      // In meditation nothing touches you: the game is suspended, you are only staring.
       if(b.mass > player.mass*1.15){ if(G.drainCD<=0) drain(b); }
       else { graft(b); beings.splice(i,1); continue; }
     }
     if(dist > viewR*2.2){ beings.splice(i,1); }
   }
-  if(opened){
+  if(opened && G.med<0.6){        // the world stops arriving while you meditate
     const target = (G.biome?G.biome.spawnTarget:22) + Math.round(10*G.quality);
     let guard=0;
     while(beings.length<target && guard++<6) spawnBeing();
@@ -1357,6 +1360,9 @@ function update(dt){
       const dd2=Math.hypot(p.x,p.y)||1;
       const fall=viewR*(0.03+0.05*G.hyper+0.02*G.trip)*dep;   // everything is always falling in
       p.x-=p.x/dd2*fall*dt; p.y-=p.y/dd2*fall*dt;
+      // deep meditation: the whole field sinks, slowly — and the body reads it as RISING.
+      // Linear vection: the floating, lifting-out sensation, made of nothing but motion.
+      p.y += viewR*0.035*G.med*dep*dt;
       p.ph+=dt; const dd=Math.hypot(p.x,p.y);
       if(dd<viewR*0.05 || dd>viewR*1.9){ const a2=srand()*TAU,nd=viewR*rr(1.1,1.6);
         p.x=Math.cos(a2)*nd; p.y=Math.sin(a2)*nd; }
@@ -1372,14 +1378,19 @@ function update(dt){
   G.kick*=Math.pow(0.02,dt);
   const tgtWarp   = (0.4 + 0.28*G.breath + trip*0.45 + rm.warp*rj)*amb + surge*0.7 + G.warpSpike + tv*1.6;
   const tgtChroma = ((0.35 + trip*0.6 + rm.chroma*rj)*amb + surge*0.6 + G.chromaSpike + tv*1.6)*I;
-  const tgtDecay  = Math.min(0.93, 0.865 + (surge*0.025 + trip*0.015)*amb + G.kick*0.012 + asc*0.02 + tv*0.03);
+  const med3=G.med;   // the induction deepens every parameter below
+  const tgtDecay  = Math.min(0.93, 0.865 + (surge*0.025 + trip*0.015)*amb + G.kick*0.012 + asc*0.02 + tv*0.03 + med3*0.02);
   const tgtKal    = ((trip*0.25 + rm.kal*rj)*amb + surge*0.4 + tv*0.4)*I;
-  const tgtSwirl  = ((Math.sin(G.t*0.13)*0.14 + trip*0.14)*amb + surge*0.25 + asc*0.5 + tv*0.9)*I;
-  // THE TUNNEL: steady, one-way, ever-deepening. No sin() => it never changes direction or slows.
-  const tgtFeedZ  = -(0.006 + (0.006 + trip*0.004)*amb + asc*0.006 + tv*0.02);   // always inward
-  const tgtFeedR  =  (0.004 + (trip*0.0015)*amb + surge*0.003 + asc*0.006 + tv*0.02)*I; // always same spin
-  const tgtSpiral = (0.45 + trip*0.8 + rm.spiral*rj)*amb + surge*0.5 + tv*1.2;
-  const tgtSat    = 1.15 + (0.15 + trip*0.6 + rm.sat*rj)*amb + tv*0.4;
+  const tgtSwirl  = ((Math.sin(G.t*0.13)*0.14 + trip*0.14)*amb + surge*0.25 + asc*0.5 + tv*0.9)*I*(1-med3*0.5);
+  // THE TUNNEL: steady, one-way, ever-deepening. No sin() => it never reverses. In meditation
+  // it slows toward monotony, and the whole world INHALES at 0.1 Hz (vection breathing) —
+  // the frame itself breathes with the mandala and the drone.
+  const tgtFeedZ  = -(0.006 + (0.006 + trip*0.004)*amb + asc*0.006 + tv*0.02)*(1-med3*0.55)
+                    + Math.sin(G.t*0.628)*0.004*med3;
+  const tgtFeedR  =  (0.004 + (trip*0.0015)*amb + surge*0.003 + asc*0.006 + tv*0.02)*I*(1-med3*0.6);
+  const tgtSpiral = ((0.45 + trip*0.8 + rm.spiral*rj)*amb + surge*0.5 + tv*1.2)*(1-med3*0.35);
+  // palette settles toward calm in trance; attention narrows (soft tunnel-vision vignette)
+  const tgtSat    = (1.15 + (0.15 + trip*0.6 + rm.sat*rj)*amb + tv*0.4)*(1-med3*0.22);
   G.warp   =lerp(G.warp,tgtWarp, tv>0.02?0.14:0.05);
   G.chroma =lerp(G.chroma,tgtChroma,0.06);
   G.decay  =lerp(G.decay,tgtDecay,0.04);
@@ -1390,7 +1401,7 @@ function update(dt){
   G.spiral =lerp(G.spiral,tgtSpiral,0.035);
   G.sat    =lerp(G.sat,tgtSat,0.03);
   // realm palette rotation blended into the global hue
-  G._hueAcc = (G._hueAcc + dt*((0.06+trip*0.1)*amb + surge*0.25 + asc*0.3) + G.hueSpike*dt*3) % TAU;
+  G._hueAcc = (G._hueAcc + dt*((0.06+trip*0.1)*amb + surge*0.25 + asc*0.3)*(1-med3*0.55) + G.hueSpike*dt*3) % TAU;
   G.realmHue = lerp(G.realmHue, rm.hueRot*rj, 0.02);
   G.hue = G._hueAcc + G.realmHue;
   // 10 Hz alpha shimmer during surges/charge — the flicker band that seeds geometric
@@ -1398,8 +1409,8 @@ function update(dt){
   const alphaShimmer = Math.sin(G.t*62.83)*0.016*(surge*0.7+tc)*I;
   G.flash=lerp(G.flash, G.flashSpike + surge*0.05*I + tv*0.45*I + alphaShimmer, 0.3);
   G.invert = (I>0.5 && (surge>0.9||tv>0.7))? (0.5+0.5*Math.sin(G.t*28))*0.5 : lerp(G.invert,0,0.2);
-  G.grain = 0.04 + surge*0.05 + (trip*0.03 + rm.grain*rj)*amb + tv*0.05;
-  G.vignette = 0.95 - surge*0.2 + (rm.vig*rj)*amb + tv*0.4;
+  G.grain = (0.04 + surge*0.05 + (trip*0.03 + rm.grain*rj)*amb + tv*0.05)*(1-med3*0.5);
+  G.vignette = 0.95 - surge*0.2 + (rm.vig*rj)*amb + tv*0.4 + med3*0.3;
   G.phos = ((0.016 + trip*0.022 + G.eyeDilate*0.03)*amb + tv*0.04)*I;  // breathing-wall phosphenes
   G.form = ((0.006 + trip*0.013 + G.med*0.012)*amb + tv*0.03)*I;       // honeycomb form-constant
   G.dof  = (0.04 + trip*0.035 + tc*0.06)*amb;                          // the well's depth of field
@@ -1629,7 +1640,8 @@ function drawMandala(){
   const rings=2+G.stage;
   for(let L=0;L<rings;L++){
     const dir=L%2?1:-1;
-    const rot=t*(0.12+L*0.05+tcm*1.4)*dir + L*0.5;
+    // in meditation the wheel slows toward monotony — the hypnotist's steady voice
+    const rot=t*(0.12+L*0.05+tcm*1.4)*dir*(1-G.med*0.65) + L*0.5;
     const rad=R*(0.34+L*(0.62/rings));
     const n=5+G.stage*2+((G.cycle-1)%4)+L;
     const lh=(hue+L*26+G.cycle*30)%360;
