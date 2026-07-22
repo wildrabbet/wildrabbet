@@ -133,6 +133,7 @@ const G = {
   eyeTimer:7, eyeDilate:0, phos:0,
   lift:0, liftTimer:70, liftFired:true, garden:[], gardenTimer:35,
   still:0, med:0, rite:'idle', riteT:0, riteTimer:210,
+  form:0, pareiTimer:28, parei:0, pareiDur:2, pareiSeed:0,
   rm:{hueRot:0,sat:0,warp:0,chroma:0,kal:0,spiral:0,flowZ:0,flowR:0,spin:0,spd:0,grain:0,vig:0},
   // event impulses (decay over time)
   kick:0, hueSpike:0, warpSpike:0, chromaSpike:0, flashSpike:0, surge:0,
@@ -156,7 +157,7 @@ const Post = (()=>{
 
   const POST = `precision highp float; varying vec2 vUv;
     uniform sampler2D uScene, uPrev; uniform vec2 uRes; uniform float uTime;
-    uniform float uWarp,uChroma,uHue,uDecay,uFeedZoom,uFeedRot,uKaleido,uBreath,uSwirl,uSpiral,uHyper,uSat,uPhos;
+    uniform float uWarp,uChroma,uHue,uDecay,uFeedZoom,uFeedRot,uKaleido,uBreath,uSwirl,uSpiral,uHyper,uSat,uPhos,uForm;
     mat2 rot(float a){ float s=sin(a),c=cos(a); return mat2(c,-s,s,c);}
     vec3 hueRot(vec3 col,float a){ const vec3 k=vec3(0.57735); float c=cos(a),s=sin(a);
       return col*c + cross(k,col)*s + k*dot(k,col)*(1.0-c);}
@@ -198,6 +199,14 @@ const Post = (()=>{
       float ph1 = sin(r*34.0 - uTime*1.7) * (0.6+0.4*sin(ang*3.0 + uTime*0.31));
       float ph2 = sin(r*11.0 - uTime*0.55 + sin(ang*6.0)*0.8);
       col += (ph1*0.7 + ph2*0.45) * uPhos * cm;
+      // Kluever form-constant: a slowly rotating honeycomb interference lattice, breathing
+      // with the trip — the geometric substrate every deep psychedelic report describes
+      float fa=uTime*0.02; mat2 fr=rot(fa);
+      vec2 hc=fr*c*(30.0+8.0*sin(uTime*0.05));
+      float hex = cos(hc.x) + cos(hc.x*0.5+hc.y*0.866) + cos(hc.x*0.5-hc.y*0.866);
+      col += hex*0.333 * uForm * cm;
+      // iridescence: oil-slick hue twist that slides down the well
+      col = hueRot(col, sin(r*9.0 - uTime*0.4) * uForm * 6.0 * cm);
       gl_FragColor=vec4(clamp(col,0.0,1.0),1.0);
     }`;
 
@@ -306,6 +315,7 @@ const Post = (()=>{
     gl.uniform1f(U(progPost,'uHyper'),u.hyper);
     gl.uniform1f(U(progPost,'uSat'),u.sat);
     gl.uniform1f(U(progPost,'uPhos'),u.phos);
+    gl.uniform1f(U(progPost,'uForm'),u.form);
     gl.drawArrays(gl.TRIANGLES,0,3);
     // pass 2 -> screen (present)
     gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,W,H);
@@ -332,6 +342,7 @@ const Post = (()=>{
 const scene = document.createElement('canvas');
 const sctx  = scene.getContext('2d');
 const glCanvas = document.getElementById('gl');
+const noteQ = [];   // sounded notes waiting to become light (chromesthesia)
 
 /* =====================================================================
    PROCEDURAL FORM GENERATION
@@ -1390,7 +1401,15 @@ function update(dt){
   G.grain = 0.04 + surge*0.05 + (trip*0.03 + rm.grain*rj)*amb + tv*0.05;
   G.vignette = 0.95 - surge*0.2 + (rm.vig*rj)*amb + tv*0.4;
   G.phos = ((0.016 + trip*0.022 + G.eyeDilate*0.03)*amb + tv*0.04)*I;  // breathing-wall phosphenes
+  G.form = ((0.006 + trip*0.013 + G.med*0.012)*amb + tv*0.03)*I;       // honeycomb form-constant
   G.dof  = (0.04 + trip*0.035 + tc*0.06)*amb;                          // the well's depth of field
+
+  // ---- pareidolia: once in a long while, for a breath or two, the mandala almost has a
+  // face. Sub-threshold — nothing is ever actually drawn clearly enough to point at. ----
+  if(G.parei>0){ G.parei=Math.max(0,G.parei-dt/G.pareiDur); }
+  else { G.pareiTimer-=dt;
+    if(opened && G.pareiTimer<=0){ G.parei=1; G.pareiDur=rr(1.6,3); G.pareiSeed=srand()*10;
+      G.pareiTimer=rr(25,60); } }
   audio.tick(dt, trip, G.realm);                                        // this biome's music breathes
 
   // ---- Troxler garden: screen-static pastel blooms that your own brain will erase
@@ -1634,6 +1653,20 @@ function drawMandala(){
   sctx.globalAlpha=0.9; sctx.fillStyle='rgba(5,2,8,0.9)';
   // the pupil dilates with eye-expansion events and the depth of the trip
   sctx.beginPath(); sctx.arc(cx,cy,R*0.085*(1+0.3*Math.sin(t*1.3))*(1+G.eyeDilate*1.9+G.trip*0.14),0,TAU); sctx.fill();
+  // pareidolia: for a breath, the mandala ALMOST arranges into a face — two shadows where
+  // eyes would be, a fainter one where a mouth would be. Below the threshold of certainty;
+  // gone before it can be looked at. The face is assembled in the player, not on the screen.
+  if(G.parei>0){
+    const env=Math.sin(Math.PI*G.parei), pa=env*0.075;
+    const s1=Math.sin(G.pareiSeed*7)*0.06, tilt=Math.sin(G.pareiSeed*13)*0.2;
+    sctx.save(); sctx.translate(cx,cy); sctx.rotate(tilt);
+    sctx.fillStyle=`rgba(4,1,8,${pa})`;
+    sctx.beginPath(); sctx.ellipse(-R*0.3, -R*0.16+s1*R, R*0.16, R*0.11, -0.2, 0, TAU); sctx.fill();
+    sctx.beginPath(); sctx.ellipse( R*0.3, -R*0.16-s1*R, R*0.16, R*0.11,  0.2, 0, TAU); sctx.fill();
+    sctx.fillStyle=`rgba(4,1,8,${pa*0.7})`;
+    sctx.beginPath(); sctx.ellipse(0, R*0.42, R*0.2, R*0.07, s1, 0, TAU); sctx.fill();
+    sctx.restore();
+  }
   // progress arc -> next metamorphosis; a full pulsing halo when transcendence is ready
   sctx.globalCompositeOperation='lighter';
   sctx.lineCap='round';
@@ -1681,6 +1714,21 @@ function render(){
     sctx.globalAlpha=0.5*tw*moteA; sctx.fillStyle=hsl(p.hue+bh,80,70,1);
     sctx.beginPath(); sctx.arc(sx,sy,p.r*tw,0,TAU); sctx.fill();
   }
+  // chromesthesia: the music, painted — each note a soft bloom on the pitch-circle
+  for(let i=noteQ.length-1;i>=0;i--){
+    const nb=noteQ[i]; const u=(G.t-nb.t0)/nb.dur;
+    if(u>=1){ noteQ.splice(i,1); continue; }
+    const env=Math.pow(Math.sin(Math.PI*Math.min(1,u)),1.5);
+    const mn=Math.min(w,h)/2, ang=nb.pc/12*TAU+nb.jit;
+    const nx=w/2+Math.cos(ang)*nb.rad*mn, ny=h/2+Math.sin(ang)*nb.rad*mn;
+    const NR=mn*(0.1+nb.vol*0.55)*(0.75+u*0.5);
+    const hue=(nb.pc*30+bh*0.3)%360;
+    const ng=sctx.createRadialGradient(nx,ny,0,nx,ny,NR);
+    ng.addColorStop(0,hsl(hue,88,64,0.24*env)); ng.addColorStop(0.6,hsl(hue,85,55,0.08*env)); ng.addColorStop(1,hsl(hue,80,50,0));
+    sctx.globalCompositeOperation='lighter'; sctx.globalAlpha=1;
+    sctx.fillStyle=ng; sctx.beginPath(); sctx.arc(nx,ny,NR,0,TAU); sctx.fill();
+  }
+  sctx.globalCompositeOperation='source-over';
   // reality gates — the two futures, read peripherally
   drawGates();
   // creatures — predators (bigger than you) carry a dark pulsing warning ring you can read peripherally
@@ -1765,6 +1813,10 @@ const audio=(()=>{
     started=true; master.gain.setTargetAtTime(G.sound?0.5:0.0, ac.currentTime, 1.2); }
   function setEnabled(v){ if(!ac) return; master.gain.setTargetAtTime(v?0.5:0.0, ac.currentTime, 0.3); }
   function blip(freq,dur,type,vol){ if(!ac||!started||!G.sound) return;
+    // chromesthesia: every sounded note becomes light in the periphery — pitch class sets
+    // its hue AND its position on the great circle, so the music paints a clock of colour
+    if(noteQ.length<24) noteQ.push({t0:G.t, dur:Math.min(2.2,dur+0.6),
+      pc:((12*Math.log2(freq/440))%12+12)%12, vol:vol||0.2, rad:rr(0.5,0.88), jit:gauss(0,0.12)});
     const o=ac.createOscillator(); o.type=type||'sine'; const g=ac.createGain();
     const m=ac.createOscillator(); const mg=ac.createGain(); // FM
     m.frequency.value=freq*rr(1.4,2.2); mg.gain.value=freq*rr(0.5,1.5);
