@@ -131,6 +131,8 @@ const G = {
   shiftHeld:false, shift:0, asc:0, travel:0, realm:0, biome:null,
   nextBiome:null, goldStreak:0, dof:0, dprScale:1,
   eyeTimer:7, eyeDilate:0, phos:0,
+  lift:0, liftTimer:70, liftFired:true, garden:[], gardenTimer:35,
+  still:0, med:0, rite:'idle', riteT:0, riteTimer:210,
   rm:{hueRot:0,sat:0,warp:0,chroma:0,kal:0,spiral:0,flowZ:0,flowR:0,spin:0,spd:0,grain:0,vig:0},
   // event impulses (decay over time)
   kick:0, hueSpike:0, warpSpike:0, chromaSpike:0, flashSpike:0, surge:0,
@@ -545,6 +547,7 @@ function enterBiome(){
   G.realm=G.biome.idx;
   G.travel=1;                                       // the crossing whoosh
   gates.length=0;
+  buildSnakes();                                    // this biome's snake-wheels
   audio.setBiome(G.biome.idx, !!G.biome.clear);
   audio.surge();
 }
@@ -1013,10 +1016,94 @@ function drawBurn(){
   sctx.restore();
 }
 
+/* ---------- ROTATING-SNAKES rings (peripheral drift illusion, Kitaoka construction):
+   repeating asymmetric luminance patches — black, dark-blue, white, light-yellow — that are
+   OBJECTIVELY STATIC. Reading the periphery (which this game demands) fires the microsaccades
+   that set them spinning. The motion you see is made entirely by your own eyes. ---------- */
+let snakeCfg=null;
+function buildSnakes(){
+  snakeCfg={ rings:[ {r:rr(0.58,0.66), n:ri(48,72)&~3, w:rr(0.05,0.07), dir:1},
+                     {r:rr(0.78,0.88), n:ri(60,88)&~3, w:rr(0.05,0.075), dir:-1} ],
+             hue:(G.realm*47+200)%360, rot:srand()*TAU };
+}
+function drawSnakes(){
+  if(!snakeCfg) return;
+  const vis=clamp((G.trip-0.22)*1.5,0,1)*(1-G.hyper)*0.72*G.intensity;
+  if(vis<=0.02) return;
+  const w=G.W,h=G.H, mn=Math.min(w,h)/2;
+  snakeCfg.rot += G.dt*0.01;      // barely moving — the spin is yours
+  const steps=[[0,0],[0.35,1],[1,0],[0.65,2]];   // [luminance, 0=achromatic 1=dark-col 2=light-col]
+  for(const ring of snakeCfg.rings){
+    const R=ring.r*mn, W=ring.w*mn, n=ring.n, seg=TAU/n;
+    for(let i=0;i<n;i++){
+      const a0=ring.dir*(i*seg)+snakeCfg.rot, a1=a0+ring.dir*seg*0.98;
+      const st=steps[i%4];
+      vctx.globalAlpha=vis*(st[0]===0?0.8:0.7);
+      vctx.fillStyle= st[1]===1? `hsl(${snakeCfg.hue|0},72%,26%)`
+                    : st[1]===2? `hsl(${(snakeCfg.hue+160)%360|0},80%,68%)`
+                    : (st[0]===0?'#000':'#fff');
+      vctx.beginPath();
+      vctx.arc(w/2,h/2,R+W/2,a0,a1,ring.dir<0);
+      vctx.arc(w/2,h/2,R-W/2,a1,a0,ring.dir>=0);
+      vctx.closePath(); vctx.fill();
+    }
+  }
+  vctx.globalAlpha=1;
+}
+function drawGarden(){
+  const gd=G.garden; if(!gd.length) return;
+  const w=G.W,h=G.H, mn=Math.min(w,h)/2;
+  for(let i=gd.length-1;i>=0;i--){
+    const g2=gd[i]; const age=G.t-g2.t0;
+    if(age>g2.dur){ gd.splice(i,1); continue; }
+    const env=Math.min(1,age/4)*Math.min(1,(g2.dur-age)/4);
+    const gx=w/2+Math.cos(g2.a)*g2.r*mn, gy=h/2+Math.sin(g2.a)*g2.r*mn, GR=g2.R*mn;
+    const gg=vctx.createRadialGradient(gx,gy,0,gx,gy,GR);
+    gg.addColorStop(0,hsl(g2.hue,42,58,0.12*env)); gg.addColorStop(1,hsl(g2.hue,42,58,0));
+    vctx.fillStyle=gg; vctx.beginPath(); vctx.arc(gx,gy,GR,0,TAU); vctx.fill();
+  }
+}
+/* ---------- THE AFTERIMAGE RITE: a saturated complementary wheel is held perfectly
+   still around the fixation point while everything else recedes. The player, entranced,
+   keeps staring. Cut to white — and the complementary ghost blooms in their own retina,
+   painted by photoreceptor fatigue. Colour washes, then it all fades back in as if
+   nothing happened. ---------- */
+function drawRite(){
+  if(G.rite==='idle') return;
+  const w=G.W,h=G.H,cx=w/2,cy=h/2,mn=Math.min(w,h);
+  if(G.rite==='charge'){
+    const a=smooth(Math.min(1,G.riteT*1.35));
+    vctx.globalAlpha=a*0.97;
+    const n=6, R=mn*0.34;
+    for(let k=0;k<n;k++){
+      const ang=k/n*TAU-Math.PI/2;
+      vctx.fillStyle= k%2? 'hsl(300,100%,50%)' : 'hsl(140,100%,44%)';
+      vctx.beginPath();
+      vctx.ellipse(cx+Math.cos(ang)*R*0.55, cy+Math.sin(ang)*R*0.55, R*0.44, R*0.2, ang, 0, TAU);
+      vctx.fill();
+    }
+    vctx.fillStyle='hsl(220,100%,52%)';
+    vctx.beginPath(); vctx.arc(cx,cy,R*0.2,0,TAU); vctx.fill();
+    vctx.fillStyle='#fff';
+    vctx.beginPath(); vctx.arc(cx,cy,mn*0.005,0,TAU); vctx.fill();
+  } else if(G.rite==='white'){
+    vctx.globalAlpha=1; vctx.fillStyle='#fff'; vctx.fillRect(0,0,w,h);
+  } else if(G.rite==='wash'){
+    vctx.globalAlpha=1; vctx.fillStyle=`hsl(${(G.t*520)%360|0},95%,55%)`; vctx.fillRect(0,0,w,h);
+  } else if(G.rite==='fade'){
+    vctx.globalAlpha=1-smooth(G.riteT);
+    vctx.fillStyle=`hsl(${(G.t*520)%360|0},95%,55%)`; vctx.fillRect(0,0,w,h);
+  }
+  vctx.globalAlpha=1;
+}
+
 function drawVeil(){
   vctx.clearRect(0,0,G.W,G.H);
+  drawSnakes();
+  drawGarden();
   drawShades();
   drawCrawlers(G.dt);
+  drawRite();
 }
 
 /* ---------- REALMS: while ascended you drift between these visual regimes. Each is a set
@@ -1083,6 +1170,31 @@ function update(dt){
   // ---- controls: WASD moves the world; you stay dead centre and ALWAYS in control ----
   let kx=(keys.has('d')||keys.has('arrowright'))-(keys.has('a')||keys.has('arrowleft'));
   let ky=(keys.has('s')||keys.has('arrowdown'))-(keys.has('w')||keys.has('arrowup'));
+  const moving=(kx||ky)?1:0;
+
+  // ---- stillness IS the deepest input. Idle and the meditation grows — visuals slow and
+  // deepen, the music thins into something colder. The first touch after long stillness
+  // lands like a hammer: the longer you were gone, the harder reality snaps back. ----
+  if(moving && G.still>8){
+    const imp=clamp(G.still/40,0.3,1.2);
+    G.kick=Math.min(1.6,G.kick+imp); G.warpSpike+=0.5*imp; G.chromaSpike+=0.6*imp;
+    G.flashSpike=Math.min(0.9,G.flashSpike+0.25*imp*G.intensity);
+    parts.push({x:0,y:0,life:1,decay:0.7,r0:player.radius*0.9,hue:player.hue,kind:'ring'});
+    audio.impact(imp);
+  }
+  if(moving||G.shiftHeld) G.still=0; else G.still+=dt;
+  G.med=lerp(G.med, clamp((G.still-6)/30,0,1), 1-Math.pow(0.3,dt));
+
+  // ---- the afterimage rite: rarely, the game becomes the oldest illusion of all.
+  // A saturated wheel burns in while you hold the centre... then pure white — and the
+  // ghost you see there is painted by your own retina. Then colour, then nothing happened.
+  if(opened && G.rite==='idle'){
+    G.riteTimer-=dt;
+    if(G.riteTimer<=0 && !G.transReady && G.hyper<0.3){ G.rite='charge'; G.riteT=0; }
+  } else if(G.rite==='charge'){ G.riteT+=dt/15; if(G.riteT>=1){ G.rite='white'; G.riteT=0; audio.duck(2.6); } }
+  else if(G.rite==='white'){ G.riteT+=dt/2.3; if(G.riteT>=1){ G.rite='wash'; G.riteT=0; } }
+  else if(G.rite==='wash'){ G.riteT+=dt/1.6; if(G.riteT>=1){ G.rite='fade'; G.riteT=0; } }
+  else if(G.rite==='fade'){ G.riteT+=dt/2.5; if(G.riteT>=1){ G.rite='idle'; G.riteTimer=rr(240,480); } }
 
   // ---- SHIFT: dash — and, when the mandala is in bloom, hold it to CHARGE TRANSCENDENCE ----
   G.shift = lerp(G.shift, G.shiftHeld?1:0, 1-Math.pow(0.02,dt));
@@ -1105,17 +1217,26 @@ function update(dt){
   // the more cycles you've transcended. Each rebirth loosens reality's grip a little more.
   if(opened) G.tripTime += dt;
   G.pace = clamp(0.4 + G.tripTime*0.02 + Math.log2(1+player.mass)*0.03 + G.depth*0.06, 0.4, 2.2);
-  G.trip = clamp(Math.log2(1+player.mass)*0.1 + G.tripTime*0.005 + G.depth*0.16 + asc*0.5 + tv*0.4, 0, 2.6);
+  G.trip = clamp(Math.log2(1+player.mass)*0.1 + G.tripTime*0.005 + G.depth*0.16 + asc*0.5 + tv*0.4 + G.med*0.45, 0, 2.6);
   const trip=G.trip;
 
-  // ---- breathing / surge scheduler ----
-  G.breath = 0.5+0.5*Math.sin(G.t*0.5);
+  // ---- breathing at 0.1 Hz — six breaths a minute, the resonance frequency of calm.
+  // The mandala, the drone's swell and the warp all inhale together; the player entrains.
+  G.breath = 0.5+0.5*Math.sin(G.t*0.628);
   if(opened){
     G.surgeTimer -= dt*G.pace;
     if(G.surgeTimer<=0){ G.surge=1; G.surgeTimer=rr(12,24); audio.surge(); }
   }
   G.surge=Math.max(0,G.surge-dt*0.22);
   const surge=smooth(G.surge);
+
+  // ---- fractionation: the classic hypnotic deepening cycle — every minute or so the
+  // whole trip SOFTENS for a few breaths... then plunges deeper than before ----
+  G.liftTimer-=dt;
+  if(opened && G.liftTimer<=0){ G.lift=1; G.liftFired=false; G.liftTimer=rr(55,90); }
+  if(G.lift>0){ G.lift=Math.max(0,G.lift-dt/7);
+    if(!G.liftFired && G.lift<0.5){ G.liftFired=true; G.surge=1; G.tripTime+=3; audio.surge(); } }
+  const lift = G.lift>0.5 ? smooth((G.lift-0.5)*2) : 0;
 
   // ---- illusions: begin immediately, escalate with trip/ascension, mixed per-biome ----
   if(opened){
@@ -1234,7 +1355,7 @@ function update(dt){
   // ---- drive the shader params (realm + travel folded in; blur kept low so it stays playable) ----
   const I=G.intensity;
   G.open = lerp(G.open, opened?1:0, 1-Math.pow(0.05,dt));
-  const amb = G.open;
+  const amb = G.open*(1-lift*0.55);   // fractionation: the lift softens everything at once
   G.warpSpike*=Math.pow(0.02,dt); G.chromaSpike*=Math.pow(0.05,dt);
   G.hueSpike*=Math.pow(0.15,dt);  G.flashSpike*=Math.pow(0.003,dt);
   G.kick*=Math.pow(0.02,dt);
@@ -1261,17 +1382,28 @@ function update(dt){
   G._hueAcc = (G._hueAcc + dt*((0.06+trip*0.1)*amb + surge*0.25 + asc*0.3) + G.hueSpike*dt*3) % TAU;
   G.realmHue = lerp(G.realmHue, rm.hueRot*rj, 0.02);
   G.hue = G._hueAcc + G.realmHue;
-  G.flash=lerp(G.flash, G.flashSpike + surge*0.05*I + tv*0.45*I, 0.3);
+  // 10 Hz alpha shimmer during surges/charge — the flicker band that seeds geometric
+  // hallucination (honeycombs, zigzags); tiny amplitude, fully gated by intensity mode
+  const alphaShimmer = Math.sin(G.t*62.83)*0.016*(surge*0.7+tc)*I;
+  G.flash=lerp(G.flash, G.flashSpike + surge*0.05*I + tv*0.45*I + alphaShimmer, 0.3);
   G.invert = (I>0.5 && (surge>0.9||tv>0.7))? (0.5+0.5*Math.sin(G.t*28))*0.5 : lerp(G.invert,0,0.2);
   G.grain = 0.04 + surge*0.05 + (trip*0.03 + rm.grain*rj)*amb + tv*0.05;
   G.vignette = 0.95 - surge*0.2 + (rm.vig*rj)*amb + tv*0.4;
   G.phos = ((0.016 + trip*0.022 + G.eyeDilate*0.03)*amb + tv*0.04)*I;  // breathing-wall phosphenes
   G.dof  = (0.04 + trip*0.035 + tc*0.06)*amb;                          // the well's depth of field
   audio.tick(dt, trip, G.realm);                                        // this biome's music breathes
+
+  // ---- Troxler garden: screen-static pastel blooms that your own brain will erase
+  // as you hold fixation — and hand back the moment you move ----
+  G.gardenTimer-=dt;
+  if(opened && G.gardenTimer<=0){ G.gardenTimer=rr(50,90);
+    if(trip>0.15 && G.hyper<0.2){ G.garden.length=0;
+      for(let i=0;i<4;i++) G.garden.push({ a:srand()*TAU, r:rr(0.5,0.82), hue:rr(0,360),
+        R:rr(0.06,0.12), t0:G.t, dur:rr(18,28) }); } }
   // travel gives a brief whoosh of blur; sustained ascension stays legible so you can keep playing
   const blur = tv*tv*4 + asc*0.5;
   if(!Post.is2d) glCanvas.style.filter = blur>0.02 ? `blur(${blur.toFixed(2)}px) saturate(${(1+asc*0.4+tv*0.4).toFixed(2)})` : '';
-  veilEl.style.filter = `blur(${(0.7+blur*0.6).toFixed(2)}px)`;
+  veilEl.style.filter = `blur(${(0.35+blur*0.6).toFixed(2)}px)`;   // crisp overlay — HD illusions
 }
 
 /* =====================================================================
@@ -1468,7 +1600,9 @@ function drawBody(body, wx, wy){
 function drawMandala(){
   const w=G.W,h=G.H,cx=w/2,cy=h/2, t=G.t;
   const tcm=smooth(G.transCharge);
-  const breathe=1+0.05*Math.sin(t*0.9)+0.03*Math.sin(t*2.3);
+  // breathes at 0.1 Hz — six breaths a minute; stare long enough and you breathe with it.
+  // Meditation (stillness) deepens the breath.
+  const breathe=1+(0.07+0.08*G.med)*Math.sin(t*0.628)+0.02*Math.sin(t*2.3);
   const R=Math.min(w,h)*(0.075+G.stage*0.006)*breathe*(1-tcm*0.35);
   const hue=(player.hue + t*8)%360;
   sctx.save();
@@ -1607,13 +1741,25 @@ const audio=(()=>{
     // drone: detuned oscillators through a slow filter LFO
     const filt=ac.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value=520; filt.Q.value=6;
     filt.connect(master); filt.connect(delay);
-    const lfo=ac.createOscillator(); const lg=ac.createGain(); lfo.frequency.value=0.06; lg.gain.value=380;
+    // the filter swells at 0.1 Hz — six breaths a minute, in phase with the mandala
+    const lfo=ac.createOscillator(); const lg=ac.createGain(); lfo.frequency.value=0.1; lg.gain.value=380;
     lfo.connect(lg); lg.connect(filt.frequency); lfo.start();
     [55,55.3,82.5,110,110.6].forEach((f,i)=>{
       const o=ac.createOscillator(); o.type=i%2?'sawtooth':'triangle'; o.frequency.value=f;
       const g=ac.createGain(); g.gain.value=0.14/(i+1); o.connect(g); g.connect(filt); o.start();
       drone.push({o,g});
     });
+    // theta binaural bed: near-identical sine carriers hard-panned L/R — a 5.5 Hz beat
+    // that exists only inside the listener's head
+    try{
+      const pl=ac.createStereoPanner(), pr2=ac.createStereoPanner(); pl.pan.value=-1; pr2.pan.value=1;
+      const o1=ac.createOscillator(), o2=ac.createOscillator();
+      o1.frequency.value=140; o2.frequency.value=145.5;
+      const g1=ac.createGain(), g2=ac.createGain(); g1.gain.value=0.045; g2.gain.value=0.045;
+      o1.connect(g1); g1.connect(pl); pl.connect(master);
+      o2.connect(g2); g2.connect(pr2); pr2.connect(master);
+      o1.start(); o2.start();
+    }catch(e){}
   }
   function on(){ ensure(); if(!ac) return; if(ac.state==='suspended') ac.resume();
     started=true; master.gain.setTargetAtTime(G.sound?0.5:0.0, ac.currentTime, 1.2); }
@@ -1653,6 +1799,15 @@ const audio=(()=>{
     arpT-=dt;
     if(arpT>0) return;
     arpT=rr(0.7,3)/(0.5+trip*0.8);
+    // deep meditation: the arpeggio goes cold — sparse, high, minor-second detuned pairs,
+    // like a town you shouldn't have walked into
+    if(G.med>0.35 && srand()<0.4+G.med*0.3){
+      const base=mf(curRoot,curMode[(srand()*curMode.length)|0]+36+pick([0,1,1,6]));
+      blip(base, rr(1.4,2.8), 'sine', 0.03+G.med*0.045);
+      blip(base*rr(1.004,1.012), rr(1.4,2.8), 'sine', 0.025+G.med*0.04);   // beating twin
+      if(srand()<G.med*0.4) blip(base*0.5*Math.pow(2,1/12), rr(2,3.5), 'triangle', 0.03);
+      return;
+    }
     const semi=curMode[(srand()*curMode.length)|0]+12*ri(1,3);
     blip(mf(curRoot,semi), rr(0.5,1.8), pick(['sine','triangle']), 0.05+Math.min(0.06,trip*0.03));
     if(srand()<0.1+trip*0.09){          // glitch: stutter cluster + delay warble
@@ -1663,8 +1818,16 @@ const audio=(()=>{
         delay.delayTime.setTargetAtTime(d0, ac.currentTime+0.5, 0.3); }
     }
   }
+  function duck(sec){ if(!ac||!master) return;
+    master.gain.setTargetAtTime(0.015, ac.currentTime, 0.08);
+    master.gain.setTargetAtTime(G.sound?0.5:0, ac.currentTime+sec, 0.6); }
   return {
-    on, setEnabled, setBiome, tick,
+    on, setEnabled, setBiome, tick, duck,
+    impact(m){ blip(30,1.3,'sine',0.28*m); blip(45,0.9,'sawtooth',0.22*m);
+      blip(mf(curRoot,0)*2, 0.5, 'square', 0.08*m);
+      if(delay){ const d0=delay.delayTime.value;
+        delay.delayTime.setTargetAtTime(d0*1.8, ac.currentTime, 0.04);
+        delay.delayTime.setTargetAtTime(d0, ac.currentTime+0.5, 0.3); } },
     absorb(p){ const base=200+ (1/(1+p))*500; blip(base*rr(0.9,1.1),0.35+p*0.4,'triangle',0.18+Math.min(0.2,p*0.2));
       if(p>0.6) blip(base*0.5,0.9,'sine',0.2); },
     surge(){ blip(70,2.2,'sawtooth',0.22); blip(105,1.8,'sine',0.16); },
@@ -1741,6 +1904,7 @@ function start(){
     (el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen||function(){}).call(el); }catch(e){}
   initPlayer(); seedMotes();
   G.biome=makeBiome(0); G.realm=G.biome.idx;   // every run begins in a random biome
+  buildSnakes();
   document.getElementById('intro').classList.add('gone');
   audio.on();
   audio.setBiome(G.biome.idx,false);           // the first biome's chord
