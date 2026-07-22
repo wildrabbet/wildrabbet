@@ -135,9 +135,10 @@ const G = {
   warp:0.55, chroma:0.45, hue:0, decay:0.86, feedZoom:0, feedRot:0,
   kaleido:0, swirl:0, breath:0, flash:0, invert:0, grain:0.05, vignette:0.9,
   spiral:0.5, sat:1.3, pace:0.4, _hueAcc:0, realmHue:0,
-  // ascension: SHIFT builds it; you keep PLAYING while you travel through realms.
+  // THE GAME: grow -> evolve (stages) -> transcend (rebirth) -> deeper cycle, forever.
   trip:0, tripTime:0, open:0, phase:'fixate', fixate:1.5,
-  shiftHeld:false, shift:0, asc:0, travel:0, realm:0, realmTimer:9,
+  cycle:1, depth:0, stage:0, evoProg:0, transReady:false, transCharge:0, drainCD:0,
+  shiftHeld:false, shift:0, asc:0, travel:0, realm:0,
   rm:{hueRot:0,sat:0,warp:0,chroma:0,kal:0,spiral:0,flowZ:0,flowR:0,spin:0,spd:0,grain:0,vig:0},
   // event impulses (decay over time)
   kick:0, hueSpike:0, warpSpike:0, chromaSpike:0, flashSpike:0, surge:0,
@@ -490,6 +491,73 @@ function graft(b){
   burst(b.x,b.y, b.radius, b.genome.hue, 14+punch*22);
   parts.push({x:0,y:0,life:1,decay:rr(0.7,1.1),r0:player.radius*0.6,hue:b.genome.hue,kind:'ring'}); // absorb shock-ring
   audio.absorb(b.mass/before);
+  // metamorphosis thresholds: 3, 9, 27, 81, 243 — then the mandala blooms
+  while(!G.transReady && player.mass>=stageThreshold(G.stage)){
+    if(G.stage>=4){ G.transReady=true; audio.ready(); break; }
+    evolve();
+  }
+}
+
+/* =====================================================================
+   THE GAME LOOP: evolve -> transcend -> rebirth, forever deeper
+   ===================================================================== */
+function stageThreshold(s){ return Math.pow(3, s+1); }   // 3, 9, 27, 81, 243
+
+function evolve(){
+  // a metamorphosis: symmetry deepens, a new organ system blooms across the body
+  G.stage++;
+  const g=player.genome;
+  g.symmetry=clamp((g.symmetry||1)+1,1,8);
+  if(srand()<0.5) g.theme=pick(EXOTIC);
+  player.parts.push(...buildBody(g, 4+G.stage*2, true));
+  if(player.parts.length>140){
+    player.parts.sort((a,c)=>(a.orbitR+a.size)-(c.orbitR+c.size));
+    player.parts.splice(0, player.parts.length-140);
+  }
+  G.kick=Math.min(1.5,G.kick+1); G.warpSpike+=0.8; G.chromaSpike+=0.9; G.hueSpike+=0.7;
+  G.flashSpike=Math.min(0.9,G.flashSpike+0.35*G.intensity);
+  burst(0,0,player.radius*1.2,player.hue,40);
+  parts.push({x:0,y:0,life:1,decay:0.8,r0:player.radius*0.8,hue:player.hue,kind:'ring'});
+  audio.evolve();
+}
+
+function rebirth(){
+  // transcendence completes: a new incarnation, a new realm, deeper in — forever
+  G.cycle++; G.depth=Math.min(12,G.depth+1);
+  G.stage=0; G.transReady=false; G.transCharge=0; G.evoProg=0;
+  let nx=G.realm; while(nx===G.realm) nx=ri(1,REALMS.length-1); G.realm=nx;
+  G.travel=1;
+  // carry echoes of what you were into the next life
+  const echoes=[];
+  for(let i=0;i<Math.min(2,player.parts.length);i++){
+    const e=player.parts[(srand()*player.parts.length)|0];
+    echoes.push(Object.assign({},e,{orbitA:srand()*TAU,orbitR:rr(0.5,1)}));
+  }
+  player.genome=makeGenome(); player.hue=player.genome.hue;
+  player.mass=1; player.vx=player.vy=0;
+  player.parts=buildBody(player.genome,6,false).concat(echoes);
+  beings.length=0;
+  for(let i=0;i<26;i++) spawnBeing();
+  G.flashSpike=Math.min(1,0.85*G.intensity); G.kick=1.4; G.hueSpike=1.2; G.chromaSpike=1.5;
+  // flush the old life out of the feedback tunnel — you snap awake in a new, dark world
+  G.decay=0.5; G.flash=0; Post.resize(G.W,G.H);
+  spawnFaceRound(); spawnBigFace();
+  audio.transcend();
+}
+
+function drain(b){
+  // touched something bigger than you: it feeds on you. Dodge these.
+  const loss=player.mass*0.12;
+  player.mass=Math.max(0.4, player.mass-loss);
+  b.mass+=loss*0.7;
+  G.drainCD=1.1;
+  const d=Math.hypot(b.x,b.y)||1;
+  b.vx+=b.x/d*player.radius*3;  b.vy+=b.y/d*player.radius*3;   // predator recoils
+  player.vx=-b.x/d*player.radius*4; player.vy=-b.y/d*player.radius*4; // the world lurches
+  G.kick=Math.min(1.5,G.kick+0.7); G.flashSpike=Math.min(0.9,G.flashSpike+0.2*G.intensity); G.hueSpike+=0.4;
+  parts.push({x:0,y:0,life:1,decay:1.2,r0:player.radius*0.5,hue:0,kind:'ring'});
+  burst(b.x,b.y,b.radius*0.6,0,10);
+  audio.drain();
 }
 
 /* --------------------------------- particles ------------------------------ */
@@ -876,28 +944,28 @@ function update(dt){
   let kx=(keys.has('d')||keys.has('arrowright'))-(keys.has('a')||keys.has('arrowleft'));
   let ky=(keys.has('s')||keys.has('arrowdown'))-(keys.has('w')||keys.has('arrowup'));
 
-  // ---- SHIFT = ASCENSION. You keep PLAYING, but you rush faster and travel through realms,
-  // and it deepens the longer you hold. It lingers after release so you play on inside it. ----
+  // ---- SHIFT: dash — and, when the mandala is in bloom, hold it to CHARGE TRANSCENDENCE ----
   G.shift = lerp(G.shift, G.shiftHeld?1:0, 1-Math.pow(0.02,dt));
-  G.asc   = lerp(G.asc, G.shiftHeld?1:0, 1-Math.pow(G.shiftHeld?0.5:0.9, dt));
-  const asc=G.asc, rj=smooth(clamp(asc,0,1));
-
-  // realm travel — while ascended, journey between realms; the deeper you are the faster
-  if(asc>0.35){
-    G.realmTimer -= dt*(0.4+asc*0.8);
-    if(G.realmTimer<=0){ let nx=G.realm; while(nx===G.realm) nx=ri(1,REALMS.length-1);
-      G.realm=nx; G.realmTimer=rr(7,13); G.travel=1; audio.surge(); }
-  } else if(G.realm!==0 && asc<0.2){ G.realm=0; G.travel=Math.max(G.travel,0.5); }
-  G.travel=Math.max(0,G.travel-dt*0.6);
+  if(G.transReady && G.shiftHeld){
+    G.transCharge=Math.min(1, G.transCharge+dt/2.6);
+    if(G.transCharge>=1) rebirth();
+  } else {
+    G.transCharge=Math.max(0, G.transCharge-dt*0.7);
+  }
+  const tc=smooth(G.transCharge);
+  const asc = clamp(G.shift*0.3 + tc*1.2, 0, 1.3); G.asc=asc;   // rush amount for the visuals
+  const rj = G.open;
+  G.travel=Math.max(0,G.travel-dt*0.5);
   const tv=smooth(G.travel);
   const rm=G.rm, RT=REALMS[G.realm];
-  for(const k in rm) rm[k]=lerp(rm[k], (RT[k]||0), 0.025);   // ease between realms
-  G.hyper = clamp(tv*0.85 + asc*0.12, 0, 1);                 // radial-streak kept LOW so it stays playable
+  for(const k in rm) rm[k]=lerp(rm[k], (RT[k]||0), 0.02);      // this cycle's realm bleeds in slowly
+  G.hyper = clamp(tv*0.8 + tc*0.75 + G.shift*0.1, 0, 1);
 
-  // pace + trip: trippier the BIGGER you are and the LONGER you ascend
+  // pace + trip: trippier the bigger you are, the longer you play, and — permanently —
+  // the more cycles you've transcended. Each rebirth loosens reality's grip a little more.
   if(opened) G.tripTime += dt;
-  G.pace = clamp(0.4 + G.tripTime*0.02 + Math.log2(1+player.mass)*0.03, 0.4, 1.9);
-  G.trip = clamp(Math.log2(1+player.mass)*0.1 + G.tripTime*0.006 + asc*0.6 + tv*0.4, 0, 2.2);
+  G.pace = clamp(0.4 + G.tripTime*0.02 + Math.log2(1+player.mass)*0.03 + G.depth*0.06, 0.4, 2.2);
+  G.trip = clamp(Math.log2(1+player.mass)*0.1 + G.tripTime*0.005 + G.depth*0.16 + asc*0.5 + tv*0.4, 0, 2.6);
   const trip=G.trip;
 
   // ---- breathing / surge scheduler ----
@@ -934,9 +1002,16 @@ function update(dt){
   player._pmx=lerp(player._pmx, G.W/2 + player.vx*0.12, 0.12);
   player._pmy=lerp(player._pmy, G.H/2 + player.vy*0.12, 0.12);
 
-  // radius/scale from mass (infinite growth; camera falls away). Ascending pulls you a little further out.
+  // radius/scale from mass (infinite growth; camera falls away). Charging transcendence pulls you out of body.
   player.radius = player.R0*Math.sqrt(player.mass/player.mass0);
-  G.scale = G.targetScreenR/player.radius * (1 - asc*0.35);
+  G.scale = G.targetScreenR/player.radius * (1 - tc*0.4 - G.shift*0.06);
+
+  // evolution progress toward the next metamorphosis (drives the mandala's arc)
+  if(!G.transReady){
+    const lo=G.stage===0?1:stageThreshold(G.stage-1), hi=stageThreshold(G.stage);
+    G.evoProg=clamp((Math.log(player.mass)-Math.log(lo))/(Math.log(hi)-Math.log(lo)),0,1);
+  } else G.evoProg=1;
+  G.drainCD=Math.max(0,G.drainCD-dt);
 
   // the fixation reticle is ALWAYS clearly visible and stays calm so you can hold your gaze on it
   cursorEl.style.opacity = (opened ? 0.85 : 1).toFixed(2);
@@ -968,7 +1043,11 @@ function update(dt){
     if(srand()<dt*1.5){ parts.push({x:b.x,y:b.y,vx:gauss(0,4),vy:gauss(0,4),life:1,decay:rr(0.8,1.8),
       r:rr(0.03,0.08)*b.radius,hue:(b.genome.hue+gauss(0,30))%360,kind:'spark'}); }
     const dist=Math.hypot(b.x,b.y);
-    if(dist < player.radius*0.82 + b.radius*0.28){ graft(b); beings.splice(i,1); continue; }
+    if(dist < player.radius*0.82 + b.radius*0.28){
+      // smaller -> food you become. Bigger -> a predator that feeds on YOU: dodge it.
+      if(b.mass > player.mass*1.15){ if(G.drainCD<=0) drain(b); }
+      else { graft(b); beings.splice(i,1); continue; }
+    }
     if(dist > viewR*2.2){ beings.splice(i,1); }
   }
   if(opened){
@@ -1192,17 +1271,84 @@ function drawBody(body, wx, wy){
   if(R<0.5) return;
   // core glow
   sctx.globalCompositeOperation='lighter';
+  // bloom that reads in the periphery — scaled down for huge bodies so late-cycle
+  // giants don't flood the feedback loop to white
+  const ba=clamp(120/R,0.3,1);
   const grd=sctx.createRadialGradient(sx,sy,0,sx,sy,R*1.6);
-  grd.addColorStop(0,hsl(body.hue,92,60,0.42));   // bloom that reads in the periphery without washing out
-  grd.addColorStop(0.5,hsl(body.hue,90,52,0.12));
+  grd.addColorStop(0,hsl(body.hue,92,60,0.42*ba));
+  grd.addColorStop(0.5,hsl(body.hue,90,52,0.12*ba));
   grd.addColorStop(1,hsl(body.hue,90,50,0));
   sctx.globalAlpha=1; sctx.fillStyle=grd;
   sctx.beginPath(); sctx.arc(sx,sy,R*1.6,0,TAU); sctx.fill();
+  if(body.danger){
+    // predator: a slow-pulsing blood ring — dark against the glow, unmistakable in the periphery
+    sctx.globalCompositeOperation='source-over';
+    sctx.globalAlpha=0.55+0.3*Math.sin(G.t*3);
+    sctx.strokeStyle='rgba(150,8,26,0.9)'; sctx.lineWidth=Math.max(1.5,R*0.09);
+    sctx.beginPath(); sctx.arc(sx,sy,R*(1.12+0.06*Math.sin(G.t*3)),0,TAU); sctx.stroke();
+    sctx.globalCompositeOperation='lighter';
+  }
   // parts (outer last)
   const rot=body.spin;
   const list=body.parts;
   for(let i=0;i<list.length;i++) drawPart(body,list[i],sx,sy,R,rot);
   sctx.globalCompositeOperation='source-over'; sctx.globalAlpha=1;
+}
+
+/* =====================================================================
+   THE MANDALA — the living centre you stare into. It IS the interface:
+   petal rings = evolution stage, complexity = cycle, the arc = progress
+   to the next metamorphosis, and when it blooms white-gold you hold
+   SHIFT to transcend. It breathes, rotates against itself, and never
+   stops changing.
+   ===================================================================== */
+function drawMandala(){
+  const w=G.W,h=G.H,cx=w/2,cy=h/2, t=G.t;
+  const tcm=smooth(G.transCharge);
+  const breathe=1+0.05*Math.sin(t*0.9)+0.03*Math.sin(t*2.3);
+  const R=Math.min(w,h)*(0.075+G.stage*0.006)*breathe*(1-tcm*0.35);
+  const hue=(player.hue + t*8)%360;
+  sctx.save();
+  sctx.globalCompositeOperation='lighter';
+  const rings=2+G.stage;
+  for(let L=0;L<rings;L++){
+    const dir=L%2?1:-1;
+    const rot=t*(0.12+L*0.05+tcm*1.4)*dir + L*0.5;
+    const rad=R*(0.34+L*(0.62/rings));
+    const n=5+G.stage*2+((G.cycle-1)%4)+L;
+    const lh=(hue+L*26+G.cycle*30)%360;
+    sctx.globalAlpha=0.4-L*0.03;
+    sctx.fillStyle=G.transReady? `hsla(${(45+L*8)|0},95%,${78-L*4}%,1)` : hsl(lh,85,64,1);
+    for(let k=0;k<n;k++){
+      const a=rot+k/n*TAU;
+      sctx.beginPath();
+      sctx.ellipse(cx+Math.cos(a)*rad, cy+Math.sin(a)*rad, R*0.16, R*0.07, a, 0, TAU);
+      sctx.fill();
+    }
+  }
+  // core: a breathing white-hot eye with a dark pupil that slowly dilates
+  sctx.globalAlpha=0.85;
+  const cg=sctx.createRadialGradient(cx,cy,0,cx,cy,R*0.3);
+  cg.addColorStop(0,'rgba(255,255,255,0.95)');
+  cg.addColorStop(0.4,hsl((hue+180)%360,80,60,0.7));
+  cg.addColorStop(1,hsl(hue,80,40,0));
+  sctx.fillStyle=cg; sctx.beginPath(); sctx.arc(cx,cy,R*0.3,0,TAU); sctx.fill();
+  sctx.globalCompositeOperation='source-over';
+  sctx.globalAlpha=0.9; sctx.fillStyle='rgba(5,2,8,0.9)';
+  sctx.beginPath(); sctx.arc(cx,cy,R*0.085*(1+0.3*Math.sin(t*1.3)),0,TAU); sctx.fill();
+  // progress arc -> next metamorphosis; a full pulsing halo when transcendence is ready
+  sctx.globalCompositeOperation='lighter';
+  sctx.lineCap='round';
+  if(G.transReady){
+    sctx.globalAlpha=0.55+0.35*Math.sin(t*4);
+    sctx.strokeStyle='hsla(48,100%,80%,1)'; sctx.lineWidth=Math.max(1.5,R*0.05);
+    sctx.beginPath(); sctx.arc(cx,cy,R*1.1+Math.sin(t*4)*R*0.04,0,TAU); sctx.stroke();
+  } else {
+    sctx.globalAlpha=0.75;
+    sctx.strokeStyle=hsl((hue+60)%360,90,75,1); sctx.lineWidth=Math.max(1.2,R*0.035);
+    sctx.beginPath(); sctx.arc(cx,cy,R*1.1,-Math.PI/2,-Math.PI/2+TAU*G.evoProg); sctx.stroke();
+  }
+  sctx.restore(); sctx.globalAlpha=1; sctx.globalCompositeOperation='source-over';
 }
 
 function render(){
@@ -1235,8 +1381,9 @@ function render(){
     sctx.globalAlpha=0.5*tw*moteA; sctx.fillStyle=hsl(p.hue+bh,80,70,1);
     sctx.beginPath(); sctx.arc(sx,sy,p.r*tw,0,TAU); sctx.fill();
   }
-  // creatures
-  for(const b of beings) drawBody({parts:b.parts,radius:b.radius,hue:b.genome.hue,spin:b.spin,hueShift:0,watch:false}, b.x,b.y);
+  // creatures — predators (bigger than you) carry a dark pulsing warning ring you can read peripherally
+  for(const b of beings) drawBody({parts:b.parts,radius:b.radius,hue:b.genome.hue,spin:b.spin,hueShift:0,watch:false,
+    danger:b.mass>player.mass*1.15}, b.x,b.y);
   // peripheral face flashes + afterimage burns — into the scene so the pipeline ghosts them
   drawFaces();
   drawBurn();
@@ -1258,8 +1405,9 @@ function render(){
     sctx.beginPath(); sctx.arc(w/2,h/2,R,0,TAU); sctx.stroke();
   }
   if(opened){
-    // the player, always centered, drawn last & on top
+    // the player, always centered, then the mandala breathing over your heart
     drawBody({parts:player.parts,radius:player.radius,hue:player.hue,spin:player.spin,hueShift:0,watch:true}, 0,0);
+    drawMandala();
   } else {
     // fixation phase: nothing but a single luminous seed at dead centre to stare into
     sctx.globalCompositeOperation='lighter';
@@ -1319,6 +1467,10 @@ const audio=(()=>{
     absorb(p){ const base=200+ (1/(1+p))*500; blip(base*rr(0.9,1.1),0.35+p*0.4,'triangle',0.18+Math.min(0.2,p*0.2));
       if(p>0.6) blip(base*0.5,0.9,'sine',0.2); },
     surge(){ blip(70,2.2,'sawtooth',0.22); blip(105,1.8,'sine',0.16); },
+    evolve(){ [220,277,330,415].forEach((f,i)=>blip(f,0.7+i*0.15,'triangle',0.16)); },
+    drain(){ blip(48,0.6,'sawtooth',0.3); blip(36,0.9,'sine',0.22); },
+    ready(){ [523,659,784].forEach(f=>blip(f,1.2,'sine',0.14)); },
+    transcend(){ blip(66,2.6,'sawtooth',0.24); [330,415,494,659,880].forEach((f,i)=>blip(f,1.6+i*0.2,'sine',0.12)); },
   };
 })();
 
