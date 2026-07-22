@@ -129,6 +129,7 @@ const G = {
   trip:0, tripTime:0, open:0, phase:'fixate', fixate:1.5,
   cycle:1, depth:0, stage:0, evoProg:0, transReady:false, transCharge:0, drainCD:0,
   shiftHeld:false, shift:0, asc:0, travel:0, realm:0, biome:null,
+  nextBiome:null, goldStreak:0, dof:0, dprScale:1,
   eyeTimer:7, eyeDilate:0, phos:0,
   rm:{hueRot:0,sat:0,warp:0,chroma:0,kal:0,spiral:0,flowZ:0,flowR:0,spin:0,spd:0,grain:0,vig:0},
   // event impulses (decay over time)
@@ -199,9 +200,20 @@ const Post = (()=>{
     }`;
 
   const PRESENT = `precision highp float; varying vec2 vUv;
-    uniform sampler2D uTex; uniform vec2 uRes; uniform float uTime,uFlash,uGrain,uVig,uInvert,uHyper;
+    uniform sampler2D uTex; uniform vec2 uRes; uniform float uTime,uFlash,uGrain,uVig,uInvert,uHyper,uDof;
     float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
     void main(){ vec2 uv=vUv; vec3 col=texture2D(uTex,uv).rgb;
+      if(uDof>0.001){
+        // DEPTH OF FIELD down the well: the bottom (centre) is pin-sharp, the walls smear
+        // tangentially the further out they are — you are looking DOWN a spiral, and it pulls.
+        vec2 c2=uv-0.5; vec2 tand=vec2(-c2.y,c2.x);
+        float amt=uDof*dot(c2,c2)*2.2;
+        vec3 acc=col;
+        acc+=texture2D(uTex,uv+tand*amt).rgb;      acc+=texture2D(uTex,uv-tand*amt).rgb;
+        acc+=texture2D(uTex,uv+tand*amt*2.0).rgb;  acc+=texture2D(uTex,uv-tand*amt*2.0).rgb;
+        acc+=texture2D(uTex,uv+c2*amt*0.7).rgb;    acc+=texture2D(uTex,uv-c2*amt*0.7).rgb;
+        col=acc/7.0;
+      }
       if(uHyper>0.001){            // hyperspace: radial motion blur streaking toward centre
         vec2 dir=uv-0.5; vec3 acc=col;
         for(int i=1;i<=8;i++){ float s=float(i)/8.0*uHyper*0.16; acc+=texture2D(uTex,uv-dir*s).rgb; }
@@ -305,6 +317,7 @@ const Post = (()=>{
     gl.uniform1f(U(progPresent,'uVig'),u.vignette);
     gl.uniform1f(U(progPresent,'uInvert'),u.invert);
     gl.uniform1f(U(progPresent,'uHyper'),u.hyper);
+    gl.uniform1f(U(progPresent,'uDof'),u.dof);
     gl.drawArrays(gl.TRIANGLES,0,3);
     cur=next;
   }
@@ -520,11 +533,64 @@ function makeBiome(depth){
           big:j(1,0.45), eye:j(1,0.5) },
   };
 }
+function clearLightBiome(){
+  // the true ending(?) — a near-empty white stillness. Then the wheel keeps turning.
+  return { idx:7, clear:true, spawnTarget:6, predBias:-2.5, spd:0.5,
+    ill:{face:0.2,burn:0.3,shade:0.1,crawl:0,big:0.4,eye:1.6} };
+}
 function enterBiome(){
-  G.biome=makeBiome(G.depth);
+  if(G.goldStreak>=7){ G.biome=clearLightBiome(); G.goldStreak=0; }
+  else if(G.nextBiome){ G.biome=G.nextBiome; G.nextBiome=null; }
+  else G.biome=makeBiome(G.depth);
   G.realm=G.biome.idx;
   G.travel=1;                                       // the crossing whoosh
+  gates.length=0;
+  audio.setBiome(G.biome.idx, !!G.biome.clear);
   audio.surge();
+}
+
+/* ---------- REALITY GATES: as a metamorphosis ripens, two futures surface in the
+   periphery — soft vortices, each previewing the biome it leads to (its palette, its
+   spiral's character: thin & fast, wide & slow...). You never look at them; you read
+   them peripherally and STEER into the one you choose. Sometimes one is ringed in
+   gold — the set path. Follow gold seven times in a row and you reach the clear
+   light. The paths always regenerate; the wheel has no end. ---------- */
+const gates=[];
+function spawnGates(){
+  const a0=srand()*TAU, viewR=Math.hypot(G.W,G.H)/2/G.scale;
+  const goldSide=srand()<0.55 ? ri(0,1) : -1;
+  for(let s=0;s<2;s++){
+    const bio=makeBiome(G.depth);
+    const ang=a0+s*Math.PI+gauss(0,0.45);
+    gates.push({ x:Math.cos(ang)*viewR*1.15, y:Math.sin(ang)*viewR*1.15,
+      r: player.radius*rr(2.6,4.2), bio, gold:s===goldSide,
+      hue:(bio.idx*47+130)%360, ph:srand()*TAU });
+  }
+}
+function drawGates(){
+  if(!gates.length) return;
+  for(const g2 of gates){
+    const sx=g2.x*G.scale+G.W/2, sy=g2.y*G.scale+G.H/2, R=Math.max(24,g2.r*G.scale);
+    if(sx<-R*2||sx>G.W+R*2||sy<-R*2||sy>G.H+R*2) continue;
+    sctx.globalCompositeOperation='lighter';
+    const gr=sctx.createRadialGradient(sx,sy,0,sx,sy,R*1.4);
+    gr.addColorStop(0,hsl(g2.hue,80,55,0.28)); gr.addColorStop(0.7,hsl(g2.hue,85,45,0.1)); gr.addColorStop(1,hsl(g2.hue,80,40,0));
+    sctx.globalAlpha=1; sctx.fillStyle=gr; sctx.beginPath(); sctx.arc(sx,sy,R*1.4,0,TAU); sctx.fill();
+    // the spiral motif previews that future's character (arm count/tightness from its biome)
+    sctx.globalAlpha=0.5; sctx.strokeStyle=hsl(g2.hue,90,70,1); sctx.lineWidth=Math.max(1,R*0.03);
+    sctx.beginPath();
+    const tight=0.25+(g2.bio.idx%4)*0.14;
+    for(let a2=0;a2<TAU*2.4;a2+=0.1){
+      const rr2=R*0.08+(a2/(TAU*2.4))*R*0.85, aa=a2/tight*0.35+G.t*(0.4+g2.bio.spd*0.3)+g2.ph;
+      const px=sx+Math.cos(aa)*rr2, py=sy+Math.sin(aa)*rr2;
+      a2? sctx.lineTo(px,py):sctx.moveTo(px,py);
+    }
+    sctx.stroke();
+    if(g2.gold){ sctx.globalAlpha=0.45+0.3*Math.sin(G.t*2.5);
+      sctx.strokeStyle='hsla(46,100%,72%,1)'; sctx.lineWidth=Math.max(1.5,R*0.05);
+      sctx.beginPath(); sctx.arc(sx,sy,R,0,TAU); sctx.stroke(); }
+  }
+  sctx.globalAlpha=1; sctx.globalCompositeOperation='source-over';
 }
 
 /* ---------- EYE EXPANSIONS: a vast iris blooms out of the fixation point and
@@ -1095,6 +1161,22 @@ function update(dt){
   // ---- shift the whole world to keep player centered ----
   for(const b of beings){ b.x+=shx; b.y+=shy; }
   for(const p of parts){ p.x+=shx; p.y+=shy; }
+  for(const g2 of gates){ g2.x+=shx; g2.y+=shy; }
+
+  // ---- reality gates: two futures surface as the metamorphosis ripens; steer into one ----
+  if(opened && !G.transReady && G.evoProg>0.7 && gates.length===0) spawnGates();
+  for(let i=gates.length-1;i>=0;i--){
+    const g2=gates[i], d2=Math.hypot(g2.x,g2.y);
+    if(d2 < g2.r + player.radius*0.6){
+      G.nextBiome=g2.bio;
+      if(g2.gold) G.goldStreak++; else G.goldStreak=0;
+      G.kick=Math.min(1.5,G.kick+0.5); G.hueSpike+=0.5;
+      parts.push({x:0,y:0,life:1,decay:0.9,r0:player.radius*0.7,hue:g2.hue,kind:'ring'});
+      gates.splice(i,1); if(gates.length) gates.length=0;   // choosing one collapses the other
+      audio.surge();
+      break;
+    }
+  }
 
   // ---- creatures (realm overlays a swirl/flow on their motion & speed) ----
   const viewR=Math.hypot(G.W,G.H)/2/G.scale;
@@ -1137,11 +1219,15 @@ function update(dt){
     if(p.kind==='spark'){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=Math.pow(0.1,dt); p.vy*=Math.pow(0.1,dt);
       p.life-=dt*p.decay; if(p.life<=0){ parts.splice(i,1); continue; } }
     else if(p.kind==='ring'){ p.life-=dt*p.decay; if(p.life<=0){ parts.splice(i,1); continue; } }
-    else { // mote: parallax drift + slow realm rotation of the whole field
+    else { // mote: parallax drift + realm rotation + a constant FALL toward the well's centre
       const dep=p.dep||1; p.x+=p.vx*dt*dep; p.y+=p.vy*dt*dep;
       const nx=p.x*mc-p.y*ms, ny=p.x*ms+p.y*mc; p.x=nx; p.y=ny;
+      const dd2=Math.hypot(p.x,p.y)||1;
+      const fall=viewR*(0.03+0.05*G.hyper+0.02*G.trip)*dep;   // everything is always falling in
+      p.x-=p.x/dd2*fall*dt; p.y-=p.y/dd2*fall*dt;
       p.ph+=dt; const dd=Math.hypot(p.x,p.y);
-      if(dd>viewR*1.8){ const a2=srand()*TAU,nd=viewR*rr(0.3,0.9); p.x=Math.cos(a2)*nd; p.y=Math.sin(a2)*nd; }
+      if(dd<viewR*0.05 || dd>viewR*1.9){ const a2=srand()*TAU,nd=viewR*rr(1.1,1.6);
+        p.x=Math.cos(a2)*nd; p.y=Math.sin(a2)*nd; }
     }
   }
 
@@ -1179,7 +1265,9 @@ function update(dt){
   G.invert = (I>0.5 && (surge>0.9||tv>0.7))? (0.5+0.5*Math.sin(G.t*28))*0.5 : lerp(G.invert,0,0.2);
   G.grain = 0.04 + surge*0.05 + (trip*0.03 + rm.grain*rj)*amb + tv*0.05;
   G.vignette = 0.95 - surge*0.2 + (rm.vig*rj)*amb + tv*0.4;
-  G.phos = ((0.014 + trip*0.02 + G.eyeDilate*0.03)*amb + tv*0.04)*I;   // breathing-wall phosphenes
+  G.phos = ((0.016 + trip*0.022 + G.eyeDilate*0.03)*amb + tv*0.04)*I;  // breathing-wall phosphenes
+  G.dof  = (0.04 + trip*0.035 + tc*0.06)*amb;                          // the well's depth of field
+  audio.tick(dt, trip, G.realm);                                        // this biome's music breathes
   // travel gives a brief whoosh of blur; sustained ascension stays legible so you can keep playing
   const blur = tv*tv*4 + asc*0.5;
   if(!Post.is2d) glCanvas.style.filter = blur>0.02 ? `blur(${blur.toFixed(2)}px) saturate(${(1+asc*0.4+tv*0.4).toFixed(2)})` : '';
@@ -1459,6 +1547,8 @@ function render(){
     sctx.globalAlpha=0.5*tw*moteA; sctx.fillStyle=hsl(p.hue+bh,80,70,1);
     sctx.beginPath(); sctx.arc(sx,sy,p.r*tw,0,TAU); sctx.fill();
   }
+  // reality gates — the two futures, read peripherally
+  drawGates();
   // creatures — predators (bigger than you) carry a dark pulsing warning ring you can read peripherally
   for(const b of beings) drawBody({parts:b.parts,radius:b.radius,hue:b.genome.hue,spin:b.spin,hueShift:0,watch:false,
     danger:b.mass>player.mass*1.15}, b.x,b.y);
@@ -1540,15 +1630,50 @@ const audio=(()=>{
     o.frequency.exponentialRampToValueAtTime(freq*rr(1.3,2.0),n+dur);
     o.start(n); o.stop(n+dur+0.02); m.stop(n+dur+0.02);
   }
+  /* ---- procedural biome music: every biome retunes the drone to its own chord/mode,
+     shifts the delay space, and runs its own slow arpeggio of chime-notes; deep trip adds
+     stuttering audio glitches and tape-warble in the delay line. The drone root never
+     leaves — the One Note under everything. ---- */
+  const MODES=[[0,0,7,12,12],[0,3,7,10,14],[0,5,7,12,17],[0,4,7,11,14],
+               [0,2,7,9,14],[0,1,6,8,13],[0,7,12,19,24],[0,0,12,12,24]];
+  let curMode=MODES[0], curRoot=45, arpT=2;
+  const mf=(root,semi)=>440*Math.pow(2,(root+semi-69)/12);
+  function setBiome(idx, clear){
+    if(!ac) return;
+    curMode = clear? MODES[7] : MODES[idx%MODES.length];
+    curRoot = clear? 45 : 43+(idx*5)%10;
+    drone.forEach((d,i)=>{
+      const semi=curMode[i%curMode.length]-24+(i>2?12:0)+(i%2?0.06:0);   // slight beat-detune
+      d.o.frequency.setTargetAtTime(mf(curRoot,semi), ac.currentTime, 2.8);
+    });
+    if(delay) delay.delayTime.setTargetAtTime(clear?0.62:0.24+((idx*97)%40)/120, ac.currentTime, 1.6);
+  }
+  function tick(dt, trip, idx){
+    if(!ac||!started||!G.sound) return;
+    arpT-=dt;
+    if(arpT>0) return;
+    arpT=rr(0.7,3)/(0.5+trip*0.8);
+    const semi=curMode[(srand()*curMode.length)|0]+12*ri(1,3);
+    blip(mf(curRoot,semi), rr(0.5,1.8), pick(['sine','triangle']), 0.05+Math.min(0.06,trip*0.03));
+    if(srand()<0.1+trip*0.09){          // glitch: stutter cluster + delay warble
+      const f=mf(curRoot,semi+12);
+      for(let i2=0,n2=ri(3,6);i2<n2;i2++) setTimeout(()=>blip(f*rr(0.94,1.06),0.05,'square',0.045), i2*42);
+      if(delay){ const d0=delay.delayTime.value;
+        delay.delayTime.setTargetAtTime(d0*rr(0.5,1.7), ac.currentTime, 0.06);
+        delay.delayTime.setTargetAtTime(d0, ac.currentTime+0.5, 0.3); }
+    }
+  }
   return {
-    on, setEnabled,
+    on, setEnabled, setBiome, tick,
     absorb(p){ const base=200+ (1/(1+p))*500; blip(base*rr(0.9,1.1),0.35+p*0.4,'triangle',0.18+Math.min(0.2,p*0.2));
       if(p>0.6) blip(base*0.5,0.9,'sine',0.2); },
     surge(){ blip(70,2.2,'sawtooth',0.22); blip(105,1.8,'sine',0.16); },
-    evolve(){ [220,277,330,415].forEach((f,i)=>blip(f,0.7+i*0.15,'triangle',0.16)); },
+    evolve(){ [0,4,7,12].forEach((s,i)=>blip(mf(curRoot,s+12),0.7+i*0.15,'triangle',0.16)); },
     drain(){ blip(48,0.6,'sawtooth',0.3); blip(36,0.9,'sine',0.22); },
-    ready(){ [523,659,784].forEach(f=>blip(f,1.2,'sine',0.14)); },
-    transcend(){ blip(66,2.6,'sawtooth',0.24); [330,415,494,659,880].forEach((f,i)=>blip(f,1.6+i*0.2,'sine',0.12)); },
+    ready(){ [12,16,19].forEach(s=>blip(mf(curRoot,s+12),1.2,'sine',0.14)); },
+    transcend(){ blip(66,2.6,'sawtooth',0.24);
+      // resolution to unison — the One Note answered in octaves
+      [0,12,24,36].forEach((s,i)=>blip(mf(curRoot,s),1.8+i*0.2,'sine',0.13)); },
   };
 })();
 
@@ -1577,7 +1702,9 @@ addEventListener('blur',()=>{ keys.clear(); G.shiftHeld=false; });
    BOOT / RESIZE / LOOP
    ===================================================================== */
 function resize(){
-  G.dpr=Math.min(window.devicePixelRatio||1, 1.4);
+  // FULL native resolution (up to 3x DPR) — auto-quality steps dprScale down only if the
+  // machine can't hold framerate, so gaming PCs get every pixel.
+  G.dpr=Math.min(window.devicePixelRatio||1, 3)*G.dprScale;
   G.W=Math.floor(innerWidth*G.dpr); G.H=Math.floor(innerHeight*G.dpr);
   scene.width=G.W; scene.height=G.H;
   Post.resize(G.W,G.H);
@@ -1594,11 +1721,16 @@ function loop(now){
   if(!G.running) return;
   let dt=(now-last)/1000; last=now; if(!(dt>0)) dt=0.016; dt=Math.min(dt,0.05);
   G.dt=dt;
-  // auto quality
+  // auto quality: shed effect density first, then resolution; climb back when headroom returns
   fpsAcc+=dt; fpsN++;
   if(fpsAcc>1){ const fps=fpsN/fpsAcc; fpsAcc=0; fpsN=0;
-    if(fps<45 && G.quality>0.4) G.quality-=0.1;
-    else if(fps>57 && G.quality<1) G.quality+=0.05; }
+    if(fps<45){
+      if(G.quality>0.4) G.quality-=0.1;
+      else if(G.dprScale>0.5){ G.dprScale=Math.max(0.5,G.dprScale*0.85); resize(); }
+    } else if(fps>57){
+      if(G.dprScale<1){ G.dprScale=Math.min(1,G.dprScale*1.08); resize(); }
+      else if(G.quality<1) G.quality+=0.05;
+    } }
   update(dt); render();
 }
 
@@ -1611,6 +1743,7 @@ function start(){
   G.biome=makeBiome(0); G.realm=G.biome.idx;   // every run begins in a random biome
   document.getElementById('intro').classList.add('gone');
   audio.on();
+  audio.setBiome(G.biome.idx,false);           // the first biome's chord
   setTimeout(resize,80);   // re-measure once fullscreen has settled
   last=performance.now();
 }
@@ -1626,7 +1759,7 @@ requestAnimationFrame(loop);
 // expose a few handles for debugging / external drivers
 window.G=G; window.player=player; window.beings=beings; window.parts=parts; window.faces=faces;
 window.shades=shades; window.crawlers=crawlers; window.bigFaces=bigFaces; window.eyeWaves=eyeWaves;
-window.Post=Post; window.REALMS=REALMS;
+window.gates=gates; window.Post=Post; window.REALMS=REALMS;
 </script>
 </body>
 </html>
