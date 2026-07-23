@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SoGoDing · Factory Puzzle Game</title>
+  <meta name="description" content="Build production lines, transform shapes and uncover the story buried inside an ever-changing industrial world in SoGoDing." />
+  <meta property="og:title" content="SoGoDing · Factory Puzzle Game" />
+  <meta property="og:description" content="Build the line. Make the part. Find out what the factory is hiding." />
+  <meta property="og:image" content="./shots/factory-line.png" />
+  <meta name="theme-color" content="#0d1315" />
+  <link rel="stylesheet" href="./sogoding.css" />
+  <link rel="icon" href="data:," />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Orbitron:wght@500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <header class="top">
+    <a class="back" href="../../#stuff">← wildrabbet</a>
+    <a class="wordmark" href="#top" id="top" aria-label="SoGoDing home">
+      <span class="wordmarkMain">SoGoDing</span>
+      <span class="wordmarkSub">Industrial Works</span>
+    </a>
+    <a class="topPlay" href="./SoGoDing.html">Play now</a>
+  </header>
+
+  <main>
+    <section class="hero">
+      <img class="heroImage" src="./shots/title-screen.png" alt="SoGoDing main menu and factory control room" width="1280" height="720" />
+      <div class="heroScrim"></div>
+      <div class="heroCopy">
+        <p class="eyebrow"><span></span> Factory puzzle automation</p>
+        <h1>Build the line.<br />Make the part.</h1>
+        <p class="heroHook">Find out what the factory is hiding.</p>
+        <p class="lede">SoGoDing is a puzzle game about turning an empty factory floor into a working production line. Arrange the machines, connect their sockets with roller routes, and deliver the exact shape and colour the contract demands.</p>
+        <div class="actions">
+          <a class="button primary" href="./SoGoDing.html"><span>▶</span> Play in browser</a>
+          <a class="button secondary" href="#how">See how it works</a>
+        </div>
+        <div class="metaRow" aria-label="Game features">
+          <span>Campaign</span>
+          <span>Factory building</span>
+          <span>Logic puzzles</span>
+          <span>Playable in browser</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="how" class="intro">
+      <p class="sectionCode">01 // THE JOB</p>
+      <div class="introGrid">
+        <h2>A simple order.<br />A complicated floor.</h2>
+        <p>Every stage gives you a production target and a box of machinery. The early jobs teach you how to add sides and mix colours. Before long you are coordinating split lines, elevated rollers, powered equipment and robot crews—all while the factory keeps changing around you.</p>
+      </div>
+    </section>
+
+    <section class="process">
+      <article class="processStep">
+        <span class="stepNo">01</span>
+        <h3>Read the contract</h3>
+        <p>The output wants a precise shape, colour or layered combination. Work backwards and decide what has to happen to the raw part.</p>
+      </article>
+      <article class="processStep">
+        <span class="stepNo">02</span>
+        <h3>Build the route</h3>
+        <p>Move the unlocked machinery and connect gold output sockets to blue inputs. Roller lines turn and snap into place as you build.</p>
+      </article>
+      <article class="processStep">
+        <span class="stepNo">03</span>
+        <h3>Run the factory</h3>
+        <p>Start production and watch the part travel. If it reaches the wrong machine—or arrives as the wrong thing—the line is yours to rethink.</p>
+      </article>
+    </section>
+
+    <section class="showcase">
+      <article class="feature">
+        <div class="featureCopy">
+          <p class="sectionCode">02 // PRODUCTION</p>
+          <h2>Every connection matters</h2>
+          <p>Stamp on another side. Shave one away. Dye, split, merge, invert, lift and redirect. Machines do exactly what they promise; the challenge is making them work together.</p>
+          <ul>
+            <li>Readable sockets and seamless roller routing</li>
+            <li>Shapes move through the complete line in real time</li>
+            <li>Multiple valid-looking routes—and plenty of convincing mistakes</li>
+          </ul>
+        </div>
+        <figure class="screen">
+          <img src="./shots/factory-line.png" alt="A powered SoGoDing roller line carrying a shape through a Side Add machine" loading="lazy" width="1280" height="720" />
+          <figcaption>Factory // Production Wing 7</figcaption>
+        </figure>
+      </article>
+
+      <article class="feature reverse">
+        <div class="featureCopy">
+          <p class="sectionCode">03 // NEW FLOORS</p>
+          <h2>The factory never stays simple</h2>
+          <p>New worlds change more than the wallpaper. Furniture becomes part of the puzzle, elevated lines cross busy floors, and specialised machines open routes that were impossible a few stages earlier.</p>
+          <ul>
+            <li>Distinct industrial worlds with their own scenery</li>
+            <li>Claws, lifts, crossovers and multi-level transport</li>
+            <li>Boss contracts at the end of every five-stage shift</li>
+          </ul>
+        </div>
+        <figure class="screen">
+          <img src="./shots/high-line.png" alt="Elevated roller machines in the SoGoDing level editor" loading="lazy" width="1280" height="720" />
+          <figcaption>Factory // The High Line</figcaption>
+        </figure>
+      </article>
+
+      <article class="feature">
+        <div class="featureCopy">
+          <p class="sectionCode">04 // ROBOT FLOOR</p>
+          <h2>Eventually, the machines start walking</h2>
+          <p>Robots are factory modules too. Link their control network, place them on the floor and use them to carry, stack and dispatch parts between separate production cells.</p>
+          <ul>
+            <li>Dedicated AI control cables and relay networks</li>
+            <li>Movable robot units with distinct jobs</li>
+            <li>Multi-unit puzzles built around simultaneous production</li>
+          </ul>
+        </div>
+        <figure class="screen">
+          <img src="./shots/robot-floor.png" alt="Robot AI Core and Courier modules on a SoGoDing factory floor" loading="lazy" width="1280" height="720" />
+          <figcaption>Robot // Wake Signal</figcaption>
+        </figure>
+      </article>
+    </section>
+
+    <section class="story">
+      <div class="storyNoise" aria-hidden="true"></div>
+      <div class="storyCopy">
+        <p class="sectionCode">05 // RECOVERED DATA</p>
+        <h2>There is a story in the machinery.</h2>
+        <p>The scenery changes. Old journal entries surface. Production records stop making sense. The further you travel, the more it feels like these contracts were left for someone in particular.</p>
+        <blockquote>“The shapes are only the job. Pay attention to what the factory remembers.”</blockquote>
+      </div>
+    </section>
+
+    <section class="factoryMode">
+      <p class="sectionCode">06 // AFTER THE SHIFT</p>
+      <div class="factoryModeGrid">
+        <div>
+          <h2>Build a factory that lasts</h2>
+          <p>Campaign victories unlock machinery for Factory mode: a persistent plant where every completed order feeds the next expansion. Save it, rebuild it, and turn a handful of rollers into something enormous.</p>
+        </div>
+        <div class="unlockList">
+          <div><strong>Shapes become resources</strong><span>Every colour and geometry is collected separately.</span></div>
+          <div><strong>Bosses unlock machinery</strong><span>Rare modules and stronger production tools arrive through progression.</span></div>
+          <div><strong>Your plant stays yours</strong><span>Save locally, export to disk and continue over time.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="finalCta">
+      <p class="status"><span></span> Production floor available</p>
+      <h2>Your first contract is waiting.</h2>
+      <p>No installation. No account. Just an empty floor and one more edge.</p>
+      <a class="button primary large" href="./SoGoDing.html"><span>▶</span> Start SoGoDing</a>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <a href="../../">← wildrabbet</a>
+    <span>SoGoDing</span>
+    <a href="./SoGoDing.html">Play game →</a>
+  </footer>
+</body>
+</html>

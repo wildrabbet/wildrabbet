@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" href="data:,">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -1524,6 +1525,10 @@
   <div style="display: flex; gap: 6px; flex-wrap: wrap;">
   <button class="btn" onclick="game.openCreatorLoadBrowser()">LOAD LEVEL</button>
   <button class="btn btn-gold" onclick="game.openCreatorSaveModal()">SAVE</button>
+  <button class="btn" onclick="game.creatorUndo()" title="Undo (Ctrl+Z)">UNDO</button>
+  <button class="btn" onclick="game.creatorRedo()" title="Redo (Ctrl+Shift+Z / Ctrl+Y)">REDO</button>
+  <button class="btn" onclick="game.creatorCopySelection()" title="Copy selected module or scenery (Ctrl+C)">COPY</button>
+  <button class="btn" onclick="game.creatorPasteSelection()" title="Paste on the snapped grid (Ctrl+V)">PASTE</button>
   <button class="btn" onclick="game.openCreatorMetaModal()">META</button>
   <button class="btn" onclick="game.openWinConditionModal()">WIN COND.</button>
   <button class="btn" id="creator-play-btn" onclick="game.toggleCreatorPlayMode()">PLAY TEST</button>
@@ -1822,17 +1827,31 @@
   ROBOT_RELAY: 'robot_relay',
   ROBOT_COURIER: 'robot_courier',
   ROBOT_STACKER: 'robot_stacker',
-  ROBOT_DISPATCHER: 'robot_dispatcher'
+  ROBOT_DISPATCHER: 'robot_dispatcher',
+  TRANSFER_CLAW: 'transfer_claw',
+  DIVERTER_ARM: 'diverter_arm',
+  ASSEMBLY_ARM: 'assembly_arm',
+  GANTRY_CRANE: 'gantry_crane',
+  ROLLER_LIFT: 'roller_lift',
+  ELEVATED_CONVEYOR: 'elevated_conveyor',
+  ROLLER_DROP: 'roller_drop',
+  CROSSOVER_CONVEYOR: 'crossover_conveyor',
+  CARGO_ELEVATOR: 'cargo_elevator'
   };
 
-  // The six supplied transparent PNGs are treated as one industrial atlas.
-  // Machine logic remains procedural; the atlas supplies the visual chassis.
+  // Factory and Robot-world PNGs share one indexed industrial atlas registry.
+  // The later pages contain real worker bodies, cranes, lifts, and gantries.
   const FACTORY_ATLASES = {};
-  for (let atlasIndex = 1; atlasIndex <= 6; atlasIndex++) {
+  const FACTORY_ATLAS_SOURCES = {
+    1:'assets/1.png',2:'assets/2.png',3:'assets/3.png',4:'assets/4.png',5:'assets/5.png',6:'assets/6.png',
+    7:'assets/Robot/page_01.png',8:'assets/Robot/page_02.png',9:'assets/Robot/page_03.png',
+    10:'assets/Robot/page_04.png',11:'assets/Robot/page_05.png'
+  };
+  Object.entries(FACTORY_ATLAS_SOURCES).forEach(([atlasIndex,src]) => {
     const atlasImage = new Image();
-    atlasImage.src = `assets/${atlasIndex}.png`;
+    atlasImage.src = src;
     FACTORY_ATLASES[atlasIndex] = atlasImage;
-  }
+  });
 
   const FACTORY_SPRITE_DEFS = {
     spawner:[2,390,12,91,91], collector:[2,670,500,96,96],
@@ -1873,11 +1892,15 @@
     reject_chute:[2,0,675,185,93], scrap_chute:[2,279,674,116,94],
     spray_nozzle:[4,477,373,102,99], kiln:[2,96,389,105,106],
     industrial_fan:[4,568,378,105,104],
-    // Temporary robot chassis are drawn procedurally over these registered bays.
-    // Keeping them in the sprite registry makes editor/save/module audits complete.
-    robot_ai_core:[5,602,281,164,75], robot_relay:[5,486,283,115,72],
-    robot_courier:[2,393,411,177,107], robot_stacker:[2,361,282,214,116],
-    robot_dispatcher:[2,0,282,289,116]
+    // Sprite-native machines: no generic game-box chassis is drawn behind them.
+    transfer_claw:[2,480,0,98,100], diverter_arm:[2,575,0,193,100],
+    assembly_arm:[2,96,190,102,98], gantry_crane:[9,388,0,380,194],
+    roller_lift:[2,194,96,193,99], elevated_conveyor:[2,0,15,98,68],
+    roller_drop:[2,576,96,192,102], crossover_conveyor:[2,96,96,194,100],
+    cargo_elevator:[10,576,0,96,194],
+    robot_ai_core:[10,386,192,190,194], robot_relay:[10,480,192,190,194],
+    robot_courier:[11,0,0,96,109], robot_stacker:[11,190,177,108,151],
+    robot_dispatcher:[11,284,176,116,154]
   };
 
   // Named scenery crops from every supplied factory atlas. Solid scenery is part
@@ -2025,7 +2048,7 @@
   const fallback=factoryRoomFromNodes(nodes),src=room||fallback,x=Math.round(Number(src.x??fallback.x)/20)*20,y=Math.round(Number(src.y??fallback.y)/20)*20;
   const w=Math.max(320,Math.round(Number(src.w??fallback.w)/80)*80),h=Math.max(320,Math.round(Number(src.h??fallback.h)/80)*80);
   const wall=Math.max(80,Math.min(h-80,Number(src.floorY??(y+160))-Number(src.y??y)));
-  return{x,y,w,h,floorY:y+Math.round(wall/20)*20,variant:Math.max(0,Math.min(3,Number(src.variant)||0))};
+  return{x,y,w,h,floorY:y+Math.round(wall/20)*20,variant:Math.max(0,Math.min(3,Number(src.variant)||0)),autoWallBackdrop:src.autoWallBackdrop!==false};
   }
 
   // Every current mechanism now has an atlas-backed industrial chassis. Keep the
@@ -2034,6 +2057,9 @@
   const ROBOT_MACHINE_TYPES = new Set(['robot_courier','robot_stacker','robot_dispatcher']);
   const ROBOT_CONTROL_TYPES = new Set(['robot_ai_core','robot_relay']);
   const ROBOT_VISUAL_TYPES = new Set([...ROBOT_MACHINE_TYPES, ...ROBOT_CONTROL_TYPES]);
+  const MECHANICAL_TRANSFER_TYPES = new Set(['transfer_claw','diverter_arm','assembly_arm','gantry_crane','roller_lift','cargo_elevator']);
+  const ELEVATED_ROLLER_TYPES = new Set(['roller_lift','elevated_conveyor','roller_drop','crossover_conveyor','cargo_elevator']);
+  const SPRITE_NATIVE_TYPES = new Set([...ROBOT_VISUAL_TYPES,...MECHANICAL_TRANSFER_TYPES,...ELEVATED_ROLLER_TYPES]);
 
   const FACTORY_START_PORT_TYPES = new Set(['out', 'read', 'io', 'signal_out', 'ai_out']);
   const FACTORY_RECEIVE_PORT_TYPES = new Set(['in', 'io', 'power_in', 'ai_in']);
@@ -2067,7 +2093,7 @@
     const scale = Math.min(size / def[3], size / def[4]);
     const px = (size - def[3] * scale) / 2 - def[1] * scale;
     const py = (size - def[4] * scale) / 2 - def[2] * scale;
-    return `background-color:#172127;background-image:url('assets/${def[0]}.png');background-size:${768 * scale}px ${768 * scale}px;background-position:${px}px ${py}px`;
+    return `background-color:#172127;background-image:url('${FACTORY_ATLAS_SOURCES[def[0]]||`assets/${def[0]}.png`}');background-size:${768 * scale}px ${768 * scale}px;background-position:${px}px ${py}px`;
   }
 
   class AetherSignal {
@@ -2076,6 +2102,8 @@
   this.isVector = false; // Purple vector signal from valve
   this.vectorDirection = null; // 'right', 'down', 'left', 'up'
   this.number = null; // Number assigned by ticker/counter (null = no number)
+  this.elevation = 0;
+  this.transportSpeed = 1;
   }
   clone() { 
   const s = new AetherSignal(this.shape, this.color, this.voltage);
@@ -2086,6 +2114,8 @@
   s.traveledDistance = this.traveledDistance || 0;
   s.originVoltage = this.originVoltage;
   s.isEntropic = this.isEntropic || false;
+  s.elevation = Math.max(0, Number(this.elevation) || 0);
+  s.transportSpeed = Number(this.transportSpeed) || 1;
   return s;
   }
   }
@@ -2120,6 +2150,11 @@
   this.robotDispatchIndex = 0;
   this.robotState = 'OFFLINE';
   this.robotCompletedJobs = 0;
+  this.mechanicalQueue = [];
+  this.mechanicalBuffer = {};
+  this.mechanicalIndex = 0;
+  this.mechanicalState = 'READY';
+  this.mechanicalCompletedJobs = 0;
   }
 
   initPorts() {
@@ -2253,6 +2288,33 @@
   break;
   case MACHINE_TYPES.ROBOT_DISPATCHER:
   basePorts = [{ x: 0, y: 0.5, type: 'in', label: 'PICK', id: 0 }, { x: 1, y: 0.28, type: 'out', label: 'A', id: 1 }, { x: 1, y: 0.72, type: 'out', label: 'B', id: 2 }, {x:.5,y:0,type:'ai_in',label:'AI',id:3}];
+  break;
+  case MACHINE_TYPES.TRANSFER_CLAW:
+  basePorts = [{x:.28,y:1,type:'in',label:'PICK',id:0},{x:.72,y:1,type:'out',label:'DROP',id:1}];
+  break;
+  case MACHINE_TYPES.DIVERTER_ARM:
+  basePorts = [{x:.5,y:1,type:'in',label:'PICK',id:0},{x:0,y:.5,type:'out',label:'A',id:1},{x:1,y:.5,type:'out',label:'B',id:2}];
+  break;
+  case MACHINE_TYPES.ASSEMBLY_ARM:
+  basePorts = [{x:0,y:.32,type:'in',label:'A',id:0},{x:.5,y:1,type:'in',label:'B',id:1},{x:1,y:.5,type:'out',label:'JOIN',id:2}];
+  break;
+  case MACHINE_TYPES.GANTRY_CRANE:
+  basePorts = [{x:0,y:.5,type:'in',label:'PICK',id:0},{x:1,y:.3,type:'out',label:'GROUND',id:1},{x:1,y:.7,type:'out',label:'HIGH',id:2}];
+  break;
+  case MACHINE_TYPES.ROLLER_LIFT:
+  basePorts = [{x:0,y:.75,type:'in',label:'LOW',id:0},{x:1,y:.25,type:'out',label:'HIGH',id:1}];
+  break;
+  case MACHINE_TYPES.ELEVATED_CONVEYOR:
+  basePorts = [{x:0,y:.5,type:'in',label:'HIGH',id:0},{x:1,y:.5,type:'out',label:'HIGH',id:1}];
+  break;
+  case MACHINE_TYPES.ROLLER_DROP:
+  basePorts = [{x:0,y:.25,type:'in',label:'HIGH',id:0},{x:1,y:.75,type:'out',label:'LOW',id:1}];
+  break;
+  case MACHINE_TYPES.CROSSOVER_CONVEYOR:
+  basePorts = [{x:0,y:.5,type:'in',label:'A',id:0},{x:1,y:.5,type:'out',label:'A',id:1},{x:.5,y:0,type:'in',label:'B',id:2},{x:.5,y:1,type:'out',label:'B',id:3}];
+  break;
+  case MACHINE_TYPES.CARGO_ELEVATOR:
+  basePorts = [{x:.5,y:1,type:'in',label:'LOAD',id:0},{x:.5,y:0,type:'out',label:'LIFT',id:1}];
   break;
   // Extended production modules
   case MACHINE_TYPES.SIDE_SUB:
@@ -2630,6 +2692,42 @@
   this.robotState=outPort===1?'DELIVERING A':'DELIVERING B';
   return [];
   }
+  case MACHINE_TYPES.TRANSFER_CLAW: {
+  const now=this._game?.simulationNow?.()??Date.now(),cargo=first.clone();
+  this.mechanicalQueue.push({sig:cargo,outPort:1,startAt:now,releaseAt:now+900,effect:'claw'});
+  this.mechanicalState='TRANSFERRING';this._campaignSucceeded=true;return [];
+  }
+  case MACHINE_TYPES.DIVERTER_ARM: {
+  const now=this._game?.simulationNow?.()??Date.now(),outPort=1+(this.mechanicalIndex++%2);
+  this.mechanicalQueue.push({sig:first.clone(),outPort,startAt:now,releaseAt:now+820,effect:'divert'});
+  this.mechanicalState=outPort===1?'SWINGING A':'SWINGING B';this._campaignSucceeded=true;return [];
+  }
+  case MACHINE_TYPES.GANTRY_CRANE: {
+  const now=this._game?.simulationNow?.()??Date.now(),outPort=(Number(first.elevation)||0)>0?2:1;
+  this.mechanicalQueue.push({sig:first.clone(),outPort,startAt:now,releaseAt:now+1150,effect:'gantry'});
+  this.mechanicalState=outPort===2?'HIGH BAY':'GROUND BAY';this._campaignSucceeded=true;return [];
+  }
+  case MACHINE_TYPES.ROLLER_LIFT: {
+  const now=this._game?.simulationNow?.()??Date.now(),raised=first.clone();raised.elevation=(Number(raised.elevation)||0)+1;raised.transportSpeed=1.25;
+  this.mechanicalQueue.push({sig:raised,outPort:1,startAt:now,releaseAt:now+680,effect:'lift'});
+  this.mechanicalState='RAISING';this._campaignSucceeded=true;return [];
+  }
+  case MACHINE_TYPES.ELEVATED_CONVEYOR: {
+  if((Number(first.elevation)||0)<1){this.mechanicalState='GROUND CARGO BLOCKED';return [];}
+  const elevated=first.clone();elevated.transportSpeed=1.6;this.mechanicalState='HIGH LINE';this._campaignSucceeded=true;return [elevated];
+  }
+  case MACHINE_TYPES.ROLLER_DROP: {
+  if((Number(first.elevation)||0)<1){this.mechanicalState='NO HIGH CARGO';return [];}
+  const lowered=first.clone();lowered.elevation=Math.max(0,(Number(lowered.elevation)||0)-1);lowered.transportSpeed=1;this.mechanicalState='LOWERED';this._campaignSucceeded=true;return [lowered];
+  }
+  case MACHINE_TYPES.CARGO_ELEVATOR: {
+  const now=this._game?.simulationNow?.()??Date.now(),lifted=first.clone();lifted.elevation=(Number(lifted.elevation)||0)>0?0:1;lifted.transportSpeed=1.1;
+  this.mechanicalQueue.push({sig:lifted,outPort:1,startAt:now,releaseAt:now+1050,effect:'elevator'});
+  this.mechanicalState=lifted.elevation?'ASCENDING':'DESCENDING';this._campaignSucceeded=true;return [];
+  }
+  case MACHINE_TYPES.ASSEMBLY_ARM:
+  case MACHINE_TYPES.CROSSOVER_CONVEYOR:
+  return [];
   // Extended module processing
   case MACHINE_TYPES.SIDE_SUB: {
   const ss2 = first.clone();
@@ -2905,7 +3003,7 @@
 
   // === SG2 COMPACT SEED CODEC ===
   // Share seeds are ~10% the size of legacy Base64 JSON. Legacy seeds still decode.
-  const SG2_TYPES = ["spawner", "collector", "dye_vat", "powered_dye_vat", "side_add", "mixer", "pulse_extender", "generator", "repeater", "comparator", "spinner", "stasis", "junction", "router", "light", "lightswitch", "observer", "valve", "elbow_pipe", "manifold", "ticker", "counter", "threshold_gate", "number_threshold_gate", "parity_router", "pattern_detector", "benchmark", "wall", "pulse_splitter", "queue", "entropy_core", "hopper", "pressure_plate", "side_sub", "side_doubler", "cloner", "color_filter", "side_gate", "inverter", "delay_buffer", "shape_lock", "splitter_3", "randomizer", "accumulator", "swap", "echo", "pulse_clock", "fuse", "averager", "difference_engine", "contract_scanner", "portal_in", "portal_out", "teleporter_switch", "vent", "rail", "fabricator", "side_siphon", "prime_gate", "composite_gate", "odd_gate", "even_gate", "dice_roll", "coin_flip", "side_anchor", "furnace", "conveyor", "overflow_conveyor", "storage_silo", "hydraulic_press", "reject_chute", "scrap_chute", "spray_nozzle", "kiln", "industrial_fan", "robot_ai_core", "robot_relay", "robot_courier", "robot_stacker", "robot_dispatcher"];
+  const SG2_TYPES = ["spawner", "collector", "dye_vat", "powered_dye_vat", "side_add", "mixer", "pulse_extender", "generator", "repeater", "comparator", "spinner", "stasis", "junction", "router", "light", "lightswitch", "observer", "valve", "elbow_pipe", "manifold", "ticker", "counter", "threshold_gate", "number_threshold_gate", "parity_router", "pattern_detector", "benchmark", "wall", "pulse_splitter", "queue", "entropy_core", "hopper", "pressure_plate", "side_sub", "side_doubler", "cloner", "color_filter", "side_gate", "inverter", "delay_buffer", "shape_lock", "splitter_3", "randomizer", "accumulator", "swap", "echo", "pulse_clock", "fuse", "averager", "difference_engine", "contract_scanner", "portal_in", "portal_out", "teleporter_switch", "vent", "rail", "fabricator", "side_siphon", "prime_gate", "composite_gate", "odd_gate", "even_gate", "dice_roll", "coin_flip", "side_anchor", "furnace", "conveyor", "overflow_conveyor", "storage_silo", "hydraulic_press", "reject_chute", "scrap_chute", "spray_nozzle", "kiln", "industrial_fan", "robot_ai_core", "robot_relay", "robot_courier", "robot_stacker", "robot_dispatcher", "transfer_claw", "diverter_arm", "assembly_arm", "gantry_crane", "roller_lift", "elevated_conveyor", "roller_drop", "crossover_conveyor", "cargo_elevator"];
   const SG2_SHAPES = ['circle','vesica','triangle','square','pentagon','hexagon','heptagon','octagon','nonagon','decagon','hendecagon','dodecagon','tridecagon','tetradecagon','pentadecagon','hexadecagon','heptadecagon','octadecagon','enneadecagon','icosagon'];
   const SG2_COLORS = ['none','grey','black','white','red','green','blue','yellow','cyan','magenta'];
   function sg2Idx(list, v, fb) { const i = list.indexOf(v); return i >= 0 ? i : (fb|0); }
@@ -2960,7 +3058,7 @@
   }
   function sg2EncodeLevel(level) {
   const w = new Sg2W();
-  w.u8(0x53); w.u8(0x47); w.u8(0x03);
+  w.u8(0x53); w.u8(0x47); w.u8(0x04);
   let flags = 8; if (level.startingZoom) flags |= 1; if(level.room)flags|=2;if(level.scenery?.length)flags|=4;w.u8(flags);
     if (flags & 1) w.u8(Math.round(Math.max(0.3, Math.min(2.5, level.startingZoom)) * 10));
     w.u8(Math.max(0,WORLD_KEYS.indexOf(normalizeWorldKey(level.world))));
@@ -3001,14 +3099,14 @@
       if (f2 & 8) w.u8(pd & 255);
       if (f2 & 16) w.u8(Math.round(cfg.delaySeconds * 10) & 255);
     }
-    if(flags&2){const room=normalizeFactoryRoom(level.room,nodes);w.i16(room.x);w.i16(room.y);w.i16(room.w);w.i16(room.h);w.i16(room.floorY);w.u8(room.variant||0);}
-    if(flags&4){const scenery=(level.scenery||[]).filter(s=>sceneryTypeIsValid(s.type)).slice(0,255);w.u8(scenery.length);for(const s of scenery){const asset=parseWorldAssetType(s.type);if(asset){w.u8(1);w.u8(WORLD_SHEET_INDEX[asset.sheet.id]);w.u8(asset.col);w.u8(asset.row);w.u8(asset.cols);w.u8(asset.rows);}else{w.u8(0);w.u8(Math.max(0,FACTORY_SCENERY_TYPES.indexOf(s.type)));}w.i16(Math.round(s.x||0));w.i16(Math.round(s.y||0));w.u8(((s.rotation||0)&3)|(sceneryIsSolid(s)?0:128));w.u8(Math.max(3,Math.min(30,Math.round((s.scale||1)*10))));}}
+    if(flags&2){const room=normalizeFactoryRoom(level.room,nodes);w.i16(room.x);w.i16(room.y);w.i16(room.w);w.i16(room.h);w.i16(room.floorY);w.u8(room.variant||0);w.u8(room.autoWallBackdrop===false?0:1);}
+    if(flags&4){const scenery=(level.scenery||[]).filter(s=>sceneryTypeIsValid(s.type)).slice(0,255);w.u8(scenery.length);for(const s of scenery){const asset=parseWorldAssetType(s.type);if(asset){w.u8(1);w.u8(WORLD_SHEET_INDEX[asset.sheet.id]);w.u8(asset.col);w.u8(asset.row);w.u8(asset.cols);w.u8(asset.rows);}else{w.u8(0);w.u8(Math.max(0,FACTORY_SCENERY_TYPES.indexOf(s.type)));}w.i16(Math.round(s.x||0));w.i16(Math.round(s.y||0));w.u8(((s.rotation||0)&3)|(sceneryIsSolid(s)?0:128)|(s.layer==='wall'?4:0)|(s.wallPanel?8:0));w.u8(Math.max(3,Math.min(30,Math.round((s.scale||1)*10))));}}
     return w.bytes();
   }
   function sg2DecodeLevel(bytes) {
     const r = new Sg2R(bytes);
     if (r.u8() !== 0x53 || r.u8() !== 0x47) throw new Error('bad SG2');
-    const version=r.u8();if(version!==2&&version!==3)throw new Error('unsupported SG2 version');
+    const version=r.u8();if(version!==2&&version!==3&&version!==4)throw new Error('unsupported SG2 version');
     const flags = r.u8();
     let startingZoom; if (flags & 1) startingZoom = r.u8() / 10;
     let world=null;if(version>=3&&(flags&8))world=WORLD_KEYS[r.u8()]||'factory';
@@ -3041,8 +3139,8 @@
       nodes.push(node);
     }
     let room=null,scenery=[];
-    if((flags&2)&&r.remaining()>=10){const roomData={x:r.i16(),y:r.i16(),w:r.i16(),h:r.i16(),floorY:r.i16()};if(version>=3&&r.remaining())roomData.variant=r.u8();room=normalizeFactoryRoom(roomData,nodes);}
-    if((flags&4)&&r.remaining()){const sceneryCount=r.u8();for(let i=0;i<sceneryCount;i++){let type;if(version>=3){if(r.remaining()<8)break;const kind=r.u8();if(kind===1){const sheet=WORLD_ASSET_SHEETS[r.u8()],col=r.u8(),row=r.u8(),cols=r.u8(),rows=r.u8();if(sheet)type=makeWorldAssetType(sheet.id,col,row,cols,rows);}else type=FACTORY_SCENERY_TYPES[r.u8()];}else{if(r.remaining()<7)break;type=FACTORY_SCENERY_TYPES[r.u8()];}const x=r.i16(),y=r.i16(),packedRotation=r.u8(),rotation=packedRotation&3,solid=(packedRotation&128)===0,scale=r.u8()/10;if(type&&sceneryTypeIsValid(type))scenery.push({id:'s'+i,type,x,y,rotation,scale,solid});}}
+    if((flags&2)&&r.remaining()>=10){const roomData={x:r.i16(),y:r.i16(),w:r.i16(),h:r.i16(),floorY:r.i16()};if(version>=3&&r.remaining())roomData.variant=r.u8();if(version>=4&&r.remaining())roomData.autoWallBackdrop=r.u8()!==0;room=normalizeFactoryRoom(roomData,nodes);}
+    if((flags&4)&&r.remaining()){const sceneryCount=r.u8();for(let i=0;i<sceneryCount;i++){let type;if(version>=3){if(r.remaining()<8)break;const kind=r.u8();if(kind===1){const sheet=WORLD_ASSET_SHEETS[r.u8()],col=r.u8(),row=r.u8(),cols=r.u8(),rows=r.u8();if(sheet)type=makeWorldAssetType(sheet.id,col,row,cols,rows);}else type=FACTORY_SCENERY_TYPES[r.u8()];}else{if(r.remaining()<7)break;type=FACTORY_SCENERY_TYPES[r.u8()];}const x=r.i16(),y=r.i16(),packedRotation=r.u8(),rotation=packedRotation&3,solid=(packedRotation&128)===0,layer=version>=4&&(packedRotation&4)?'wall':'floor',wallPanel=version>=4&&!!(packedRotation&8),scale=r.u8()/10;if(type&&sceneryTypeIsValid(type))scenery.push({id:'s'+i,type,x,y,rotation,scale,solid,layer,wallPanel});}}
     const level = { contract, nodes, room:room||factoryRoomFromNodes(nodes), scenery, world };
     if (startingZoom) level.startingZoom = startingZoom;
     return level;
@@ -3322,8 +3420,8 @@
     {title:'Red Letter Day',contract:campaignReq('triangle','red'),modules:['side_add','side_add',campaignDye('red')],difficulty:1,role:'COMBINE',introduced:['DYE VAT'],hints:['Shape and colour are independent. Build both qualities before collection.','An unusually short line may wake the maintenance hatch.'],journal:'There is a red door behind the vat. No handle, only four tiny lights. They blink when I use exactly four roller runs. -Kai',secretUnlock:'S1-1',secretMaxWires:4},
     {title:'Any Order',contract:campaignReq('square','blue'),modules:['side_add','side_add','side_add',campaignDye('blue')],difficulty:1,role:'EXPERIMENT',hints:['Some operations commute: dyeing early or late can reach the same result.'],journal:'Supervisor did not care whether I dyed first or last. “Only the shipment matters.” I wrote that down because it sounded less normal than she thought. -Kai'},
     {title:'First Quota',contract:campaignReq('pentagon','yellow'),modules:['side_add','side_add','side_add','side_add',campaignDye('red'),campaignDye('green')],difficulty:2,role:'BOSS',introduced:['COLOUR MIXING'],required:['side_add','side_add','side_add','side_add','dye_vat','dye_vat'],hints:['Red followed by green becomes yellow.','Boss contracts recombine everything from the preceding set.'],journal:'Quota cleared. The yellow pentagons went into a lift marked PERSONNEL, not SHIPPING. When I asked why, the label had been painted over by lunch. -Kai'},
-    {title:'Take One Away',spawns:[{shape:'square',color:'grey'}],contract:campaignReq('triangle','red'),modules:['side_sub',campaignDye('red')],difficulty:1,role:'TEACH',introduced:['SIDE SHAVER'],hints:['The Side Shaver removes one side. Start by reading what INPUT already produces.','Three runs or fewer will expose an old night-shift trace.'],journal:'New input stock arrives pre-shaped. The shaver screams like a brake. Under it: KAI WAS HERE, but the handwriting is not mine. -Kai',secretUnlock:'S1-2',secretMaxWires:3},
-    {title:'Double Shift',spawns:[{shape:'vesica',color:'grey'}],contract:campaignReq('square','blue'),modules:['side_doubler',campaignDye('blue')],difficulty:1,role:'TEACH',introduced:['SIDE DOUBLER'],hints:['The Doubler multiplies the current side count by two.'],journal:'A vesica becomes a square in one motion. The Doubler is elegant. The serial plate says COGNITIVE REPLICATION UNIT. Probably a mistranslation. -Kai'},
+    {title:'The High Line',spawns:[{shape:'square',color:'grey'}],contract:campaignReq('triangle','red'),modules:['side_sub',campaignDye('red'),'roller_lift','elevated_conveyor','roller_drop'],difficulty:2,role:'TEACH · ELEVATION',introduced:['SIDE SHAVER','ELEVATED TRANSPORT'],required:['roller_lift','elevated_conveyor','roller_drop'],hints:['The Side Shaver removes one side. Start by reading what INPUT already produces.','Use LIFT → HIGH ROLLER → DROP as one continuous elevated section. Ground cargo cannot enter a high roller.','Six runs or fewer expose an old night-shift trace.'],journal:'The new line climbs over the old one. From the catwalk I found KAI WAS HERE stamped beneath the lift, but the handwriting is not mine. -Kai',secretUnlock:'S1-2',secretMaxWires:6},
+    {title:'Double Shift',spawns:[{shape:'vesica',color:'grey'}],contract:campaignReq('square','blue'),modules:['side_doubler',campaignDye('blue'),'transfer_claw'],difficulty:2,role:'TEACH · TRANSFER',introduced:['SIDE DOUBLER','TRANSFER CLAW'],required:['transfer_claw'],hints:['The Doubler multiplies the current side count by two.','The powered claw picks cargo from its lower PICK roller, holds it visibly, then places it on DROP.'],journal:'A vesica becomes a square in one motion. The new transfer claw carries it like something breakable. The serial plate says COGNITIVE REPLICATION UNIT. Probably a mistranslation. -Kai'},
     {title:'The Long Way Down',spawns:[{shape:'heptagon',color:'grey'}],contract:campaignReq('square','white'),modules:['side_sub','side_sub','side_sub',campaignDye('white')],difficulty:2,role:'REINFORCE',hints:['Subtraction is a path, not a punishment. Count backwards before wiring.'],journal:'White shapes make the lights dim. Maintenance says the colour draws more power. In the dark I heard somebody knocking from inside the collector. -Kai'},
     {title:'Carbon Paper',contract:campaignMulti(campaignReq('triangle','red'),campaignReq('triangle','blue')),modules:['side_add','side_add','cloner',campaignDye('red'),campaignDye('blue')],difficulty:2,role:'TEACH',introduced:['CLONER','MULTI-CONTRACT'],required:['cloner'],hints:['Build the shared triangle before cloning it.','Each clone needs its own dye and both may enter the same output.','Seven clean runs reveal a second route.'],journal:'The Cloner makes two perfect copies, including tiny surface scratches. The log calls those scratches “memory residues.” Nobody laughs when I joke anymore. -Kai',secretUnlock:'S1-3',secretMaxWires:7},
     {title:'Two Become One',spawns:[{shape:'triangle',color:'grey'},{shape:'triangle',color:'grey'}],contract:campaignGradient('hexagon','red','blue'),modules:[campaignDye('red'),campaignDye('blue'),'mixer'],difficulty:2,role:'BOSS',introduced:['MIXER','GRADIENTS'],required:['mixer'],hints:['The Mixer adds side counts. Different input colours become top and bottom.'],journal:'The merged piece carries both colours without blending. Two histories, one shell. The shipping manifest lists the batch as “viable.” -Kai'},
@@ -3480,8 +3578,8 @@
   { level: '1-4', target: 'workspace', title: 'Experiment safely', body: 'Dye and stamp can trade places without changing this output. The campaign will often ask which operations truly depend on order.' },
   { level: '1-5', target: 'workspace', title: 'First boss contract', body: 'Red followed by green becomes yellow. Boss levels ask you to recombine the ideas you have already practised—never an unexplained new rule.' },
   { level: '1-5', target: 'full', title: 'Operator training complete', body: 'You now know the complete interaction language. New machines arrive one at a time; open the <strong>Production Log</strong> for story clues and a gentle first hint.' },
-  { level: '1-6', target: 'workspace', title: 'Side Shaver', body: 'The <strong>Side Shaver</strong> removes one side. Always inspect the INPUT shape before assuming it starts as a circle.' },
-  { level: '1-7', target: 'workspace', title: 'Side Doubler', body: 'The <strong>Doubler</strong> multiplies the current side count by two. Additions before and after multiplication are not equivalent.' },
+  { level: '1-6', target: 'workspace', title: 'The high line', body: 'The <strong>Lift</strong> raises cargo, the bright <strong>High Roller</strong> carries only raised cargo, and the <strong>Drop</strong> returns it to floor height. Use all three in order.' },
+  { level: '1-7', target: 'workspace', title: 'Robot transfer arm', body: 'The <strong>Transfer Claw</strong> is part of the roller route: cargo enters PICK, waits in its animated grip, and leaves DROP. It also introduces a real timing delay.' },
   { level: '1-9', target: 'workspace', title: 'Cloner', body: 'Build shared properties <strong>before</strong> cloning. Each clone leaves a separate output socket and may receive different treatment.' },
   { level: '1-10', target: 'workspace', title: 'Mixer', body: 'The <strong>Mixer</strong> waits for both inputs, adds their side counts, and preserves different colours as a top/bottom gradient.' },
   { level: '1-13', target: 'workspace', title: 'Inverter', body: 'The <strong>Inverter</strong> maps a side count to <strong>21 − n</strong>. It is a shortcut only when you understand the number on both sides.' }
@@ -4351,7 +4449,7 @@
   // Snapshot activity before any INPUT dispatches. If each INPUT re-checks the
   // live transit list, the first one makes the line "active" and suppresses
   // every later INPUT in the same frame (notably level 1-15).
-  const productionBusyAtTickStart = this.inTransit.length > 0 || this.nodes.some(node => (node.type === MACHINE_TYPES.REPEATER && (node.repeaterQueue.length > 0 || (node.powerBurstQueue && node.powerBurstQueue.length > 0) || node.isBursting)) || (node.type === MACHINE_TYPES.LIGHTSWITCH && node.lightswitchBursting) || (node.type === MACHINE_TYPES.LIGHT && node.lightTemporary) || (node.type === MACHINE_TYPES.PULSE_SPLITTER && node.pulseSplitterQueue.length > 0) || (node.type === MACHINE_TYPES.QUEUE && node.queueBuffer.length > 0) || (ROBOT_MACHINE_TYPES.has(node.type) && ((node.robotQueue && node.robotQueue.length) || Object.keys(node.robotBuffer || {}).length)));
+  const productionBusyAtTickStart = this.inTransit.length > 0 || this.nodes.some(node => (node.type === MACHINE_TYPES.REPEATER && (node.repeaterQueue.length > 0 || (node.powerBurstQueue && node.powerBurstQueue.length > 0) || node.isBursting)) || (node.type === MACHINE_TYPES.LIGHTSWITCH && node.lightswitchBursting) || (node.type === MACHINE_TYPES.LIGHT && node.lightTemporary) || (node.type === MACHINE_TYPES.PULSE_SPLITTER && node.pulseSplitterQueue.length > 0) || (node.type === MACHINE_TYPES.QUEUE && node.queueBuffer.length > 0) || (ROBOT_MACHINE_TYPES.has(node.type) && ((node.robotQueue && node.robotQueue.length) || Object.keys(node.robotBuffer || {}).length)) || (MECHANICAL_TRANSFER_TYPES.has(node.type) && ((node.mechanicalQueue && node.mechanicalQueue.length) || Object.keys(node.mechanicalBuffer || {}).length)));
   this.nodes.forEach(n => {
   if (n.type === MACHINE_TYPES.SPAWNER) {
   // Initialize lastProcessed if not set
@@ -4439,6 +4537,9 @@
   if(ROBOT_MACHINE_TYPES.has(m.type)) {
   m.robotQueue = []; m.robotBuffer = {}; m.robotDispatchIndex = 0;
   }
+  if(MECHANICAL_TRANSFER_TYPES.has(m.type)) {
+  m.mechanicalQueue=[];m.mechanicalBuffer={};m.mechanicalIndex=0;m.mechanicalState='READY';
+  }
   });
   const res = n.process([]);
   this.dispatch(n.id, 0, res[0]); if (n.config.dual) this.dispatch(n.id, 1, res[1]);
@@ -4467,7 +4568,7 @@
   // Distance-based speed: shapes travel at constant pixels/sec
   // Short wires (~80px)  0.5s, long wires (~400px)  2.7s
   const SHAPE_SPEED_PX_PER_MS = 0.15; // 150 pixels per second
-  item.progress += dt * SHAPE_SPEED_PX_PER_MS / (item.distance || 80);
+  item.progress += dt * SHAPE_SPEED_PX_PER_MS * Math.max(.35,Number(item.sig.transportSpeed)||1) / (item.distance || 80);
   if (item.progress >= 1) {
   const node = this.nodes.find(n => n.id === item.tid);
   if (node) {
@@ -4567,6 +4668,10 @@
   }
   } else if (node.type === MACHINE_TYPES.ROBOT_STACKER) {
   this.queueRobotStack(node,item.tp,item.sig);
+  } else if (node.type === MACHINE_TYPES.ASSEMBLY_ARM) {
+  this.queueMechanicalAssembly(node,item.tp,item.sig);
+  } else if (node.type === MACHINE_TYPES.CROSSOVER_CONVEYOR) {
+  const exitPort=item.tp===2?3:1;node.mechanicalState=item.tp===2?'LANE B':'LANE A';node._campaignSucceeded=true;this.dispatch(node.id,exitPort,item.sig.clone());
   } else if (node.type === MACHINE_TYPES.MIXER) {
   if (!node.buffer) node.buffer = { sig: item.sig, port: item.tp };
   else {
@@ -4764,6 +4869,7 @@
   // until its walk cycle reaches the destination socket.
   const robotNow=this.simulationNow();
   this.releaseRobotJobs(this.nodes,robotNow,(node,job)=>this.dispatch(node.id,job.outPort,job.sig));
+  this.releaseMechanicalJobs(this.nodes,robotNow,(node,job)=>this.dispatch(node.id,job.outPort,job.sig));
 
   // Handle spinner pending rotations - rotate after shape has left
   this.nodes.forEach(n => {
@@ -6190,32 +6296,32 @@
   const av=this.factoryPortVector(fromPort),bv=this.factoryPortVector(toPort),lead=40;
   const sa={x:a.x+av.x*lead,y:a.y+av.y*lead},tb={x:b.x+bv.x*lead,y:b.y+bv.y*lead};
   const xs=this.nodes.map(n=>n.x),ys=this.nodes.map(n=>n.y),x2=this.nodes.map(n=>n.x+80),y2=this.nodes.map(n=>n.y+80);
+  const sceneryBlockers=this.factorySolidSceneryRects();
+  sceneryBlockers.forEach(r=>{xs.push(r.x);ys.push(r.y);x2.push(r.x+r.w);y2.push(r.y+r.h);});
   const minX=Math.min(sa.x,tb.x,...xs)-46,maxX=Math.max(sa.x,tb.x,...x2)+46;
   const minY=Math.min(sa.y,tb.y,...ys)-46,maxY=Math.max(sa.y,tb.y,...y2)+46;
-  const midX=Math.round(((sa.x+tb.x)/2)/20)*20,midY=Math.round(((sa.y+tb.y)/2)/20)*20;
-  const candidates=[
-  [a,sa,{x:tb.x,y:sa.y},tb,b],
-  [a,sa,{x:sa.x,y:tb.y},tb,b],
-  [a,sa,{x:midX,y:sa.y},{x:midX,y:tb.y},tb,b],
-  [a,sa,{x:sa.x,y:midY},{x:tb.x,y:midY},tb,b],
-  [a,sa,{x:minX,y:sa.y},{x:minX,y:tb.y},tb,b],
-  [a,sa,{x:maxX,y:sa.y},{x:maxX,y:tb.y},tb,b],
-  [a,sa,{x:sa.x,y:minY},{x:tb.x,y:minY},tb,b],
-  [a,sa,{x:sa.x,y:maxY},{x:tb.x,y:maxY},tb,b]
-  ].map(path=>this.factoryCompactPath(path));
   const blockers=this.nodes.filter(n=>n.id!==fromNode.id&&n.id!==toNode.id&&n.type!==MACHINE_TYPES.WALL).concat(this.nodes.filter(n=>n.type===MACHINE_TYPES.WALL));
-  const sceneryBlockers=this.factorySolidSceneryRects();
-  const score=path=>{
-  let value=this.factoryPolylineLength(path)+(path.length-2)*16;
-  for(let i=1;i<path.length;i++){
-  const p=path[i-1],q=path[i];
-  blockers.forEach(n=>{if(this.factorySegmentHitsRect(p,q,{left:n.x-12,top:n.y-12,right:n.x+92,bottom:n.y+92}))value+=20000;});
-  sceneryBlockers.forEach(r=>{if(this.factorySegmentHitsRect(p,q,{left:r.x-12,top:r.y-12,right:r.x+r.w+12,bottom:r.y+r.h+12}))value+=30000;});
-  occupied.forEach(other=>{const op=other.factoryPath||[];for(let j=1;j<op.length;j++){const hit=this.getSegmentIntersection(p.x,p.y,q.x,q.y,op[j-1].x,op[j-1].y,op[j].x,op[j].y);if(hit&&hit.lambda>.02&&hit.lambda<.98&&hit.gamma>.02&&hit.gamma<.98)value+=900;}});
+  // Route every roller run on the same 20px lattice used by the placement
+  // preview. A* makes solid scenery a real obstacle instead of merely adding a
+  // score penalty that could still allow a belt to pass through a prop.
+  const step=20,snap=p=>({x:Math.round(p.x/step)*step,y:Math.round(p.y/step)*step});
+  const start=snap(sa),goal=snap(tb),key=p=>`${p.x},${p.y}`;
+  const obstacleRects=blockers.map(n=>({left:n.x-22,top:n.y-22,right:n.x+102,bottom:n.y+102}))
+    .concat(sceneryBlockers.map(r=>({left:r.x-22,top:r.y-22,right:r.x+r.w+22,bottom:r.y+r.h+22})));
+  if(obstacleRects.some(r=>this.factorySegmentHitsRect(a,sa,r)||this.factorySegmentHitsRect(tb,b,r)))return[];
+  const pointBlocked=p=>obstacleRects.some(r=>p.x>r.left&&p.x<r.right&&p.y>r.top&&p.y<r.bottom);
+  const crossingCost=(p,q)=>{let cost=0;occupied.forEach(other=>{const op=other.factoryPath||[];for(let j=1;j<op.length;j++){const hit=this.getSegmentIntersection(p.x,p.y,q.x,q.y,op[j-1].x,op[j-1].y,op[j].x,op[j].y);if(hit&&hit.lambda>.02&&hit.lambda<.98&&hit.gamma>.02&&hit.gamma<.98)cost+=80;}});return cost;};
+  const pad=160,bounds={left:Math.floor((minX-pad)/step)*step,right:Math.ceil((maxX+pad)/step)*step,top:Math.floor((minY-pad)/step)*step,bottom:Math.ceil((maxY+pad)/step)*step};
+  const open=[{...start,g:0,f:Math.abs(goal.x-start.x)+Math.abs(goal.y-start.y),dir:''}],best=new Map([[key(start),0]]),parents=new Map(),dirs=[[step,0,'r'],[-step,0,'l'],[0,step,'d'],[0,-step,'u']];
+  let found=null,guard=0;
+  while(open.length&&guard++<24000){
+  open.sort((u,v)=>u.f-v.f);const cur=open.shift(),ck=key(cur);if(cur.x===goal.x&&cur.y===goal.y){found=cur;break;}
+  for(const [dx,dy,dir] of dirs){const next={x:cur.x+dx,y:cur.y+dy};if(next.x<bounds.left||next.x>bounds.right||next.y<bounds.top||next.y>bounds.bottom)continue;if((pointBlocked(next)||obstacleRects.some(r=>this.factorySegmentHitsRect(cur,next,r)))&&key(next)!==key(goal))continue;
+  const ng=cur.g+step+(cur.dir&&cur.dir!==dir?9:0)+crossingCost(cur,next);const nk=key(next);if(ng>=(best.get(nk)??Infinity))continue;best.set(nk,ng);parents.set(nk,{prev:ck,dir});open.push({...next,g:ng,f:ng+Math.abs(goal.x-next.x)+Math.abs(goal.y-next.y),dir});}
   }
-  return value;
-  };
-  candidates.sort((p,q)=>score(p)-score(q));return candidates[0];
+  if(found){const route=[];let cursor=key(goal);while(cursor){const [x,y]=cursor.split(',').map(Number);route.push({x,y});if(cursor===key(start))break;cursor=parents.get(cursor)?.prev;}route.reverse();return this.factoryCompactPath([a,sa,...route,tb,b]);}
+  // A disconnected obstacle field never falls back to a line through scenery.
+  return[];
   }
 
   refreshFactoryConnectionPath(connection,occupied=[]) {
@@ -6326,6 +6432,21 @@
   let released=0;(nodes||[]).forEach(n=>{if(!ROBOT_MACHINE_TYPES.has(n.type)||!n.robotQueue?.length)return;for(let q=n.robotQueue.length-1;q>=0;q--){const job=n.robotQueue[q];if(now<job.releaseAt)continue;dispatchFn(n,job);n.robotQueue.splice(q,1);n.robotCompletedJobs=(n.robotCompletedJobs||0)+1;n.robotState=n.robotQueue.length?'WORKING':'READY';released++;}});return released;
   }
 
+  queueMechanicalAssembly(node,inputPort,signal) {
+  if(!node||node.type!==MACHINE_TYPES.ASSEMBLY_ARM||!signal)return false;
+  node.mechanicalBuffer=node.mechanicalBuffer||{};node.mechanicalBuffer[inputPort]=signal.clone();node.mechanicalState='STORING '+(inputPort===0?'A':'B');
+  if(!node.mechanicalBuffer[0]||!node.mechanicalBuffer[1])return true;
+  const a=node.mechanicalBuffer[0],b=node.mechanicalBuffer[1],sa=SHAPES[a.shape.toUpperCase()]?.sides||1,sb=SHAPES[b.shape.toUpperCase()]?.sides||1,shape=Object.values(SHAPES).find(s=>s.sides===Math.min(20,sa+sb))?.id||'icosagon';let cargo;
+  if(a.color===b.color&&!a.topColor&&!b.topColor)cargo=new AetherSignal(shape,a.color,(a.voltage+b.voltage)/2);
+  else{cargo=new AetherSignal(shape,'grey',(a.voltage+b.voltage)/2);cargo.topColor=a.topColor||a.color;cargo.bottomColor=b.bottomColor||b.color;}
+  cargo.elevation=Math.max(Number(a.elevation)||0,Number(b.elevation)||0);cargo.transportSpeed=Math.max(Number(a.transportSpeed)||1,Number(b.transportSpeed)||1);
+  const now=node._game?.simulationNow?.()??this.simulationNow();node.mechanicalQueue.push({sig:cargo,outPort:2,startAt:now,releaseAt:now+1200,effect:'assemble'});node.mechanicalState='ASSEMBLING';node.mechanicalBuffer={};node._campaignSucceeded=true;return true;
+  }
+
+  releaseMechanicalJobs(nodes,now,dispatchFn) {
+  let released=0;(nodes||[]).forEach(n=>{if(!MECHANICAL_TRANSFER_TYPES.has(n.type)||!n.mechanicalQueue?.length)return;for(let q=n.mechanicalQueue.length-1;q>=0;q--){const job=n.mechanicalQueue[q];if(now<job.releaseAt)continue;dispatchFn(n,job);n.mechanicalQueue.splice(q,1);n.mechanicalCompletedJobs=(n.mechanicalCompletedJobs||0)+1;n.mechanicalState=n.mechanicalQueue.length?'WORKING':'READY';released++;}});return released;
+  }
+
   drawRobotControlCable(ctx,connection,ghostEnd=null) {
   const from=this.nodes.find(n=>n.id===connection.fid),to=this.nodes.find(n=>n.id===connection.tid),p1=from?.ports?.find(p=>p.id===connection.fp),p2=to?.ports?.find(p=>p.id===connection.tp);
   if(!from||!p1||(!ghostEnd&&(!to||!p2)))return;
@@ -6395,6 +6516,50 @@
   ctx.restore();
   }
 
+  drawFactoryNativeMachine(n,powered=false) {
+  const ctx=this.ctx,type=n.type,def=FACTORY_SPRITE_DEFS[type],img=def&&FACTORY_ATLASES[def[0]],now=this.factoryActive?Date.now():this.simulationNow();
+  const layouts={
+    transfer_claw:{w:92,h:94,y:-15,label:'TRANSFER CLAW'},diverter_arm:{w:126,h:66,y:-2,label:'DIVERTER ARM'},
+    assembly_arm:{w:92,h:92,y:-14,label:'ASSEMBLY ARM'},gantry_crane:{w:154,h:79,y:-22,label:'GANTRY CRANE'},
+    roller_lift:{w:112,h:58,y:10,label:'ROLLER LIFT'},elevated_conveyor:{w:96,h:66,y:7,label:'HIGH ROLLER'},
+    roller_drop:{w:112,h:60,y:8,label:'ROLLER DROP'},crossover_conveyor:{w:104,h:58,y:11,label:'CROSSOVER'},
+    cargo_elevator:{w:62,h:124,y:-24,label:'CARGO LIFT'},robot_ai_core:{w:116,h:76,y:-2,label:'AI CORE'},
+    robot_relay:{w:108,h:76,y:-2,label:'AI RELAY'},robot_courier:{w:72,h:86,y:-14,label:'COURIER'},
+    robot_stacker:{w:82,h:112,y:-31,label:'STACKER'},robot_dispatcher:{w:88,h:116,y:-34,label:'DISPATCHER'}
+  },layout=layouts[type]||{w:84,h:84,y:-8,label:type.replaceAll('_',' ').toUpperCase()};
+  const robotJob=n.robotQueue?.[0]||null,mechanicalJob=n.mechanicalQueue?.[0]||null,job=robotJob||mechanicalJob;
+  const progress=job?Math.max(0,Math.min(1,(now-job.startAt)/Math.max(1,job.releaseAt-job.startAt))):0;
+  const rot=ROBOT_VISUAL_TYPES.has(type)?0:((n.config?.rotation||0)&3),robotMotion=ROBOT_MACHINE_TYPES.has(type)&&job;
+  ctx.save();ctx.fillStyle='rgba(0,0,0,.34)';ctx.beginPath();ctx.ellipse(n.x+40,n.y+68,Math.min(57,layout.w*.43),Math.min(16,layout.h*.13),0,0,Math.PI*2);ctx.fill();
+  ctx.translate(n.x+40,n.y+40);ctx.rotate(rot*Math.PI/2);
+  const bob=robotMotion?Math.sin(progress*Math.PI*4)*2.2:(ROBOT_MACHINE_TYPES.has(type)?Math.sin(now*.004+n.x)*.8:0),walkX=robotMotion?(progress-.5)*20:0;
+  if(img&&img.complete&&img.naturalWidth){
+    ctx.imageSmoothingEnabled=false;ctx.shadowBlur=powered?16:7;ctx.shadowColor=ROBOT_VISUAL_TYPES.has(type)?'rgba(164,117,255,.72)':'rgba(255,202,92,.58)';
+    ctx.drawImage(img,def[1],def[2],def[3],def[4],-layout.w/2+walkX,-layout.h/2+layout.y+bob,layout.w,layout.h);ctx.shadowBlur=0;
+  }
+  if(ELEVATED_ROLLER_TYPES.has(type)){
+    const phase=powered?(now*.08)%16:0;ctx.strokeStyle=powered?'rgba(255,224,139,.88)':'rgba(194,210,214,.6)';ctx.lineWidth=2;
+    for(let x=-35+phase;x<39;x+=16){ctx.beginPath();ctx.moveTo(x,-5);ctx.lineTo(x+7,0);ctx.lineTo(x,5);ctx.stroke();}
+    if(type===MACHINE_TYPES.ELEVATED_CONVEYOR){ctx.fillStyle=powered?'rgba(102,222,255,.26)':'rgba(82,118,128,.15)';ctx.fillRect(-42,-17,84,34);}
+  }
+  ctx.restore();
+
+  if(job&&job.sig){
+    const inPort=(n.ports||[]).find(p=>p.type==='in')||{x:.25,y:1},outPort=(n.ports||[]).find(p=>p.id===job.outPort)||(n.ports||[]).find(p=>p.type==='out')||{x:.75,y:1};
+    const ax=n.x+inPort.x*80,ay=n.y+inPort.y*80,bx=n.x+outPort.x*80,by=n.y+outPort.y*80;
+    const arc=Math.sin(progress*Math.PI),hx=ax+(bx-ax)*progress,hy=ay+(by-ay)*progress-arc*(type===MACHINE_TYPES.CARGO_ELEVATOR?8:34);
+    ctx.save();ctx.strokeStyle=powered?'#d8b06a':'#7e8587';ctx.lineWidth=5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(n.x+40,n.y+5);ctx.lineTo(n.x+40+(hx-(n.x+40))*.48,n.y+20);ctx.lineTo(hx,hy-8);ctx.stroke();
+    ctx.strokeStyle='#222c30';ctx.lineWidth=2;ctx.beginPath();ctx.arc(hx,hy-3,8,.15*Math.PI,.85*Math.PI);ctx.stroke();
+    const col=COLORS[(job.sig.color||'grey').toUpperCase()]?.hex||'#777';this.drawGeometricShape(ctx,hx,hy+2,7,job.sig.shape,col,job.sig.topColor,job.sig.bottomColor,true);
+    ctx.restore();
+  }
+
+  const online=ROBOT_CONTROL_TYPES.has(type)?(type===MACHINE_TYPES.ROBOT_AI_CORE||!!this._robotControl?.nodes?.has(n.id)):ROBOT_MACHINE_TYPES.has(type)?!!this._robotControl?.nodes?.has(n.id):powered;
+  ctx.save();ctx.font='800 6px Orbitron';ctx.textAlign='center';ctx.textBaseline='middle';const tw=Math.min(82,Math.max(42,ctx.measureText(layout.label).width+10)),ly=n.y+68;
+  ctx.fillStyle='rgba(13,19,22,.9)';ctx.strokeStyle=online?'#70eaff':'rgba(181,199,204,.46)';ctx.lineWidth=1;this.roundRect(ctx,n.x+40-tw/2,ly,tw,12,3,true,true);ctx.fillStyle=online?'#e8fbff':'#b9c3c6';ctx.fillText(layout.label,n.x+40,ly+6);
+  ctx.fillStyle=online?'#62efff':'#6c7476';ctx.shadowBlur=online?9:0;ctx.shadowColor='#62efff';ctx.beginPath();ctx.arc(n.x+68,n.y+8,2.7,0,Math.PI*2);ctx.fill();ctx.restore();
+  }
+
   drawFactoryRobotMachine(n,powered=false) {
   const ctx=this.ctx,now=this.factoryActive?Date.now():this.simulationNow();
   if(ROBOT_CONTROL_TYPES.has(n.type)){
@@ -6434,16 +6599,13 @@
   if(ghost&&ghostCell){n.x=ghostCell.x;n.y=ghostCell.y;ctx.save();ctx.globalAlpha=.52;}
   const type=factorySpriteType(n.type);const placeholder=FACTORY_PLACEHOLDER_TYPES.has(type);const def=FACTORY_SPRITE_DEFS[type];
   const powered=!!this._factoryPower?.nodes?.has(n.id)||n.isPowered||this.connections.some(c=>c.fid===n.id&&this.inTransit.some(t=>t.fid===c.fid));
-  if(n.type!==MACHINE_TYPES.WALL)this.drawFactoryMachineFoundation(n,powered);
+  if(n.type!==MACHINE_TYPES.WALL&&!SPRITE_NATIVE_TYPES.has(n.type))this.drawFactoryMachineFoundation(n,powered);
   ctx.save();
   if(n.type===MACHINE_TYPES.WALL){
   ctx.fillStyle='#343d43';ctx.strokeStyle='#b98945';ctx.lineWidth=2;this.roundRect(ctx,n.x+3,n.y+5,74,70,3,true,true);
   const img=FACTORY_ATLASES[6];if(img&&img.complete&&img.naturalWidth){ctx.beginPath();ctx.rect(n.x+5,n.y+7,70,66);ctx.clip();ctx.imageSmoothingEnabled=false;ctx.drawImage(img,0,0,386,97,n.x-35,n.y+18,150,38);}ctx.restore();
-  }else if(ROBOT_VISUAL_TYPES.has(n.type)){
-  this.drawFactoryRobotMachine(n,powered);
-  const label=n.type===MACHINE_TYPES.ROBOT_AI_CORE?'AI CORE':n.type===MACHINE_TYPES.ROBOT_RELAY?'AI RELAY':n.type===MACHINE_TYPES.ROBOT_COURIER?'ROBOT COURIER':n.type===MACHINE_TYPES.ROBOT_STACKER?'ROBOT STACKER':'ROBOT DISPATCH';
-  ctx.font='800 7px Orbitron';ctx.textAlign='center';ctx.textBaseline='middle';const tw=Math.min(76,ctx.measureText(label).width+10);
-  ctx.fillStyle='rgba(20,27,31,.94)';ctx.strokeStyle=powered?'#6ee6ff':'rgba(177,199,206,.42)';ctx.lineWidth=1;this.roundRect(ctx,n.x+40-tw/2,n.y+60,tw,14,3,true,true);ctx.fillStyle='#dce8eb';ctx.fillText(label,n.x+40,n.y+67);ctx.restore();
+  }else if(SPRITE_NATIVE_TYPES.has(n.type)){
+  this.drawFactoryNativeMachine(n,powered);ctx.restore();
   }else if(placeholder||!def){
   ctx.shadowBlur=14;ctx.shadowColor='rgba(255,55,55,.55)';ctx.fillStyle='#681d20';ctx.strokeStyle='#ff5b5b';ctx.lineWidth=3;this.roundRect(ctx,n.x+10,n.y-7,60,68,5,true,true);ctx.shadowBlur=0;
   ctx.strokeStyle='#ff6666';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(n.x+21,n.y+5);ctx.lineTo(n.x+59,n.y+48);ctx.moveTo(n.x+59,n.y+5);ctx.lineTo(n.x+21,n.y+48);ctx.stroke();
@@ -6477,6 +6639,13 @@
   ctx.fillStyle=isEndpoint?'rgba(81,62,29,.95)':'rgba(20,27,31,.92)';ctx.strokeStyle=isEndpoint?'#edc368':isDyeVat?(dyeKey==='black'?'#aeb7bf':dyeHex):'rgba(177,199,206,.42)';ctx.lineWidth=isDyeVat?1.5:1;
   if(isDyeVat){ctx.shadowBlur=9;ctx.shadowColor=dyeHex;}
   this.roundRect(ctx,n.x+40-tw/2,n.y+60,tw,14,3,true,true);ctx.shadowBlur=0;ctx.fillStyle=isEndpoint?'#ffe7a4':isDyeVat?(dyeKey==='black'?'#e5ebef':dyeHex):'#dce8eb';ctx.fillText(label.toUpperCase(),n.x+40,n.y+67);
+  if(n.type===MACHINE_TYPES.SPAWNER){
+  const shapeKey=String(n.config?.shape||'circle').toLowerCase(),shapeDef=Object.values(SHAPES).find(s=>s.id===shapeKey)||SHAPES.CIRCLE;
+  if(shapeDef.sides>1){const colorKey=String(n.config?.color||'grey').toUpperCase(),shapeColor=COLORS[colorKey]?.hex||COLORS.GREY.hex,badge=`EMITS ${shapeDef.sides} · ${shapeDef.name.toUpperCase()}`;
+  ctx.save();ctx.font='900 7px Orbitron';const bw=Math.max(70,Math.min(118,ctx.measureText(badge).width+28)),bx=n.x+40-bw/2,by=n.y-23;
+  ctx.shadowBlur=12;ctx.shadowColor=shapeColor;ctx.fillStyle='rgba(9,14,17,.96)';ctx.strokeStyle=shapeColor;ctx.lineWidth=2;this.roundRect(ctx,bx,by,bw,17,4,true,true);ctx.shadowBlur=0;
+  this.drawGeometricShape(ctx,bx+11,by+8.5,5.5,shapeKey,shapeColor,null,null,true);ctx.fillStyle='#fff4cf';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(badge,bx+21,by+8.7);ctx.restore();}
+  }
   if((n.locked||n.config?.locked)&&!isEndpoint){ctx.fillStyle='#ff6b62';ctx.beginPath();ctx.arc(n.x+70,n.y+8,4,0,Math.PI*2);ctx.fill();}
   ctx.restore();
   }
@@ -6723,7 +6892,7 @@
 
   drawNodeArt(n) {
   const ctx = this.ctx; ctx.save();
-  if(ROBOT_VISUAL_TYPES.has(n.type)){
+  if(SPRITE_NATIVE_TYPES.has(n.type)){
   ctx.restore();
   this.drawFactoryMountedMachine(n);
   return;
@@ -8107,7 +8276,7 @@
   const room=normalizeFactoryRoom(roomOverride||this.factoryRoomBounds(),this.nodes||[]),camera=cameraOverride||this.camera,canvas=canvasOverride||this.canvas,zoom=camera.zoom||1;
   const worldKey=normalizeWorldKey(worldOverride||(this.creatorMode&&!this.creatorPlayMode?this.creatorWorld:null)||this.currentWorld||this.currentLevel?.world),theme=WORLD_REGISTRY[worldKey];
   const vx=-camera.x/zoom,vy=-camera.y/zoom,vw=canvas.width/zoom,vh=canvas.height/zoom,wallH=Math.max(80,room.floorY-room.y);
-  const signature=worldSheets(worldKey).find(s=>!/Auto-tile/i.test(s.file))||worldSheets(worldKey)[0],signatureImg=signature&&worldSheetImage(signature.id);
+  const signature=worldSheets(worldKey).find(s=>!/Auto-tile/i.test(s.file))||worldSheets(worldKey)[0],signatureImg=signature&&worldSheetImage(signature.id),sceneryList=sceneryOverride||this.factoryScenery||this.currentLevel?.scenery||[];
   ctx.save();
   ctx.fillStyle=theme.bg;ctx.fillRect(vx-120,vy-120,vw+240,vh+240);
   // World-specific atmosphere outside the authored room.
@@ -8126,11 +8295,12 @@
   if(worldKey==='ruins'||worldKey==='abandoned'){ctx.strokeStyle='rgba(25,20,20,.28)';ctx.lineWidth=2;for(let i=0;i<8;i++){const x=room.x+80+(i*179%Math.max(100,room.w-160)),y=room.floorY+50+(i*113%Math.max(100,room.y+room.h-room.floorY-100));ctx.beginPath();ctx.moveTo(x-24,y-18);ctx.lineTo(x,y);ctx.lineTo(x-13,y+29);ctx.moveTo(x,y);ctx.lineTo(x+31,y+8);ctx.stroke();}}
   // Each backdrop incorporates its supplied atlas as a continuous set-dressing wall.
   ctx.fillStyle=theme.wall;ctx.fillRect(room.x,room.y,room.w,wallH);
-  if(signatureImg?.complete&&signatureImg.naturalWidth){ctx.imageSmoothingEnabled=false;const srcH=Math.min(signature.height,Math.max(144,Math.min(288,wallH*1.5))),drawW=768*(wallH/srcH);ctx.globalAlpha=worldKey==='factory'?1:.9;for(let x=room.x;x<room.x+room.w;x+=drawW)ctx.drawImage(signatureImg,0,0,768,srcH,x,room.y,drawW,wallH);ctx.globalAlpha=1;}
+  if(room.autoWallBackdrop!==false&&signatureImg?.complete&&signatureImg.naturalWidth){ctx.imageSmoothingEnabled=false;const srcH=Math.min(signature.height,Math.max(144,Math.min(288,wallH*1.5))),drawW=signature.width*(wallH/srcH);ctx.globalAlpha=worldKey==='factory'?1:.9;for(let x=room.x;x<room.x+room.w;x+=drawW)ctx.drawImage(signatureImg,0,0,signature.width,srcH,x,room.y,drawW,wallH);ctx.globalAlpha=1;}
+  this.drawFactoryScenery(ctx,sceneryList.filter(s=>s.layer==='wall'||s.wallPanel));
   const wallShade=ctx.createLinearGradient(0,room.y,0,room.floorY);wallShade.addColorStop(0,'rgba(255,255,255,.08)');wallShade.addColorStop(.7,'rgba(0,0,0,.03)');wallShade.addColorStop(1,'rgba(0,0,0,.38)');ctx.fillStyle=wallShade;ctx.fillRect(room.x,room.y,room.w,wallH);
   ctx.fillStyle='#252d31';ctx.fillRect(room.x,room.floorY-9,room.w,11);ctx.save();ctx.beginPath();ctx.rect(room.x,room.floorY-9,room.w,11);ctx.clip();ctx.strokeStyle=theme.accent;ctx.lineWidth=6;for(let x=room.x-20;x<room.x+room.w+20;x+=24){ctx.beginPath();ctx.moveTo(x,room.floorY+2);ctx.lineTo(x+16,room.floorY-11);ctx.stroke();}ctx.restore();
   ctx.fillStyle='rgba(8,12,14,.82)';ctx.fillRect(room.x+16,room.y+14,Math.min(310,room.w-32),34);ctx.strokeStyle=theme.accent;ctx.lineWidth=2;ctx.strokeRect(room.x+16,room.y+14,Math.min(310,room.w-32),34);ctx.fillStyle=theme.accent;ctx.font='700 13px Orbitron';ctx.textAlign='left';ctx.fillText(`${String(WORLD_KEYS.indexOf(worldKey)+1).padStart(2,'0')} · ${theme.name.toUpperCase()} // ${theme.story.toUpperCase()}`,room.x+28,room.y+36);
-  this.drawFactoryScenery(ctx,sceneryOverride||this.factoryScenery||this.currentLevel?.scenery||[]);
+  this.drawFactoryScenery(ctx,sceneryList.filter(s=>s.layer!=='wall'&&!s.wallPanel));
   ctx.restore();
   ctx.save();ctx.strokeStyle='#2d353a';ctx.lineWidth=12;ctx.strokeRect(room.x-6,room.y-6,room.w+12,room.h+12);ctx.strokeStyle=theme.accent+'99';ctx.lineWidth=2;ctx.strokeRect(room.x,room.y,room.w,room.h);ctx.restore();
   }
@@ -8272,6 +8442,7 @@
   this._spawnStartTime = this.simulationNow();
   this.productionStartTime = this.simulationNow();
   this.nodes.forEach(n => {
+  n._campaignUsed=false;n._campaignSucceeded=false;
   if (n.type === MACHINE_TYPES.FUSE) n._fuseBlow = false;
   if (n.type === MACHINE_TYPES.PULSE_CLOCK) { n._lastPulse = null; n._clockBursting = false; }
   if (n.type === MACHINE_TYPES.SPAWNER) n.lastProcessed = 0;
@@ -8281,6 +8452,7 @@
   if (n.type === MACHINE_TYPES.DIFFERENCE_ENGINE) n._diffBuffer = null;
   if (n.type === MACHINE_TYPES.AVERAGER) n._avgBuffer = null;
   if (ROBOT_MACHINE_TYPES.has(n.type)) { n.robotQueue=[]; n.robotBuffer={}; n.robotDispatchIndex=0; n.robotState='WAITING FOR AI'; n.robotCompletedJobs=0; n._game=this; }
+  if (MECHANICAL_TRANSFER_TYPES.has(n.type)) { n.mechanicalQueue=[];n.mechanicalBuffer={};n.mechanicalIndex=0;n.mechanicalState='READY';n.mechanicalCompletedJobs=0;n._game=this; }
   });
   this.inTransit = [];
   var hint = document.getElementById('spawner-start-hint');
@@ -8304,6 +8476,7 @@
   if (n.queueBuffer) n.queueBuffer = [];
   if (n._delayQueue) n._delayQueue = [];
   if (ROBOT_MACHINE_TYPES.has(n.type)) { n.robotQueue=[]; n.robotBuffer={}; n.robotDispatchIndex=0; n.robotState='OFFLINE'; n.robotCompletedJobs=0; }
+  if (MECHANICAL_TRANSFER_TYPES.has(n.type)) { n.mechanicalQueue=[];n.mechanicalBuffer={};n.mechanicalIndex=0;n.mechanicalState='READY';n.mechanicalCompletedJobs=0; }
   });
   this.waitingForSpawn = true;
   this.isPaused = true;
@@ -8544,7 +8717,7 @@
   this.connections = this.connections.filter(c => !(c.tid === node.id && c.tp === port.id));
   const connection={ fid: this.wiring.node.id, tid: node.id, fp: this.wiring.fp, tp: port.id, isComparatorRead: sp.type === 'read' };
   this.connections.push(connection);
-  if(this.factoryVisualMode){this.refreshFactoryConnectionPaths();this.calculateIntersections();this.updateFactoryBuildStatus();}
+  if(this.factoryVisualMode){this.refreshFactoryConnectionPaths();if(!connection.factoryPath?.length){this.connections=this.connections.filter(c=>c!==connection);this.showTerminalMessage('No roller route: scenery blocks the connection','#ff625d');return;}this.calculateIntersections();this.updateFactoryBuildStatus();}
   this.wiring.visited.add(this.wiring.node.id);
   this.wiring.visited.add(node.id);
 
@@ -8698,6 +8871,15 @@
   [MACHINE_TYPES.ROBOT_COURIER]: 'Requires a purple AI command. Stores one shape, visibly walks it from PICK to DROP, and doubles as a timing buffer between roller cells.',
   [MACHINE_TYPES.ROBOT_STACKER]: 'Requires AI. Stores A and B, joins their side counts, preserves different colours as layers, then carries the mega-shape to MEGA.',
   [MACHINE_TYPES.ROBOT_DISPATCHER]: 'Requires AI. Stores arrivals and alternates deliveries between bays A and B. Connect both roller outputs for parallel production.',
+  [MACHINE_TYPES.TRANSFER_CLAW]: 'PICK is the powered input. The claw holds one shape for 0.9 seconds, swings it over the machine gap, then places it on DROP.',
+  [MACHINE_TYPES.DIVERTER_ARM]: 'Alternates every arrival between A and B. The moving arm is real storage, so its swing changes branch timing.',
+  [MACHINE_TYPES.ASSEMBLY_ARM]: 'Stores A and B, joins their side counts, and preserves different colours as a layered part before the powered placement motion.',
+  [MACHINE_TYPES.GANTRY_CRANE]: 'Reads cargo height: floor cargo goes to GROUND, raised cargo goes to HIGH. Use it to reunite stacked factory floors.',
+  [MACHINE_TYPES.ROLLER_LIFT]: 'Raises cargo one factory level. Its HIGH output must enter an Elevated Roller, Gantry HIGH bay, or a Roller Drop.',
+  [MACHINE_TYPES.ELEVATED_CONVEYOR]: 'Carries raised cargo quickly above the floor. Ground cargo jams at its input until routed through a Lift.',
+  [MACHINE_TYPES.ROLLER_DROP]: 'Accepts raised cargo and returns it to floor height. Ground cargo cannot enter from the HIGH socket.',
+  [MACHINE_TYPES.CROSSOVER_CONVEYOR]: 'Two isolated roller lanes cross inside one module: left A exits right A, top B exits bottom B. The cargo streams never collide.',
+  [MACHINE_TYPES.CARGO_ELEVATOR]: 'A timed vertical transfer. Floor cargo rises; already-raised cargo descends, allowing reversible multi-floor machinery.',
   };
   return tips[n.type] || 'Mount this machine on one roller. Adjacent rollers orient it automatically; right-click cycles available settings and Shift+RMB opens its briefing.';
   }
@@ -9885,6 +10067,7 @@
   const linked=this.connections.some(c=>c.fid===n.id||c.tid===n.id);
   if(ROBOT_CONTROL_TYPES.has(n.type))return linked&&this.robotControlTopology().nodes.has(n.id);
   if(ROBOT_MACHINE_TYPES.has(n.type))return !!n._campaignUsed&&linked&&this.robotControlTopology().nodes.has(n.id);
+  if(SPRITE_NATIVE_TYPES.has(n.type)&&!ROBOT_VISUAL_TYPES.has(n.type))return !!n._campaignSucceeded;
   return n._campaignUsed||([MACHINE_TYPES.PORTAL_OUT,MACHINE_TYPES.GENERATOR,MACHINE_TYPES.PULSE_CLOCK].includes(n.type)&&this.connections.some(c=>c.fid===n.id));
   });
     if(node)claimed.add(node.id);else missing.push(type);
@@ -10138,7 +10321,7 @@
   contract: this.creatorWinCondition || { shape: 'circle', color: 'red' },
   nodes,
   room: normalizeFactoryRoom(this.creatorRoom,nodes),
-  scenery: (this.creatorScenery||[]).map((s,i)=>({id:s.id||('s'+i),type:s.type,x:Math.round(s.x),y:Math.round(s.y),rotation:(s.rotation||0)&3,scale:Math.max(.3,Math.min(3,s.scale||1)),solid:sceneryIsSolid(s)})),
+  scenery: (this.creatorScenery||[]).map((s,i)=>({id:s.id||('s'+i),type:s.type,x:Math.round(s.x),y:Math.round(s.y),rotation:(s.rotation||0)&3,scale:Math.max(.3,Math.min(3,s.scale||1)),solid:sceneryIsSolid(s),layer:s.layer==='wall'?'wall':'floor',wallPanel:!!s.wallPanel})),
   world: normalizeWorldKey(this.creatorWorld)
   };
   if (this.creatorStartingZoom) level.startingZoom = this.creatorStartingZoom;
@@ -10163,14 +10346,16 @@
   if (match) maxId = Math.max(maxId, parseInt(match[1], 10));
   });
   this.creatorNextId = maxId + 1;
-  this.creatorRoom = normalizeFactoryRoom(level.room,level.nodes||[]);
-  this.creatorScenery = (level.scenery||[]).map((s,i)=>({id:s.id||('s'+i),type:s.type,x:Number(s.x)||0,y:Number(s.y)||0,rotation:(s.rotation||0)&3,scale:Math.max(.3,Math.min(3,Number(s.scale)||1)),solid:s.solid==null?sceneryDefaultSolid(s.type):!!s.solid})).filter(s=>sceneryTypeIsValid(s.type));
   this.creatorWorld = normalizeWorldKey(level.world||((meta&&meta.chapter)===2?'abandoned':'factory'));
+  this.creatorRoom = normalizeFactoryRoom(level.room,level.nodes||[]);
+  this.creatorScenery = (level.scenery||[]).map((s,i)=>({id:s.id||('s'+i),type:s.type,x:Number(s.x)||0,y:Number(s.y)||0,rotation:(s.rotation||0)&3,scale:Math.max(.3,Math.min(3,Number(s.scale)||1)),solid:s.solid==null?sceneryDefaultSolid(s.type):!!s.solid,layer:s.layer==='wall'?'wall':'floor',wallPanel:!!s.wallPanel})).filter(s=>sceneryTypeIsValid(s.type));
+  this.materializeCreatorWallBackdrop();
   this.creatorNextSceneryId = this.creatorScenery.reduce((max,s)=>Math.max(max,parseInt(String(s.id).replace(/\D/g,''),10)||0),0)+1;
   this.creatorWinCondition = level.contract || { shapes: [{ shape: 'circle', color: 'red' }] };
   this.creatorStartingZoom = level.startingZoom || null;
   this.creatorProductionLogs = (meta && meta.productionLogs) || level.productionLogs || [];
   this.creatorMeta = {
+  ...(meta||{}),
   id: (meta && meta.id) || level.id || '',
   title: (meta && meta.title) || level.title || 'Untitled',
   chapter: (meta && meta.chapter) || level.chapter || 1,
@@ -10221,8 +10406,9 @@
   }
   
   openLevelCreator() {
+  const levelBeingEdited=(!this.creatorMode&&this.currentLevel&&this.currentLevel.id!=='test')?this.currentLevel:null;
   this.factoryBuildMode = false;
-  this.factoryVisualMode = false;
+  this.factoryVisualMode = true;
   this.creatorMode = true;
   this.creatorNodes = [];
   this.creatorConnections = [];
@@ -10241,6 +10427,9 @@
   this.creatorBlockRotation = 0;
   this.creatorBlockColor = 'red';
   this.creatorPlayMode = false;
+  this.creatorUndoStack = [];
+  this.creatorRedoStack = [];
+  this.creatorClipboard = null;
   this.creatorProductionLogs = [];
   this.creatorMeta = { id: '', title: 'Untitled', chapter: 1, hints: [], source: 'scratch' };
   if (!this.creatorWinCondition) {
@@ -10250,6 +10439,9 @@
   this.initCreatorCanvas();
   this.buildCreatorPalette();
   this.initCreatorControls();
+  if(!levelBeingEdited)this.materializeCreatorWallBackdrop();
+  if(levelBeingEdited)this.applyLevelToCreator(levelBeingEdited,{id:levelBeingEdited.id,title:levelBeingEdited.title,chapter:levelBeingEdited.chapter||1,hints:levelBeingEdited.hints||[],productionLogs:levelBeingEdited.productionLogs||[],source:'campaign'});
+  this.creatorRecordHistory(true);
   this.updateCreatorMetaBar();
   this.creatorLoop();
   }
@@ -10374,6 +10566,15 @@
   { type: 'spray_nozzle', name: 'Spray Nozzle', icon: '[SPR]' },
   { type: 'kiln', name: 'Kiln', icon: '[KLN]' },
   { type: 'industrial_fan', name: 'Industrial Fan', icon: '[FAN]' },
+  { type: 'transfer_claw', name: 'Transfer Claw', icon: '[CLW]' },
+  { type: 'diverter_arm', name: 'Diverter Arm', icon: '[DIV]' },
+  { type: 'assembly_arm', name: 'Assembly Arm', icon: '[ASM]' },
+  { type: 'gantry_crane', name: 'Gantry Crane', icon: '[GNT]' },
+  { type: 'roller_lift', name: 'Roller Lift', icon: '[UP]' },
+  { type: 'elevated_conveyor', name: 'Elevated Roller', icon: '[HI]' },
+  { type: 'roller_drop', name: 'Roller Drop', icon: '[DN]' },
+  { type: 'crossover_conveyor', name: 'Roller Crossover', icon: '[X]' },
+  { type: 'cargo_elevator', name: 'Cargo Elevator', icon: '[ELV]' },
   { type: 'robot_ai_core', name: 'Robot AI Core', icon: '[AI]' },
   { type: 'robot_relay', name: 'Robot AI Relay', icon: '[NET]' },
   { type: 'robot_courier', name: 'Robot Courier', icon: '[RC]' },
@@ -10382,7 +10583,7 @@
   ];
   
   html += '<div id="creator-machine-panel"><h3 style="color: var(--brass); margin-bottom: 10px; font-size: 0.8rem;">BLOCKS</h3>';
-  html += '<p style="font-size: 0.65rem; color: var(--text-dim); margin-bottom: 10px;">Right-click to rotate · Middle-click placed block to rotate · 1=Place 2=Move 3=Delete 4=Lock · Hold CTRL for free placement</p>';
+  html += '<p style="font-size:.65rem;color:var(--text-dim);margin-bottom:10px;line-height:1.55"><b style="color:var(--brass)">1/P</b> Place · <b style="color:var(--brass)">2/V</b> Move · <b style="color:var(--brass)">3/X</b> Delete · <b style="color:var(--brass)">4/L</b> Lock<br><b>Ctrl+C / Ctrl+V</b> Copy/Paste · <b>Ctrl+Z / Ctrl+Y</b> Undo/Redo · <b>R</b> Rotate · <b>Del</b> Delete selected<br><b>RMB empty / Esc</b> Deselect · <b>WASD</b> Camera · <b>Arrows</b> Nudge · hold <b>CTRL</b> for free placement</p>';
   html += '<div id="block-palette-container">';
   blocks.forEach(block => {
   html += `<button class="btn block-btn" data-type="${block.type}" style="margin-bottom:6px;width:100%;font-size:.7rem;justify-content:flex-start;" onclick="game.selectCreatorBlock('${block.type}')"><span class="creator-block-sprite" style="${factorySpriteIconStyle(block.type, 40)}">${block.icon}</span><span class="creator-block-name">${block.name}</span></button>`;
@@ -10390,10 +10591,10 @@
   html += '</div></div>';
 
   html += '<div id="creator-scenery-panel" style="display:none">';
-  html += '<h3 style="color:var(--brass);font-size:.8rem;margin-bottom:8px;">WORLD BACKDROP</h3><p style="font-size:.65rem;color:var(--text-dim);line-height:1.45;margin-bottom:10px;">Choose the level world, then a themed floorplan. Every supplied atlas is available below. Pick a sheet, set the crop size, and click its labelled 48px grid origin. Larger props can span several cells.</p>';
+  html += '<h3 style="color:var(--brass);font-size:.8rem;margin-bottom:8px;">WORLD BACKDROP</h3><p style="font-size:.65rem;color:var(--text-dim);line-height:1.45;margin-bottom:10px;">Choose a world and floorplan, then drag a box directly over any atlas. The box snaps to the asset grid; release to pick that exact crop, then click the workspace to place it.</p>';
   html += '<label style="font-size:.62rem;color:var(--text-dim)">STORY WORLD</label><select id="creator-world-select" class="crt-input" style="width:100%;margin:4px 0 10px" onchange="game.setCreatorWorld(this.value)"><optgroup label="MAIN STORY">'+WORLD_ORDER.filter(k=>!WORLD_REGISTRY[k].bonus).map(k=>`<option value="${k}"${k===this.creatorWorld?' selected':''}>${String(WORLD_KEYS.indexOf(k)+1).padStart(2,'0')} · ${WORLD_REGISTRY[k].name}</option>`).join('')+'</optgroup><optgroup label="BONUS AFTERMATH">'+WORLD_ORDER.filter(k=>WORLD_REGISTRY[k].bonus).map(k=>`<option value="${k}">${WORLD_REGISTRY[k].name}</option>`).join('')+'</optgroup></select>';
   html += '<div id="creator-world-story" style="font-size:.64rem;color:var(--brass);margin-bottom:10px"></div><div id="creator-room-presets"></div>';
-  html += '<button class="btn btn-gold" style="width:100%;margin:2px 0 14px" onclick="game.selectCreatorRoomTool()">SELECT / MOVE ROOM</button>';
+  html += '<button class="btn btn-gold" style="width:100%;margin:2px 0 6px" onclick="game.selectCreatorRoomTool()">SELECT / MOVE ROOM</button><button class="btn" style="width:100%;margin:0 0 14px" onclick="game.restoreCreatorDefaultWall()">RESTORE DEFAULT WALL PANELS</button><div style="font-size:.62rem;color:#8defff;line-height:1.45;margin:-5px 0 10px">The top buildings are individual scenery panels. Drag them directly, press Delete, or use their inspector.</div>';
   html += '<div id="creator-atlas-browser"></div><div id="creator-curated-assets"></div>';
   html += '</div>';
   
@@ -10474,10 +10675,11 @@
   }
   return node;
   });
-  this.connections = [];
+  this.connections = (this.creatorConnections||[]).map(c=>({...c}));
   this.inTransit = [];
   this.isPaused = true;
   this.waitingForSpawn = true;
+  this.factoryVisualMode = true;
   this.productionStartTime = null;
   var hint = document.getElementById('spawner-start-hint');
   if (hint) hint.style.display = 'block';
@@ -10487,7 +10689,9 @@
   this.ctx = this.creatorCtx;
   
   // Copy camera settings
-  this.camera = { ...this.creatorCamera };
+  this.camera = this.creatorCamera;
+  this.setupFactoryAssembly();
+  this.refreshFactoryConnectionPaths();
   
   } else {
   // Exit play mode - return to editing
@@ -10495,6 +10699,8 @@
   btn.classList.remove('btn-gold');
   document.getElementById('creator-palette').style.display = '';
   
+  // Keep test wiring available when the author re-enters play test.
+  this.creatorConnections=(this.connections||[]).map(c=>({fid:c.fid,fp:c.fp,tid:c.tid,tp:c.tp}));
   // Clear game state
   this.nodes = [];
   this.connections = [];
@@ -10503,6 +10709,7 @@
   this.currentWorld = null;
   this.factoryRoom = null;
   this.factoryScenery = [];
+  this.factoryVisualMode = true;
   this.waitingForSpawn = false;
   this.isPaused = false;
   this.productionStartTime = null;
@@ -10535,7 +10742,9 @@
   }
 
   this.showTerminalMessage('Searching shortest win…', '#d4af37');
+  this._solverRequiredModules=(this.creatorMeta&&this.creatorMeta.requiredModules)||[];
   const solution = this._solveShortestWin(spawners, collectors[0], intermediates, targets);
+  this._solverRequiredModules=[];
   if (!solution) {
     this.showTerminalMessage('No winning wiring found with current modules (unary/mixer/split search).', '#ff6666');
     document.getElementById('autocomplete-body').innerHTML =
@@ -10630,7 +10839,7 @@
   }
 
   _sigKey(sig) {
-  return [sig.shape, (sig.color || 'grey').toLowerCase(), sig.topColor || '', sig.bottomColor || ''].join('|');
+  return [sig.shape, (sig.color || 'grey').toLowerCase(), sig.topColor || '', sig.bottomColor || '', Number(sig.elevation)||0].join('|');
   }
 
   _sigMatchesReq(sig, req) {
@@ -10646,12 +10855,21 @@
     shape: spawner.config.shape || 'circle',
     color: (spawner.config.color || 'grey').toLowerCase(),
     topColor: null,
-    bottomColor: null
+    bottomColor: null,
+    elevation: 0,
+    transportSpeed: 1
   };
   }
 
   _cloneSig(sig) {
-  return { shape: sig.shape, color: sig.color, topColor: sig.topColor || null, bottomColor: sig.bottomColor || null };
+  return {
+    shape: sig.shape,
+    color: sig.color,
+    topColor: sig.topColor || null,
+    bottomColor: sig.bottomColor || null,
+    elevation: Number(sig.elevation) || 0,
+    transportSpeed: Number(sig.transportSpeed) || 1
+  };
   }
 
   _shapeBySides(sides) {
@@ -10677,8 +10895,8 @@
   _simulateNodeOutputs(sig, node) {
   const shapeData = SHAPES[(sig.shape || '').toUpperCase()];
   if (!shapeData) return [];
-  const mk = (shape, color, outPort = 1, top = null, bot = null) => [{
-    sig: { shape, color: (color || 'grey').toLowerCase(), topColor: top, bottomColor: bot },
+  const mk = (shape, color, outPort = 1, top = null, bot = null, elevation = Number(sig.elevation)||0, transportSpeed = Number(sig.transportSpeed)||1) => [{
+    sig: { shape, color: (color || 'grey').toLowerCase(), topColor: top, bottomColor: bot, elevation, transportSpeed },
     outPort
   }];
 
@@ -10742,6 +10960,38 @@
       { sig:this._cloneSig(sig), outPort:1 },
       { sig:this._cloneSig(sig), outPort:2 }
     ];
+  case MACHINE_TYPES.TRANSFER_CLAW:
+    return [{sig:this._cloneSig(sig),outPort:1}];
+  case MACHINE_TYPES.DIVERTER_ARM:
+    return [
+      {sig:this._cloneSig(sig),outPort:1},
+      {sig:this._cloneSig(sig),outPort:2}
+    ];
+  case MACHINE_TYPES.GANTRY_CRANE:
+    return [{sig:this._cloneSig(sig),outPort:(Number(sig.elevation)||0)>0?2:1}];
+  case MACHINE_TYPES.ROLLER_LIFT: {
+    const raised=this._cloneSig(sig);raised.elevation=(Number(raised.elevation)||0)+1;raised.transportSpeed=1.25;
+    return [{sig:raised,outPort:1}];
+  }
+  case MACHINE_TYPES.ELEVATED_CONVEYOR: {
+    if((Number(sig.elevation)||0)<1)return [];
+    const elevated=this._cloneSig(sig);elevated.transportSpeed=1.6;
+    return [{sig:elevated,outPort:1}];
+  }
+  case MACHINE_TYPES.ROLLER_DROP: {
+    if((Number(sig.elevation)||0)<1)return [];
+    const lowered=this._cloneSig(sig);lowered.elevation=Math.max(0,(Number(lowered.elevation)||0)-1);lowered.transportSpeed=1;
+    return [{sig:lowered,outPort:1}];
+  }
+  case MACHINE_TYPES.CROSSOVER_CONVEYOR:
+    return [
+      {sig:this._cloneSig(sig),outPort:1},
+      {sig:this._cloneSig(sig),outPort:3}
+    ];
+  case MACHINE_TYPES.CARGO_ELEVATOR: {
+    const lifted=this._cloneSig(sig);lifted.elevation=(Number(lifted.elevation)||0)>0?0:1;lifted.transportSpeed=1.1;
+    return [{sig:lifted,outPort:1}];
+  }
   case MACHINE_TYPES.PULSE_SPLITTER: {
     const halfA = Math.ceil(shapeData.sides / 2);
     const halfB = Math.floor(shapeData.sides / 2);
@@ -10785,6 +11035,7 @@
     return [];
   case MACHINE_TYPES.MIXER:
   case MACHINE_TYPES.ROBOT_STACKER:
+  case MACHINE_TYPES.ASSEMBLY_ARM:
   case MACHINE_TYPES.AVERAGER:
   case MACHINE_TYPES.DIFFERENCE_ENGINE:
   case MACHINE_TYPES.SWAP:
@@ -10802,10 +11053,11 @@
   if (!sa || !sb) return null;
   const sides = Math.min(20, sa.sides + sb.sides);
   const shape = this._shapeBySides(sides) || 'icosagon';
+  const elevation=Math.max(Number(a.elevation)||0,Number(b.elevation)||0),transportSpeed=Math.max(Number(a.transportSpeed)||1,Number(b.transportSpeed)||1);
   if (a.color === b.color && !a.topColor && !b.topColor) {
-    return { shape, color: a.color, topColor: null, bottomColor: null };
+    return { shape, color: a.color, topColor: null, bottomColor: null, elevation, transportSpeed };
   }
-  return { shape, color: 'grey', topColor: a.color, bottomColor: b.color };
+  return { shape, color: 'grey', topColor: a.color, bottomColor: b.color, elevation, transportSpeed };
   }
 
   _pickPort(node, dir, preferredId) {
@@ -10891,7 +11143,7 @@
   byTarget.forEach(list => list.sort((a, b) => a.hops - b.hops));
 
   // Mixer enrichment: combine two reachable signals through unused mixers
-  const mixers = intermediates.filter(n => n.type === MACHINE_TYPES.MIXER || n.type === MACHINE_TYPES.ROBOT_STACKER);
+  const mixers = intermediates.filter(n => n.type === MACHINE_TYPES.MIXER || n.type === MACHINE_TYPES.ROBOT_STACKER || n.type === MACHINE_TYPES.ASSEMBLY_ARM);
   if (mixers.length) {
     // Prefer cheap pairs (limit combinations)
     const cheap = reachable.filter(st => st.hops <= 4).slice(0, 80);
@@ -10942,8 +11194,15 @@
   // Assign cheapest module-disjoint chains per target
   const chosen = [];
   const usedGlobal = new Set();
+  const requiredTypes=Array.isArray(this._solverRequiredModules)?this._solverRequiredModules:[];
+  const satisfiesRequired=st=>{
+    if(!requiredTypes.length)return true;
+    const available={};(st.nodeIds||[]).forEach(id=>{const node=spawners.concat(intermediates).find(n=>n.id===id);if(node)available[node.type]=(available[node.type]||0)+1;});
+    const needed={};requiredTypes.forEach(type=>needed[type]=(needed[type]||0)+1);
+    return Object.entries(needed).every(([type,count])=>(available[type]||0)>=count);
+  };
   for (let ti = 0; ti < targets.length; ti++) {
-    const pick = byTarget[ti].find(st => st.usedIds.every(id => !usedGlobal.has(id)));
+    const pick = byTarget[ti].find(st => st.usedIds.every(id => !usedGlobal.has(id))&&(targets.length!==1||satisfiesRequired(st)));
     if (!pick) {
       // Fallback: allow overlap (may be invalid wiring) — prefer reporting failure
       const any = byTarget[ti][0];
@@ -11093,7 +11352,20 @@
   }
 
   setCreatorWorld(key) {
-  this.creatorWorld=normalizeWorldKey(key);this.creatorAtlasSheet=null;this.creatorSelectedScenery=null;this.renderCreatorWorldPalette();this.updateCreatorMetaBar();
+  this.creatorRecordHistory();this.creatorScenery=(this.creatorScenery||[]).filter(s=>!s.wallPanel);this.creatorWorld=normalizeWorldKey(key);this.creatorRoom={...normalizeFactoryRoom(this.creatorRoom,this.creatorNodes),autoWallBackdrop:true};this.materializeCreatorWallBackdrop();this.creatorAtlasSheet=null;this.creatorSelectedScenery=null;this.renderCreatorWorldPalette();this.updateCreatorMetaBar();
+  }
+
+  materializeCreatorWallBackdrop() {
+  const room=normalizeFactoryRoom(this.creatorRoom,this.creatorNodes||[]);if(room.autoWallBackdrop===false)return;
+  const world=normalizeWorldKey(this.creatorWorld),signature=worldSheets(world).find(s=>!/Auto-tile/i.test(s.file))||worldSheets(world)[0];if(!signature){room.autoWallBackdrop=false;this.creatorRoom=room;return;}
+  const wallH=Math.max(80,room.floorY-room.y),rows=Math.max(1,Math.min(signature.rows,Math.ceil(Math.min(signature.height,Math.max(144,Math.min(288,wallH*1.5)))/48))),cols=Math.max(1,signature.cols),cropH=rows*48,scale=Math.max(.3,Math.min(3,wallH/cropH)),panelW=cols*48*scale,type=makeWorldAssetType(signature.id,0,0,cols,rows),panels=[];
+  let index=0;for(let x=room.x;x<room.x+room.w;x+=panelW){panels.push({id:`wall-${world}-${index++}`,type,x:x+panelW/2,y:room.y+wallH/2,rotation:0,scale,solid:false,layer:'wall',wallPanel:true});}
+  this.creatorScenery=[...panels,...(this.creatorScenery||[]).filter(s=>!s.wallPanel)];room.autoWallBackdrop=false;this.creatorRoom=room;
+  this.creatorNextSceneryId=this.creatorScenery.reduce((max,s)=>Math.max(max,parseInt(String(s.id).replace(/\D/g,''),10)||0),0)+1;
+  }
+
+  restoreCreatorDefaultWall() {
+  if(!this.creatorMode||this.creatorPlayMode)return;this.creatorRecordHistory();this.creatorScenery=(this.creatorScenery||[]).filter(s=>!s.wallPanel);this.creatorRoom={...normalizeFactoryRoom(this.creatorRoom,this.creatorNodes),autoWallBackdrop:true};this.materializeCreatorWallBackdrop();this.showCreatorInspector(null);this.updateCreatorMetaBar();this.showTerminalMessage('Default wall panels restored','#72e5ff');
   }
 
   renderCreatorWorldPalette() {
@@ -11101,7 +11373,7 @@
   const story=document.getElementById('creator-world-story');if(story)story.textContent=(world.bonus?'BONUS · ':'')+world.story+' · '+world.packs.reduce((n,p)=>n+p[2].length,0)+' atlas sheets';
   const presets=document.getElementById('creator-room-presets');if(presets)presets.innerHTML=worldRoomPresets(key).map(p=>`<button class="btn" style="width:100%;margin-bottom:6px;justify-content:flex-start" onclick="game.applyCreatorRoomPreset('${p.id}')">${p.name} · ${p.w/80}×${p.h/80} bays</button>`).join('');
   const sheets=worldSheets(key);if(!WORLD_SHEET_MAP[this.creatorAtlasSheet]||WORLD_SHEET_MAP[this.creatorAtlasSheet].world!==key)this.creatorAtlasSheet=sheets[0]?.id||null;
-  const browser=document.getElementById('creator-atlas-browser');if(browser){browser.innerHTML='<h3 style="color:var(--brass);font-size:.72rem;margin:12px 0 7px;border-bottom:1px solid rgba(205,175,120,.2);padding-bottom:4px">ALL WORLD ASSETS</h3><label style="font-size:.6rem;color:var(--text-dim)">ATLAS SHEET</label><select id="creator-atlas-sheet" class="crt-input" style="width:100%;margin:4px 0 8px" onchange="game.setCreatorAtlasSheet(this.value)">'+sheets.map(s=>`<option value="${s.id}"${s.id===this.creatorAtlasSheet?' selected':''}>${s.label}</option>`).join('')+'</select><div style="display:flex;gap:8px;align-items:end;margin-bottom:8px"><label style="font-size:.6rem;color:var(--text-dim);flex:1">CROP W (TILES)<input id="creator-crop-w" class="crt-input" type="number" min="1" max="16" value="1" style="width:100%;margin-top:3px"></label><label style="font-size:.6rem;color:var(--text-dim);flex:1">CROP H (TILES)<input id="creator-crop-h" class="crt-input" type="number" min="1" max="16" value="1" style="width:100%;margin-top:3px"></label></div><div id="creator-atlas-selection" style="min-height:44px;padding:6px;border:1px solid rgba(205,175,120,.2);font-size:.6rem;color:var(--text-dim);margin-bottom:8px">Click a labelled cell to select its crop origin.</div><div id="creator-atlas-grid"></div>';this.renderCreatorAtlasGrid();}
+  const browser=document.getElementById('creator-atlas-browser');if(browser){browser.innerHTML='<h3 style="color:var(--brass);font-size:.72rem;margin:12px 0 7px;border-bottom:1px solid rgba(205,175,120,.2);padding-bottom:4px">ALL WORLD ASSETS</h3><label style="font-size:.6rem;color:var(--text-dim)">ATLAS SHEET</label><select id="creator-atlas-sheet" class="crt-input" style="width:100%;margin:4px 0 8px" onchange="game.setCreatorAtlasSheet(this.value)">'+sheets.map(s=>`<option value="${s.id}"${s.id===this.creatorAtlasSheet?' selected':''}>${s.label}</option>`).join('')+'</select><div id="creator-atlas-selection" style="min-height:44px;padding:6px;border:1px solid rgba(205,175,120,.2);font-size:.6rem;color:var(--text-dim);margin-bottom:8px"><b style="color:var(--brass)">DRAG TO SELECT</b><br>The selection box snaps to whole atlas cells.</div><div id="creator-atlas-grid"></div>';this.renderCreatorAtlasGrid();}
   const curated=document.getElementById('creator-curated-assets');if(curated)curated.innerHTML=key==='factory'?'<details style="margin-top:12px"><summary style="cursor:pointer;color:var(--brass);font-size:.7rem">CURATED FACTORY CROPS (67)</summary>'+FACTORY_SCENERY_DEFS.map(def=>`<button class="btn scenery-btn" data-scenery="${def.id}" style="margin-top:6px;width:100%;font-size:.64rem;justify-content:flex-start;gap:8px" onclick="game.selectCreatorScenery('${def.id}')"><span class="creator-scenery-sprite" style="${factorySceneryIconStyle(def.id,54,42)}"></span><span class="creator-block-name">${def.name}</span></button>`).join('')+'</details>':'';
   }
 
@@ -11110,13 +11382,20 @@
   }
 
   renderCreatorAtlasGrid() {
-  const sheet=WORLD_SHEET_MAP[this.creatorAtlasSheet],grid=document.getElementById('creator-atlas-grid');if(!sheet||!grid)return;const cell=17,scale=cell/48;let html=`<div style="display:grid;grid-template-columns:repeat(16,${cell}px);gap:1px;width:max-content;background:#080b0d;padding:2px;border:1px solid rgba(205,175,120,.3)">`;
-  for(let row=0;row<sheet.rows;row++)for(let col=0;col<sheet.cols;col++){const label=`R${String(row+1).padStart(2,'0')} C${String(col+1).padStart(2,'0')}`;html+=`<button title="${sheet.label} · ${label}" aria-label="${label}" onclick="game.selectWorldAsset('${sheet.id}',${col},${row})" style="width:${cell}px;height:${cell}px;padding:0;border:0;outline:1px solid rgba(255,255,255,.07);background-color:#182025;background-image:url('${sheet.src}');background-repeat:no-repeat;background-size:${sheet.width*scale}px ${sheet.height*scale}px;background-position:${-col*cell}px ${-row*cell}px;image-rendering:pixelated;cursor:pointer"></button>`;}
-  grid.innerHTML=html+'</div><div style="font-size:.58rem;color:var(--text-dim);margin-top:5px">'+sheet.cols+'×'+sheet.rows+' labelled cells · transparent cells are retained because they may be part of a larger crop.</div>';
+  const sheet=WORLD_SHEET_MAP[this.creatorAtlasSheet],grid=document.getElementById('creator-atlas-grid');if(!sheet||!grid)return;
+  const width=Math.min(224,sheet.width),scale=width/sheet.width,height=Math.max(1,Math.round(sheet.height*scale));
+  grid.innerHTML=`<canvas id="creator-atlas-canvas" width="${width}" height="${height}" style="display:block;width:${width}px;height:${height}px;border:1px solid rgba(205,175,120,.48);background:#0b1013;image-rendering:pixelated;cursor:crosshair;touch-action:none"></canvas><div style="font-size:.58rem;color:var(--text-dim);margin-top:5px">${sheet.cols}×${sheet.rows} cells · drag from one corner of a prop to the other.</div>`;
+  const canvas=document.getElementById('creator-atlas-canvas'),ctx=canvas.getContext('2d'),img=worldSheetImage(sheet.id),cellW=width/sheet.cols,cellH=height/sheet.rows;
+  const paint=()=>{ctx.clearRect(0,0,width,height);ctx.imageSmoothingEnabled=false;if(img?.complete&&img.naturalWidth)ctx.drawImage(img,0,0,width,height);ctx.strokeStyle='rgba(255,255,255,.11)';ctx.lineWidth=1;ctx.beginPath();for(let c=1;c<sheet.cols;c++){ctx.moveTo(Math.round(c*cellW)+.5,0);ctx.lineTo(Math.round(c*cellW)+.5,height);}for(let r=1;r<sheet.rows;r++){ctx.moveTo(0,Math.round(r*cellH)+.5);ctx.lineTo(width,Math.round(r*cellH)+.5);}ctx.stroke();const d=this.creatorAtlasDrag;if(d&&d.sheetId===sheet.id){const c0=Math.min(d.startCol,d.endCol),c1=Math.max(d.startCol,d.endCol),r0=Math.min(d.startRow,d.endRow),r1=Math.max(d.startRow,d.endRow);ctx.fillStyle='rgba(88,225,255,.22)';ctx.strokeStyle='#7deeff';ctx.lineWidth=2;ctx.fillRect(c0*cellW,r0*cellH,(c1-c0+1)*cellW,(r1-r0+1)*cellH);ctx.strokeRect(c0*cellW+1,r0*cellH+1,(c1-c0+1)*cellW-2,(r1-r0+1)*cellH-2);}};
+  if(img&&!img.complete)img.addEventListener('load',paint,{once:true});paint();
+  const cellAt=e=>{const r=canvas.getBoundingClientRect();return{col:Math.max(0,Math.min(sheet.cols-1,Math.floor((e.clientX-r.left)/r.width*sheet.cols))),row:Math.max(0,Math.min(sheet.rows-1,Math.floor((e.clientY-r.top)/r.height*sheet.rows)))}};
+  canvas.addEventListener('pointerdown',e=>{e.preventDefault();canvas.setPointerCapture(e.pointerId);const p=cellAt(e);this.creatorAtlasDrag={sheetId:sheet.id,startCol:p.col,startRow:p.row,endCol:p.col,endRow:p.row};paint();});
+  canvas.addEventListener('pointermove',e=>{if(!this.creatorAtlasDrag||this.creatorAtlasDrag.sheetId!==sheet.id)return;const p=cellAt(e);this.creatorAtlasDrag.endCol=p.col;this.creatorAtlasDrag.endRow=p.row;paint();});
+  canvas.addEventListener('pointerup',e=>{const d=this.creatorAtlasDrag;if(!d||d.sheetId!==sheet.id)return;const p=cellAt(e);d.endCol=p.col;d.endRow=p.row;const col=Math.min(d.startCol,d.endCol),row=Math.min(d.startRow,d.endRow),cw=Math.abs(d.endCol-d.startCol)+1,ch=Math.abs(d.endRow-d.startRow)+1;this.selectWorldAsset(sheet.id,col,row,cw,ch);paint();});
   }
 
-  selectWorldAsset(sheetId,col,row) {
-  const sheet=WORLD_SHEET_MAP[sheetId];if(!sheet)return;const cw=Math.max(1,Math.min(sheet.cols-col,parseInt(document.getElementById('creator-crop-w')?.value,10)||1)),ch=Math.max(1,Math.min(sheet.rows-row,parseInt(document.getElementById('creator-crop-h')?.value,10)||1)),type=makeWorldAssetType(sheetId,col,row,cw,ch);this.selectCreatorScenery(type);const def=resolveSceneryDef(type),status=document.getElementById('creator-atlas-selection');if(status)status.innerHTML=`<div style="display:flex;gap:8px;align-items:center"><span class="creator-scenery-sprite" style="${factorySceneryIconStyle(type,54,42)}"></span><span style="color:#fff">${def.name}<br><span style="color:var(--brass)">${def.sw}×${def.sh}px crop selected</span></span></div>`;
+  selectWorldAsset(sheetId,col,row,cropW=1,cropH=1) {
+  const sheet=WORLD_SHEET_MAP[sheetId];if(!sheet)return;const cw=Math.max(1,Math.min(sheet.cols-col,cropW||1)),ch=Math.max(1,Math.min(sheet.rows-row,cropH||1)),type=makeWorldAssetType(sheetId,col,row,cw,ch);this.selectCreatorScenery(type);const def=resolveSceneryDef(type),status=document.getElementById('creator-atlas-selection');if(status)status.innerHTML=`<div style="display:flex;gap:8px;align-items:center"><span class="creator-scenery-sprite" style="${factorySceneryIconStyle(type,54,42)}"></span><span style="color:#fff">${def.name}<br><span style="color:var(--brass)">${cw}×${ch} cells · ${def.sw}×${def.sh}px</span><br>Click the workspace to place.</span></div>`;
   }
 
   selectCreatorScenery(type) {
@@ -11125,9 +11404,16 @@
   document.querySelectorAll('.tool-btn').forEach(btn=>btn.style.background='');
   }
 
+  clearCreatorSelection() {
+  this.creatorSelectedBlock=null;this.creatorSelectedScenery=null;this.creatorSelectedNode=null;this.creatorSelectedSceneryItem=null;this.creatorSelectedRoom=false;
+  this.creatorMovingNode=null;this.creatorMovingScenery=null;this.creatorMovingRoom=false;this.creatorMoveOffset=null;this.wiring=null;this.dragging=null;
+  document.querySelectorAll('.block-btn,.scenery-btn').forEach(btn=>btn.style.background='');
+  this.showCreatorInspector(null);
+  }
+
   applyCreatorRoomPreset(id) {
-  const preset=worldRoomPresets(this.creatorWorld).find(p=>p.id===id);if(!preset)return;const canvas=document.getElementById('creator-canvas'),camera=this.creatorCamera||{x:0,y:0,zoom:1},cx=(canvas.width/2-camera.x)/camera.zoom,cy=(canvas.height/2-camera.y)/camera.zoom;
-  const x=Math.round((cx-preset.w/2)/80)*80,y=Math.round((cy-preset.h/2)/80)*80;this.creatorRoom={x,y,w:preset.w,h:preset.h,floorY:y+preset.wall,variant:preset.variant};this.creatorSelectedRoom=true;this.selectCreatorRoomTool();this.showCreatorRoomInspector();this.updateCreatorMetaBar();
+  const preset=worldRoomPresets(this.creatorWorld).find(p=>p.id===id);if(!preset)return;this.creatorRecordHistory();const canvas=document.getElementById('creator-canvas'),camera=this.creatorCamera||{x:0,y:0,zoom:1},cx=(canvas.width/2-camera.x)/camera.zoom,cy=(canvas.height/2-camera.y)/camera.zoom;
+  const x=Math.round((cx-preset.w/2)/80)*80,y=Math.round((cy-preset.h/2)/80)*80;this.creatorScenery=(this.creatorScenery||[]).filter(s=>!s.wallPanel);this.creatorRoom={x,y,w:preset.w,h:preset.h,floorY:y+preset.wall,variant:preset.variant,autoWallBackdrop:true};this.materializeCreatorWallBackdrop();this.creatorSelectedRoom=true;this.selectCreatorRoomTool();this.showCreatorRoomInspector();this.updateCreatorMetaBar();
   }
 
   selectCreatorRoomTool() {
@@ -11255,8 +11541,9 @@
   if (!n1 || !n2) continue;
   const p1 = n1.ports.find(p => p.id === c.fp), p2 = n2.ports.find(p => p.id === c.tp);
   if (!p1 || !p2) continue;
-  if (this.distToSegment(x, y, n1.x+p1.x*80, n1.y+p1.y*80, n2.x+p2.x*80, n2.y+p2.y*80) < 10) {
+  if (this.factoryDistanceToPath(x,y,c.factoryPath||[]) < 24) {
   this.connections.splice(i, 1);
+  this.refreshFactoryConnectionPaths();
   return;
   }
   }
@@ -11271,7 +11558,7 @@
   if (e.button === 2) { // Right click
   e.preventDefault();
   const hoveredScenery=this.creatorSceneryAt(x,y);
-  if(hoveredScenery){hoveredScenery.rotation=((hoveredScenery.rotation||0)+1)%4;this.creatorSelectedSceneryItem=hoveredScenery;this.showCreatorSceneryInspector(hoveredScenery);return;}
+  if(hoveredScenery){this.creatorRecordHistory();hoveredScenery.rotation=((hoveredScenery.rotation||0)+1)%4;this.creatorSelectedSceneryItem=hoveredScenery;this.showCreatorSceneryInspector(hoveredScenery);return;}
   if(this.creatorTool==='scenery'&&this.creatorSelectedScenery){this.creatorSceneryRotation=((this.creatorSceneryRotation||0)+1)%4;return;}
   
   // Check if hovering over a dye vat to change color - use direct mouse position
@@ -11289,13 +11576,13 @@
   // Cycle through colors
   const colors = ['red', 'green', 'blue', 'yellow', 'cyan', 'magenta', 'white', 'black'];
   const currentIndex = colors.indexOf(hoveredNode.config.color || 'red');
-  hoveredNode.config.color = colors[(currentIndex + 1) % colors.length];
+  this.creatorRecordHistory();hoveredNode.config.color = colors[(currentIndex + 1) % colors.length];
   return;
   }
   
   if (hoveredNode && hoveredNode.type === 'repeater') {
   // Cycle repeater delay and reset state
-  if (hoveredNode.repeaterDelay == null) hoveredNode.repeaterDelay = 3;
+  this.creatorRecordHistory();if (hoveredNode.repeaterDelay == null) hoveredNode.repeaterDelay = 3;
   hoveredNode.repeaterDelay = (hoveredNode.repeaterDelay + 1) % 4;
   hoveredNode.repeaterQueue = [];
   hoveredNode.powerBurstQueue = [];
@@ -11306,7 +11593,7 @@
   
   if (hoveredNode && hoveredNode.type === 'threshold_gate') {
   // Cycle threshold value (1-10)
-  if (!hoveredNode.thresholdValue) hoveredNode.thresholdValue = 1;
+  this.creatorRecordHistory();if (!hoveredNode.thresholdValue) hoveredNode.thresholdValue = 1;
   hoveredNode.thresholdValue = (hoveredNode.thresholdValue % 10) + 1;
   hoveredNode.config.threshold = hoveredNode.thresholdValue;
   return;
@@ -11314,14 +11601,14 @@
   
   if (hoveredNode && hoveredNode.type === 'number_threshold_gate') {
   // Cycle threshold value (1-10)
-  if (!hoveredNode.thresholdValue) hoveredNode.thresholdValue = 1;
+  this.creatorRecordHistory();if (!hoveredNode.thresholdValue) hoveredNode.thresholdValue = 1;
   hoveredNode.thresholdValue = (hoveredNode.thresholdValue % 10) + 1;
   hoveredNode.config.threshold = hoveredNode.thresholdValue;
   return;
   }
 
   if (hoveredNode && hoveredNode.type === 'pulse_splitter') {
-  hoveredNode.pulseSplitterDelay = ((hoveredNode.pulseSplitterDelay || 2) % 5) + 1;
+  this.creatorRecordHistory();hoveredNode.pulseSplitterDelay = ((hoveredNode.pulseSplitterDelay || 2) % 5) + 1;
   hoveredNode.config.pulseSplitterDelay = hoveredNode.pulseSplitterDelay;
   hoveredNode.pulseSplitterQueue = [];
   return;
@@ -11329,33 +11616,25 @@
 
   // Rotate any other placed block
   if (hoveredNode) {
+  this.creatorRecordHistory();
   hoveredNode.config.rotation = ((hoveredNode.config.rotation || 0) + 1) % 4;
   const fresh = new Node(hoveredNode.id, hoveredNode.type, hoveredNode.x, hoveredNode.y, hoveredNode.config);
   hoveredNode.ports = fresh.ports;
   return;
   }
 
-  // If holding a placeable block, rotate it
-  if (this.creatorTool === 'place' && this.creatorSelectedBlock) {
-  // Allow rotation for ALL blocks except spawner/collector (single port blocks)
-  const nonRotatableTypes = []; // Everything can rotate now!
-  if (!nonRotatableTypes.includes(this.creatorSelectedBlock)) {
-  this.creatorBlockRotation = (this.creatorBlockRotation + 1) % 4;
-  return;
-  }
-  }
-  
-  // Otherwise pan
-  this.creatorPanning = true;
-  this.creatorPanStart = { x: e.clientX, y: e.clientY };
+  // Empty-space RMB is a universal cancel/deselect gesture. Rotation remains on
+  // middle-click/R, while WASD and arrows keep camera navigation explicit.
+  this.clearCreatorSelection();
   return;
   }
   
   if (e.button === 1) { // Middle click - rotate hovered block
   e.preventDefault();
-  const hoveredScenery=this.creatorSceneryAt(x,y);if(hoveredScenery){hoveredScenery.rotation=((hoveredScenery.rotation||0)+1)%4;this.showCreatorSceneryInspector(hoveredScenery);return;}
+  const hoveredScenery=this.creatorSceneryAt(x,y);if(hoveredScenery){this.creatorRecordHistory();hoveredScenery.rotation=((hoveredScenery.rotation||0)+1)%4;this.showCreatorSceneryInspector(hoveredScenery);return;}
   const hoveredNode = this.creatorNodes.find(n => x >= n.x && x <= n.x + 80 && y >= n.y && y <= n.y + 80);
   if (hoveredNode) {
+  this.creatorRecordHistory();
   hoveredNode.config.rotation = ((hoveredNode.config.rotation || 0) + 1) % 4;
   // Re-init ports with new rotation
   const fresh = new Node(hoveredNode.id, hoveredNode.type, hoveredNode.x, hoveredNode.y, hoveredNode.config);
@@ -11365,15 +11644,17 @@
   }
   if (e.button === 0) { // Left click
   if(this.creatorTool==='room'){
-  const room=this.creatorRoom;if(room&&x>=room.x&&x<=room.x+room.w&&y>=room.y&&y<=room.y+room.h){this.creatorMovingRoom=true;this.creatorMoveOffset={x:x-room.x,y:y-room.y};this.showCreatorRoomInspector();}return;
+  const room=this.creatorRoom;if(room&&x>=room.x&&x<=room.x+room.w&&y>=room.y&&y<=room.y+room.h){this.creatorRecordHistory();this.creatorMovingRoom=true;this.creatorMoveOffset={x:x-room.x,y:y-room.y};this.showCreatorRoomInspector();}return;
   }
   if(this.creatorTool==='scenery'&&this.creatorSelectedScenery){
-  const sx=this._creatorCtrlHeld?Math.round(x):Math.round(x/20)*20,sy=this._creatorCtrlHeld?Math.round(y):Math.round(y/20)*20,item={id:'s'+(this.creatorNextSceneryId++),type:this.creatorSelectedScenery,x:sx,y:sy,rotation:(this.creatorSceneryRotation||0)&3,scale:1,solid:sceneryDefaultSolid(this.creatorSelectedScenery)};if(!this.creatorCanPlaceScenery(item)){this.showTerminalMessage('Solid scenery cannot overlap a module','#ff625d');return;}this.creatorScenery.push(item);this.creatorSelectedSceneryItem=item;this.showCreatorSceneryInspector(item);this.updateCreatorMetaBar();return;
+  const sx=this._creatorCtrlHeld?Math.round(x):Math.round(x/20)*20,sy=this._creatorCtrlHeld?Math.round(y):Math.round(y/20)*20,item={id:'s'+(this.creatorNextSceneryId++),type:this.creatorSelectedScenery,x:sx,y:sy,rotation:(this.creatorSceneryRotation||0)&3,scale:1,solid:sceneryDefaultSolid(this.creatorSelectedScenery),layer:sy<(this.creatorRoom?.floorY??0)?'wall':'floor',wallPanel:false};if(!this.creatorCanPlaceScenery(item)){this.showTerminalMessage('Solid scenery cannot overlap a module','#ff625d');return;}this.creatorRecordHistory();this.creatorScenery.push(item);this.creatorSelectedSceneryItem=item;this.showCreatorSceneryInspector(item);this.updateCreatorMetaBar();return;
   }
   // In place mode with no block selected, OR in move mode — allow dragging existing blocks
   if (this.creatorTool === 'place') {
+  const clickedScenery=this.creatorSceneryAt(x,y);if(clickedScenery){this.creatorRecordHistory();this.showCreatorSceneryInspector(clickedScenery);this.creatorMovingScenery=clickedScenery;this.creatorMoveOffset={x:x-clickedScenery.x,y:y-clickedScenery.y};return;}
   const clickedExisting = this.creatorNodes.find(n => x >= n.x && x <= n.x + 80 && y >= n.y && y <= n.y + 80);
   if (clickedExisting) {
+  this.creatorRecordHistory();this.showCreatorInspector(clickedExisting);
   this.creatorMovingNode = clickedExisting;
   this.creatorMoveOffset = { x: x - clickedExisting.x, y: y - clickedExisting.y };
   return;
@@ -11383,6 +11664,7 @@
   // Place block
   const exists = this.creatorNodes.find(n => n.x === gridX && n.y === gridY);
   if (!exists && this.creatorCanPlaceNode(null,gridX,gridY)) {
+  this.creatorRecordHistory();
   const config = {};
   
   // Set rotation for ALL blocks (universal rotation)
@@ -11413,12 +11695,13 @@
   }
   }
   } else if (this.creatorTool === 'delete') {
-  const sceneryItem=this.creatorSceneryAt(x,y);if(sceneryItem){this.creatorScenery=this.creatorScenery.filter(s=>s!==sceneryItem);if(this.creatorSelectedSceneryItem===sceneryItem)this.showCreatorSceneryInspector(null);this.updateCreatorMetaBar();return;}
+  const sceneryItem=this.creatorSceneryAt(x,y);if(sceneryItem){this.creatorRecordHistory();this.creatorScenery=this.creatorScenery.filter(s=>s!==sceneryItem);if(this.creatorSelectedSceneryItem===sceneryItem)this.showCreatorSceneryInspector(null);this.updateCreatorMetaBar();return;}
   // Delete block - use direct mouse position for better detection of off-grid blocks
   const nodeIndex = this.creatorNodes.findIndex(n => 
   x >= n.x && x <= n.x + 80 && y >= n.y && y <= n.y + 80
   );
   if (nodeIndex !== -1) {
+  this.creatorRecordHistory();
   const deletedNode = this.creatorNodes[nodeIndex];
   this.creatorNodes.splice(nodeIndex, 1);
   this.updateCreatorMetaBar();
@@ -11434,11 +11717,12 @@
   } else if (this.creatorTool === 'move') {
   // Start moving block - use direct mouse position for better detection of off-grid blocks
   this.creatorMouseX = x; this.creatorMouseY = y;
-  const foundScenery=this.creatorSceneryAt(x,y);if(foundScenery){this.creatorSelectedSceneryItem=foundScenery;this.showCreatorSceneryInspector(foundScenery);this.creatorMovingScenery=foundScenery;this.creatorMoveOffset={x:x-foundScenery.x,y:y-foundScenery.y};return;}
+  const foundScenery=this.creatorSceneryAt(x,y);if(foundScenery){this.creatorRecordHistory();this.creatorSelectedSceneryItem=foundScenery;this.showCreatorSceneryInspector(foundScenery);this.creatorMovingScenery=foundScenery;this.creatorMoveOffset={x:x-foundScenery.x,y:y-foundScenery.y};return;}
   const foundNode = this.creatorNodes.find(n => 
   x >= n.x && x <= n.x + 80 && y >= n.y && y <= n.y + 80
   );
   if (foundNode) {
+  this.creatorRecordHistory();
   this.showCreatorInspector(foundNode);
   this.creatorMovingNode = foundNode;
   // Store offset from node center to cursor
@@ -11453,7 +11737,7 @@
   x >= n.x && x <= n.x + 80 && y >= n.y && y <= n.y + 80
   );
   if (foundNode) {
-  foundNode.config.locked = !foundNode.config.locked;
+  this.creatorRecordHistory();foundNode.config.locked = !foundNode.config.locked;foundNode.locked=!!foundNode.config.locked;this.showCreatorInspector(foundNode);
   }
   }
   }
@@ -11492,7 +11776,7 @@
   } else if (this.dragging) {
   // Dragging block in play mode
   const nx=Math.round((this.creatorMouseX-40)/20)*20,ny=Math.round((this.creatorMouseY-40)/20)*20,snap=this.nearestValidModuleSnap(this.dragging,nx,ny,20,4);
-  if(snap){this.dragging.x=snap.x;this.dragging.y=snap.y;}
+  if(snap){this.dragging.x=snap.x;this.dragging.y=snap.y;this.refreshFactoryConnectionPaths();}
   }
   }
   
@@ -11503,18 +11787,19 @@
   } else if(this.creatorMovingRoom&&this.creatorMoveOffset){
   const wall=this.creatorRoom.floorY-this.creatorRoom.y,targetX=this.creatorMouseX-this.creatorMoveOffset.x,targetY=this.creatorMouseY-this.creatorMoveOffset.y,nx=this._creatorCtrlHeld?targetX:Math.round(targetX/20)*20,ny=this._creatorCtrlHeld?targetY:Math.round(targetY/20)*20;this.creatorRoom.x=nx;this.creatorRoom.y=ny;this.creatorRoom.floorY=ny+wall;
   } else if(this.creatorMovingScenery&&this.creatorMoveOffset){
-  const targetX=this.creatorMouseX-this.creatorMoveOffset.x,targetY=this.creatorMouseY-this.creatorMoveOffset.y,nx=this._creatorCtrlHeld?targetX:Math.round(targetX/20)*20,ny=this._creatorCtrlHeld?targetY:Math.round(targetY/20)*20;if(this.creatorCanPlaceScenery(this.creatorMovingScenery,nx,ny)){this.creatorMovingScenery.x=nx;this.creatorMovingScenery.y=ny;}
+  const targetX=this.creatorMouseX-this.creatorMoveOffset.x,targetY=this.creatorMouseY-this.creatorMoveOffset.y,nx=this._creatorCtrlHeld?targetX:Math.round(targetX/20)*20,ny=this._creatorCtrlHeld?targetY:Math.round(targetY/20)*20;if(this.creatorCanPlaceScenery(this.creatorMovingScenery,nx,ny)){this.creatorMovingScenery.x=nx;this.creatorMovingScenery.y=ny;if(this.creatorMovingScenery.wallPanel&&ny>=(this.creatorRoom?.floorY??Infinity)){this.creatorMovingScenery.wallPanel=false;this.creatorMovingScenery.layer='floor';}(this.creatorConnections||[]).forEach(c=>delete c.factoryPath);}
   } else if (this.creatorMovingNode && this.creatorMoveOffset) {
   const targetX = this.creatorMouseX - this.creatorMoveOffset.x;
   const targetY = this.creatorMouseY - this.creatorMoveOffset.y;
   const gridX=this._creatorCtrlHeld?targetX:Math.round(targetX/80)*80,gridY=this._creatorCtrlHeld?targetY:Math.round(targetY/80)*80;
-  if(this.creatorCanPlaceNode(this.creatorMovingNode,gridX,gridY)){this.creatorMovingNode.x=gridX;this.creatorMovingNode.y=gridY;}
+  if(this.creatorCanPlaceNode(this.creatorMovingNode,gridX,gridY)){this.creatorMovingNode.x=gridX;this.creatorMovingNode.y=gridY;(this.creatorConnections||[]).forEach(c=>delete c.factoryPath);}
   }
   }
   
   onCreatorMouseUp(e) {
   if (this.creatorPlayMode && this.wiring && this.wiring.snap) {
   this.autoLink(this.wiring.snap.node, this.wiring.snap.port);
+  this.refreshFactoryConnectionPaths();
   }
   this.creatorPanning = false;
   this.creatorMovingNode = null;
@@ -11525,21 +11810,98 @@
   this.dragging = null;
   }
   
+  creatorHistorySnapshot() {
+  return JSON.stringify({level:this.buildCreatorLevelSnapshot(),meta:this.creatorMeta,logs:this.creatorProductionLogs||[],connections:(this.creatorConnections||[]).map(c=>({fid:c.fid,fp:c.fp,tid:c.tid,tp:c.tp}))});
+  }
+
+  creatorRecordHistory(reset=false) {
+  const snapshot=this.creatorHistorySnapshot();
+  if(reset){this.creatorUndoStack=[snapshot];this.creatorRedoStack=[];return;}
+  this.creatorUndoStack=this.creatorUndoStack||[];
+  if(this.creatorUndoStack[this.creatorUndoStack.length-1]!==snapshot)this.creatorUndoStack.push(snapshot);
+  if(this.creatorUndoStack.length>80)this.creatorUndoStack.shift();
+  this.creatorRedoStack=[];
+  }
+
+  creatorRestoreHistory(snapshot) {
+  if(!snapshot)return;const data=JSON.parse(snapshot);
+  this.applyLevelToCreator(data.level,data.meta||{});this.creatorProductionLogs=data.logs||[];this.creatorConnections=data.connections||[];
+  this.creatorSelectedNode=null;this.creatorSelectedSceneryItem=null;this.creatorSelectedRoom=false;this.showCreatorInspector(null);this.updateCreatorMetaBar();
+  }
+
+  creatorUndo() {
+  if(!this.creatorMode||this.creatorPlayMode)return;
+  const stack=this.creatorUndoStack||[];if(!stack.length){this.showTerminalMessage('Nothing to undo','#d6b45f');return;}
+  const current=this.creatorHistorySnapshot(),snapshot=stack.pop();this.creatorRedoStack=this.creatorRedoStack||[];this.creatorRedoStack.push(current);this.creatorRestoreHistory(snapshot);this.showTerminalMessage('Undo','#72e5ff');
+  }
+
+  creatorRedo() {
+  if(!this.creatorMode||this.creatorPlayMode)return;
+  const stack=this.creatorRedoStack||[];if(!stack.length){this.showTerminalMessage('Nothing to redo','#d6b45f');return;}
+  const current=this.creatorHistorySnapshot(),snapshot=stack.pop();this.creatorUndoStack=this.creatorUndoStack||[];this.creatorUndoStack.push(current);this.creatorRestoreHistory(snapshot);this.showTerminalMessage('Redo','#72e5ff');
+  }
+
+  creatorCopySelection() {
+  if(!this.creatorMode||this.creatorPlayMode)return;
+  if(this.creatorSelectedNode){const n=this.creatorSelectedNode;this.creatorClipboard={kind:'node',data:{type:n.type,config:{...(n.config||{})},repeaterDelay:n.repeaterDelay,pulseSplitterDelay:n.pulseSplitterDelay}};}
+  else if(this.creatorSelectedSceneryItem){const s=this.creatorSelectedSceneryItem;this.creatorClipboard={kind:'scenery',data:{type:s.type,rotation:s.rotation||0,scale:s.scale||1,solid:sceneryIsSolid(s),layer:s.layer==='wall'?'wall':'floor',wallPanel:!!s.wallPanel}};}
+  else {this.showTerminalMessage('Select a module or scenery item first','#ffb657');return;}
+  this.showTerminalMessage('Copied selection','#72e5ff');
+  }
+
+  creatorPasteSelection() {
+  if(!this.creatorMode||this.creatorPlayMode||!this.creatorClipboard){this.showTerminalMessage('Clipboard is empty','#ffb657');return;}
+  this.creatorRecordHistory();const baseX=this.creatorMouseX??0,baseY=this.creatorMouseY??0;
+  if(this.creatorClipboard.kind==='node'){const d=this.creatorClipboard.data,x=Math.round(baseX/80)*80,y=Math.round(baseY/80)*80;if(!this.creatorCanPlaceNode(null,x,y)){this.showTerminalMessage('Paste cell is blocked','#ff625d');return;}const n=new Node(`n${this.creatorNextId++}`,d.type,x,y,{...(d.config||{})});if(d.repeaterDelay!=null)n.repeaterDelay=d.repeaterDelay;if(d.pulseSplitterDelay!=null)n.pulseSplitterDelay=d.pulseSplitterDelay;this.creatorNodes.push(n);this.showCreatorInspector(n);}
+  else {const d=this.creatorClipboard.data,item={id:'s'+(this.creatorNextSceneryId++),type:d.type,x:Math.round(baseX/20)*20,y:Math.round(baseY/20)*20,rotation:d.rotation||0,scale:d.scale||1,solid:!!d.solid,layer:d.layer==='wall'?'wall':'floor',wallPanel:false};if(!this.creatorCanPlaceScenery(item)){this.showTerminalMessage('Paste position is blocked','#ff625d');return;}this.creatorScenery.push(item);this.showCreatorSceneryInspector(item);}
+  this.updateCreatorMetaBar();this.showTerminalMessage('Pasted on grid','#72e5ff');
+  }
+
+  creatorDeleteSelection() {
+  if(this.creatorPlayMode)return;const n=this.creatorSelectedNode,s=this.creatorSelectedSceneryItem;if(!n&&!s)return;
+  this.creatorRecordHistory();if(n){this.creatorNodes=this.creatorNodes.filter(x=>x!==n);this.creatorConnections=(this.creatorConnections||[]).filter(c=>c.fid!==n.id&&c.tid!==n.id);}
+  if(s)this.creatorScenery=this.creatorScenery.filter(x=>x!==s);this.showCreatorInspector(null);this.updateCreatorMetaBar();
+  }
+
+  creatorRotateSelection() {
+  if(this.creatorPlayMode)return;const n=this.creatorSelectedNode,s=this.creatorSelectedSceneryItem;if(!n&&!s)return;
+  this.creatorRecordHistory();if(s){s.rotation=((s.rotation||0)+1)&3;this.showCreatorSceneryInspector(s);}else{n.config.rotation=((n.config.rotation||0)+1)&3;const fresh=new Node(n.id,n.type,n.x,n.y,n.config);n.ports=fresh.ports;this.showCreatorInspector(n);}
+  }
+
+  creatorToggleSelectionLock() {
+  const n=this.creatorSelectedNode;if(!n||this.creatorPlayMode)return;this.creatorRecordHistory();n.config.locked=!n.config.locked;n.locked=!!n.config.locked;this.showCreatorInspector(n);this.showTerminalMessage(n.locked?'Module locked':'Module movable',n.locked?'#ffc85b':'#72e5ff');
+  }
+
+  creatorNudgeSelection(dx,dy) {
+  if(this.creatorPlayMode)return;const n=this.creatorSelectedNode,s=this.creatorSelectedSceneryItem;if(!n&&!s){this.creatorCamera.x-=dx;this.creatorCamera.y-=dy;return;}
+  this.creatorRecordHistory();if(n&&this.creatorCanPlaceNode(n,n.x+dx,n.y+dy)){n.x+=dx;n.y+=dy;}else if(s&&this.creatorCanPlaceScenery(s,s.x+dx,s.y+dy)){s.x+=dx;s.y+=dy;}
+  }
+
   initCreatorControls() {
-  const canvas = document.getElementById('creator-canvas');
-  canvas.oncontextmenu = () => false;
-  var self = this;
-  document.addEventListener('keydown', function(e) {
-  if (!self.creatorMode || self.creatorPlayMode) return;
-  if (e.key === '1') self.selectCreatorTool('place');
-  if (e.key === '2') self.selectCreatorTool('move');
-  if (e.key === '3') self.selectCreatorTool('delete');
-  if (e.key === '4') self.selectCreatorTool('lock');
-  if (e.key === 'Control') self._creatorCtrlHeld = true;
+  const canvas = document.getElementById('creator-canvas');canvas.oncontextmenu=()=>false;
+  if(this._creatorKeyHandlersAttached)return;this._creatorKeyHandlersAttached=true;const self=this;
+  document.addEventListener('keydown',function(e){
+  if(e.key==='Control'||e.key==='Meta')self._creatorCtrlHeld=true;
+  if(!self.creatorMode)return;const tag=(e.target?.tagName||'').toLowerCase();if(['input','textarea','select'].includes(tag))return;
+  if(self.creatorPlayMode){if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();self.toggleCreatorPlayMode();}return;}
+  const mod=e.ctrlKey||e.metaKey,key=e.key.toLowerCase();
+  if(mod&&key==='z'){e.preventDefault();e.shiftKey?self.creatorRedo():self.creatorUndo();return;}
+  if(mod&&key==='y'){e.preventDefault();self.creatorRedo();return;}
+  if(mod&&key==='c'){e.preventDefault();self.creatorCopySelection();return;}
+  if(mod&&key==='v'){e.preventDefault();self.creatorPasteSelection();return;}
+  if(mod&&key==='s'){e.preventDefault();self.openCreatorSaveModal();return;}
+  if(key==='1'||key==='p')self.selectCreatorTool('place');
+  else if(key==='2'||key==='v')self.selectCreatorTool('move');
+  else if(key==='3'||key==='x')self.selectCreatorTool('delete');
+  else if(key==='4')self.selectCreatorTool('lock');
+  else if(key==='l')self.creatorSelectedNode?self.creatorToggleSelectionLock():self.selectCreatorTool('lock');
+  else if(key==='r')self.creatorRotateSelection();
+  else if(key==='delete'||key==='backspace')self.creatorDeleteSelection();
+  else if(key==='escape'){e.preventDefault();e.stopImmediatePropagation();self.clearCreatorSelection();}
+  else if(['w','a','s','d'].includes(key)){const speed=e.shiftKey?80:40;if(key==='w')self.creatorCamera.y+=speed;if(key==='s')self.creatorCamera.y-=speed;if(key==='a')self.creatorCamera.x+=speed;if(key==='d')self.creatorCamera.x-=speed;}
+  else if(key.startsWith('arrow')){e.preventDefault();const step=e.shiftKey?80:20;self.creatorNudgeSelection(key==='arrowleft'?-step:key==='arrowright'?step:0,key==='arrowup'?-step:key==='arrowdown'?step:0);}
   });
-  document.addEventListener('keyup', function(e) {
-  if (e.key === 'Control') self._creatorCtrlHeld = false;
-  });
+  document.addEventListener('keyup',function(e){if(e.key==='Control'||e.key==='Meta')self._creatorCtrlHeld=false;});
   }
   
   closeCreator() {
@@ -11576,10 +11938,13 @@
   if (source === 'custom') level = getCustomLevels().find(l => l.id === id);
   else level = getAllCampaignLevels().find(l => l.id === id);
   if (!level) { this.showTerminalMessage('Level not found', '#ff4d4d'); return; }
-  this.applyLevelToCreator(level, {
+  const creatorMeta={
   id: level.id, title: level.title, chapter: level.chapter || (String(id).startsWith('2-') ? 2 : 1),
   hints: level.hints || [], productionLogs: level.productionLogs || [], source: source || 'campaign'
-  });
+  };
+  ['difficulty','designRole','introduced','requiredModules','secretUnlock','secretMaxWires','routeChapter','routeFrom','placeholder','loreTitle','ending'].forEach(key=>{if(level[key]!=null)creatorMeta[key]=level[key];});
+  this.applyLevelToCreator(level,creatorMeta);
+  this.creatorRecordHistory(true);
   document.getElementById('overlay-creator-load').classList.add('hidden');
   this.showTerminalMessage('Loaded ' + level.id + ' into editor', '#4dff4d');
   }
@@ -11729,8 +12094,8 @@
   showCreatorInspector(node) {
   const panel = document.getElementById('creator-inspector');
   if (!panel) return;
-  if (!node) { panel.style.display = 'none'; return; }
-  this.creatorSelectedNode = node;
+  if (!node) { this.creatorSelectedNode=null;panel.style.display = 'none'; return; }
+  this.creatorSelectedNode = node;this.creatorSelectedSceneryItem=null;this.creatorSelectedRoom=false;
   const cfg = node.config || (node.config = {});
   const colors = SG2_COLORS;
   const shapes = SG2_SHAPES;
@@ -11779,17 +12144,21 @@
   '<label style="font-size:11px;color:rgba(235,235,235,.5)">X / Y</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:4px 0 8px"><input id="scenery-x" type="number" class="crt-input" value="'+Math.round(item.x)+'"><input id="scenery-y" type="number" class="crt-input" value="'+Math.round(item.y)+'"></div>'+
   '<label style="font-size:11px;color:rgba(235,235,235,.5)">Rotation</label><select id="scenery-rotation" class="crt-input" style="width:100%;margin:4px 0 8px"><option value="0">0°</option><option value="1">90°</option><option value="2">180°</option><option value="3">270°</option></select>'+
   '<label style="font-size:11px;color:rgba(235,235,235,.5)">Scale</label><input id="scenery-scale" type="number" min="0.3" max="3" step="0.1" class="crt-input" style="width:100%;margin:4px 0 8px" value="'+(item.scale||1).toFixed(1)+'">'+
+  '<label style="font-size:11px;color:rgba(235,235,235,.5)">Visual layer</label><select id="scenery-layer" class="crt-input" style="width:100%;margin:4px 0 8px"><option value="wall">WALL · behind signs and machines</option><option value="floor">FLOOR · normal interactive scenery</option></select>'+
   '<label style="font-size:11px;color:rgba(235,235,235,.5)">Collision</label><select id="scenery-solid" class="crt-input" style="width:100%;margin:4px 0 8px"><option value="1">SOLID · blocks modules and rollers</option><option value="0">DECORATIVE · no collision</option></select>'+
-  '<button class="btn btn-gold" style="width:100%;margin-top:8px" onclick="game.applyCreatorSceneryInspector()">APPLY</button><button class="btn" style="width:100%;margin-top:6px;border-color:#ff4d4d" onclick="game.deleteSelectedCreatorScenery()">DELETE SCENERY</button><button class="btn" style="width:100%;margin-top:6px" onclick="game.showCreatorSceneryInspector(null)">CLOSE</button>';
+  '<button class="btn btn-gold" style="width:100%;margin-top:8px" onclick="game.applyCreatorSceneryInspector()">APPLY</button><button class="btn" style="width:100%;margin-top:6px;border-color:#ff4d4d" onclick="game.deleteSelectedCreatorScenery()">DELETE THIS SCENERY</button><button class="btn" style="width:100%;margin-top:6px" onclick="game.showCreatorSceneryInspector(null)">CLOSE</button>';
   document.getElementById('scenery-rotation').value=String((item.rotation||0)&3);
+  document.getElementById('scenery-layer').value=item.layer==='wall'?'wall':'floor';
   document.getElementById('scenery-solid').value=sceneryIsSolid(item)?'1':'0';
   }
 
   applyCreatorSceneryInspector() {
-  const item=this.creatorSelectedSceneryItem;if(!item)return;const candidate={...item,x:Number(document.getElementById('scenery-x')?.value)||0,y:Number(document.getElementById('scenery-y')?.value)||0,rotation:Math.max(0,Math.min(3,parseInt(document.getElementById('scenery-rotation')?.value,10)||0)),scale:Math.max(.3,Math.min(3,Number(document.getElementById('scenery-scale')?.value)||1)),solid:document.getElementById('scenery-solid')?.value!=='0'};if(!this.creatorCanPlaceScenery(candidate)){this.showTerminalMessage('Solid scenery cannot overlap a module','#ff625d');return;}Object.assign(item,candidate);this.showCreatorSceneryInspector(item);this.showTerminalMessage('Scenery updated · '+(item.solid?'SOLID':'DECORATIVE'),'#4dff4d');
+  this.creatorRecordHistory();
+  const item=this.creatorSelectedSceneryItem;if(!item)return;const layer=document.getElementById('scenery-layer')?.value==='wall'?'wall':'floor',candidate={...item,x:Number(document.getElementById('scenery-x')?.value)||0,y:Number(document.getElementById('scenery-y')?.value)||0,rotation:Math.max(0,Math.min(3,parseInt(document.getElementById('scenery-rotation')?.value,10)||0)),scale:Math.max(.3,Math.min(3,Number(document.getElementById('scenery-scale')?.value)||1)),solid:document.getElementById('scenery-solid')?.value!=='0',layer,wallPanel:layer==='wall'&&!!item.wallPanel};if(!this.creatorCanPlaceScenery(candidate)){this.showTerminalMessage('Solid scenery cannot overlap a module','#ff625d');return;}Object.assign(item,candidate);this.showCreatorSceneryInspector(item);this.showTerminalMessage('Scenery updated · '+(item.solid?'SOLID':'DECORATIVE'),'#4dff4d');
   }
 
   deleteSelectedCreatorScenery() {
+  this.creatorRecordHistory();
   const item=this.creatorSelectedSceneryItem;if(!item)return;this.creatorScenery=this.creatorScenery.filter(s=>s!==item);this.showCreatorSceneryInspector(null);this.updateCreatorMetaBar();
   }
 
@@ -11799,12 +12168,14 @@
   }
 
   applyCreatorRoomInspector() {
+  this.creatorRecordHistory();
   const room={x:Number(document.getElementById('room-x')?.value)||0,y:Number(document.getElementById('room-y')?.value)||0,w:Number(document.getElementById('room-w')?.value)||960,h:Number(document.getElementById('room-h')?.value)||720,variant:this.creatorRoom?.variant||0};const wall=Number(document.getElementById('room-wall')?.value)||160;room.floorY=room.y+wall;this.creatorRoom=normalizeFactoryRoom(room,this.creatorNodes);this.showCreatorRoomInspector();this.showTerminalMessage('Floorplan updated','#4dff4d');
   }
 
   applyCreatorInspector() {
   const node = this.creatorSelectedNode;
   if (!node) return;
+  this.creatorRecordHistory();
   const cfg = node.config || (node.config = {});
   const locked = document.getElementById('insp-locked');
   if (locked) { cfg.locked = locked.value === '1'; node.locked = cfg.locked; }
@@ -11957,7 +12328,9 @@
   
   clearCreator() {
   if (confirm('Clear all machines, scenery and the current floorplan?')) {
+  this.creatorRecordHistory();
   this.creatorNodes = [];
+  this.creatorConnections = [];
   this.creatorScenery = [];
   this.creatorRoom = normalizeFactoryRoom(null,[]);
   this.creatorSelectedSceneryItem=null;this.creatorSelectedRoom=false;this.showCreatorInspector(null);this.updateCreatorMetaBar();
@@ -12157,6 +12530,10 @@
   const dt = now - (this.creatorLastTick || now);
   this.creatorLastTick = now;
   if (!this.isPaused) this.update(dt);
+  this.canvas=canvas;this.ctx=ctx;this.camera=this.creatorCamera;this.factoryVisualMode=true;
+  if(this.connections.some(c=>!c.factoryPath?.length))this.refreshFactoryConnectionPaths();this.draw();
+  requestAnimationFrame(() => this.creatorLoop());
+  return;
   }
   
   // Clear
@@ -12171,23 +12548,21 @@
   if(this.creatorPlayMode)this.drawFactoryRoom(ctx,this.factoryRoom,this.factoryScenery,this.creatorCamera,canvas);
   else this.drawFactoryRoom(ctx,this.creatorRoom,this.creatorScenery,this.creatorCamera,canvas);
 
-  // Grid (only in edit mode)
-  if (!this.creatorPlayMode) this.drawWorldGrid(ctx, this.creatorCamera, canvas);
-  
   // Draw nodes - save the main context and temporarily use creator context
   const savedCtx = this.ctx;
   this.ctx = ctx;
   
   if (this.creatorPlayMode) {
   // In play mode, draw actual game state (use the main draw logic)
-  this.nodes.forEach(n => this.drawNodeArt(n));
+  this.nodes.forEach(n => this.drawFactoryMountedMachine(n));
   
-  this.drawConnectionsLayer(ctx);
+  if(this.connections.some(c=>!c.factoryPath?.length))this.refreshFactoryConnectionPaths();
+  this.drawFactoryBelts(ctx);
   
   if (this.wiring && this.wiring.node) {
   const pwx = this.wiring.snap ? (this.wiring.snap.node.x + this.wiring.snap.port.x*80) : this.creatorMouseX;
   const pwy = this.wiring.snap ? (this.wiring.snap.node.y + this.wiring.snap.port.y*80) : this.creatorMouseY;
-  this.drawWiringPreviewLine(ctx, pwx, pwy);
+  this.drawFactoryWiringPreview(ctx, pwx, pwy);
   }
   
   // Draw in-transit signals
@@ -12196,8 +12571,9 @@
   if (!f || !t) return;
   const p1 = f.ports.find(p => p.id === i.fp), p2 = t.ports.find(p => p.id === i.tp);
   if (!p1 || !p2) return;
-  const x = (f.x + p1.x*80) + (t.x + p2.x*80 - (f.x + p1.x*80)) * i.progress;
-  const y = (f.y + p1.y*80) + (t.y + p2.y*80 - (f.y + p1.y*80)) * i.progress;
+  const pathPoint=i.factoryPath?this.factoryPointOnPath(i.factoryPath,i.progress):null;
+  const x = pathPoint?pathPoint.x:(f.x + p1.x*80) + (t.x + p2.x*80 - (f.x + p1.x*80)) * i.progress;
+  const y = pathPoint?pathPoint.y:(f.y + p1.y*80) + (t.y + p2.y*80 - (f.y + p1.y*80)) * i.progress;
   
   // Draw vector signal with purple outline
   if (i.sig.isVector) {
@@ -12269,11 +12645,16 @@
   }
   });
   } else {
-  // In edit mode, draw creator nodes
-  this.creatorNodes.forEach(n => this.drawNodeArt(n));
+  // Edit mode uses the exact production renderer too. Temporary state swapping
+  // keeps authoring data separate without maintaining a second visual system.
+  const savedNodes=this.nodes,savedConnections=this.connections,savedScenery=this.factoryScenery,savedRoom=this.factoryRoom,savedWorld=this.currentWorld,savedVisual=this.factoryVisualMode;
+  this.nodes=this.creatorNodes;this.connections=this.creatorConnections||[];this.factoryScenery=this.creatorScenery;this.factoryRoom=this.creatorRoom;this.currentWorld=this.creatorWorld;this.factoryVisualMode=true;
+  if(this.connections.some(c=>!c.factoryPath?.length))this.refreshFactoryConnectionPaths();this.calculateIntersections();this.drawFactoryBelts(ctx);
+  this.creatorNodes.forEach(n => this.drawFactoryMountedMachine(n));
+  if(this.creatorSelectedNode){const n=this.creatorSelectedNode;ctx.save();ctx.strokeStyle='#7deeff';ctx.lineWidth=3/this.creatorCamera.zoom;ctx.setLineDash([9/this.creatorCamera.zoom,5/this.creatorCamera.zoom]);ctx.strokeRect(n.x-5,n.y-9,90,88);ctx.restore();}
 
   if(this.creatorSelectedRoom&&this.creatorRoom){const r=this.creatorRoom;ctx.save();ctx.strokeStyle='rgba(255,203,84,.9)';ctx.lineWidth=3/this.creatorCamera.zoom;ctx.setLineDash([12/this.creatorCamera.zoom,8/this.creatorCamera.zoom]);ctx.strokeRect(r.x,r.y,r.w,r.h);ctx.setLineDash([]);ctx.restore();}
-  if(this.creatorSelectedSceneryItem){const r=this.factorySceneryRect(this.creatorSelectedSceneryItem),solid=sceneryIsSolid(this.creatorSelectedSceneryItem);ctx.save();ctx.strokeStyle=solid?'#ffb24f':'#68d9ef';ctx.lineWidth=2/this.creatorCamera.zoom;ctx.setLineDash([8/this.creatorCamera.zoom,5/this.creatorCamera.zoom]);ctx.strokeRect(r.x,r.y,r.w,r.h);ctx.setLineDash([]);ctx.fillStyle=solid?'rgba(60,30,8,.9)':'rgba(7,35,44,.9)';ctx.fillRect(r.x,r.y-20/this.creatorCamera.zoom,(solid?104:78)/this.creatorCamera.zoom,18/this.creatorCamera.zoom);ctx.fillStyle=solid?'#ffd27a':'#8defff';ctx.font=(10/this.creatorCamera.zoom)+'px JetBrains Mono';ctx.fillText(solid?'SOLID OBSTACLE':'DECORATIVE',r.x+5/this.creatorCamera.zoom,r.y-7/this.creatorCamera.zoom);ctx.restore();}
+  if(this.creatorSelectedSceneryItem){const item=this.creatorSelectedSceneryItem,r=this.factorySceneryRect(item),solid=sceneryIsSolid(item),tag=item.wallPanel?'EDITABLE WALL PANEL':solid?'SOLID OBSTACLE':item.layer==='wall'?'WALL SCENERY':'DECORATIVE';ctx.save();ctx.strokeStyle=item.wallPanel?'#ffe07a':solid?'#ffb24f':'#68d9ef';ctx.lineWidth=2/this.creatorCamera.zoom;ctx.setLineDash([8/this.creatorCamera.zoom,5/this.creatorCamera.zoom]);ctx.strokeRect(r.x,r.y,r.w,r.h);ctx.setLineDash([]);ctx.fillStyle=item.wallPanel?'rgba(62,46,8,.94)':solid?'rgba(60,30,8,.9)':'rgba(7,35,44,.9)';ctx.fillRect(r.x,r.y-20/this.creatorCamera.zoom,Math.max(90,tag.length*7)/this.creatorCamera.zoom,18/this.creatorCamera.zoom);ctx.fillStyle=item.wallPanel?'#ffe07a':solid?'#ffd27a':'#8defff';ctx.font=(10/this.creatorCamera.zoom)+'px JetBrains Mono';ctx.fillText(tag,r.x+5/this.creatorCamera.zoom,r.y-7/this.creatorCamera.zoom);ctx.restore();}
   if(this.creatorTool==='scenery'&&this.creatorSelectedScenery&&this.creatorMouseX!==undefined){const gx=this._creatorCtrlHeld?this.creatorMouseX:Math.round(this.creatorMouseX/20)*20,gy=this._creatorCtrlHeld?this.creatorMouseY:Math.round(this.creatorMouseY/20)*20;ctx.save();ctx.globalAlpha=.55;this.drawFactoryScenery(ctx,[{type:this.creatorSelectedScenery,x:gx,y:gy,rotation:(this.creatorSceneryRotation||0)&3,scale:1}]);ctx.restore();}
   
   // Ghost preview for placement - FIXED cursor offset
@@ -12303,10 +12684,11 @@
   }
   
   const ghost = new Node('ghost', this.creatorSelectedBlock === 'dual_spawner' ? 'spawner' : this.creatorSelectedBlock, gridX, gridY, config);
-  this.drawNodeArt(ghost);
+  this.drawFactoryMountedMachine(ghost,true,{x:gridX,y:gridY});
   ctx.globalAlpha = 1;
   }
   }
+  this.nodes=savedNodes;this.connections=savedConnections;this.factoryScenery=savedScenery;this.factoryRoom=savedRoom;this.currentWorld=savedWorld;this.factoryVisualMode=savedVisual;
   }
   
   // Restore original context
@@ -12654,6 +13036,11 @@
   { type:'dye_magenta', name:'Magenta Dye Vat', desc:'Dyes magenta', cost:{grey:120,red:40,blue:40}, icon:'#ff3eff', category:'Dyes', dyeColor:'magenta', unlock:'1-6' },
   { type:'spawner_5', name:'Spawner (1-5)', desc:'R-click shape up to 5 sides', cost:{grey:1800,red:300}, icon:'#ff9922', category:'Spawners', spawnerMax:5, unlock:'1-6' },
   { type:'overflow_conveyor', name:'Overflow Conveyor', desc:'Main + overflow outs', cost:{grey:60}, icon:'#888888', category:'Transport', unlock:'1-6' },
+  { type:'roller_lift', name:'Roller Lift', desc:'Raises cargo to the high line', cost:{grey:90,yellow:10}, icon:'#6edcff', category:'Elevated Transport', unlock:'1-6' },
+  { type:'elevated_conveyor', name:'Elevated Roller', desc:'Fast roller for raised cargo only', cost:{grey:70,cyan:8}, icon:'#8defff', category:'Elevated Transport', unlock:'1-6' },
+  { type:'roller_drop', name:'Roller Drop', desc:'Returns raised cargo to floor height', cost:{grey:90,yellow:10}, icon:'#6edcff', category:'Elevated Transport', unlock:'1-6' },
+  { type:'crossover_conveyor', name:'Roller Crossover', desc:'Two isolated lanes cross safely', cost:{grey:140,cyan:18}, icon:'#85bfff', category:'Elevated Transport', unlock:'1-6' },
+  { type:'transfer_claw', name:'Transfer Claw', desc:'Animated timed pick-and-place transfer', cost:{grey:180,yellow:20}, icon:'#e5b85c', category:'Robotic Arms', unlock:'1-6' },
   { type:'fuse', name:'Fuse', desc:'One-shot pass then closes', cost:{grey:40}, icon:'#ffff00', category:'Logic', unlock:'1-6' },
   { type:'side_siphon', name:'Side Siphon', desc:'Steals a side for the next shape', cost:{grey:80}, icon:'#ff66ff', category:'Processors', unlock:'1-6' },
   // 1-10 Circuits
@@ -12702,6 +13089,10 @@
   { type:'parity_router', name:'Parity Router', desc:'Even / odd routes', cost:{grey:220,cyan:40}, icon:'#00ddff', category:'Routing', unlock:'2-4' },
   { type:'threshold_gate', name:'Threshold Gate', desc:'Blocks under threshold', cost:{grey:200,yellow:40}, icon:'#ff8800', category:'Routing', unlock:'2-4' },
   { type:'pulse_clock', name:'Pulse Clock', desc:'Timed pulses', cost:{grey:80}, icon:'#4dffff', category:'Timing', unlock:'2-4' },
+  { type:'diverter_arm', name:'Diverter Arm', desc:'Alternates pick-and-place between A/B', cost:{grey:420,cyan:45}, icon:'#e09a4f', category:'Robotic Arms', unlock:'2-4' },
+  { type:'assembly_arm', name:'Assembly Arm', desc:'Powered two-part layered assembly', cost:{grey:650,yellow:70}, icon:'#d8b46e', category:'Robotic Arms', unlock:'2-4' },
+  { type:'gantry_crane', name:'Gantry Crane', desc:'Sorts floor and high-line cargo', cost:{grey:900,cyan:100}, icon:'#c28e55', category:'Robotic Arms', unlock:'2-4' },
+  { type:'cargo_elevator', name:'Cargo Elevator', desc:'Timed reversible level transfer', cost:{grey:720,cyan:80}, icon:'#79c9ef', category:'Elevated Transport', unlock:'2-4' },
   // 2-8 Act II Finale
   { type:'spawner_15', name:'Spawner (1-15)', desc:'Up to 15 sides', cost:{grey:25000,cyan:2500,yellow:2500}, icon:'#ffcc55', category:'Spawners', spawnerMax:15, unlock:'2-8' },
   { type:'spawner_20', name:'Spawner (1-20)', desc:'Up to 20 sides', cost:{grey:80000,white:8000,magenta:6000}, icon:'#ffdd77', category:'Spawners', spawnerMax:20, unlock:'2-8' },
@@ -13222,7 +13613,7 @@
   var now = Date.now();
   this._factoryRobotNow=now;
   if(!this._factoryRobotRuntime)this._factoryRobotRuntime={simulationNow:function(){return self._factoryRobotNow;},robotIsControlled:function(node){return self.robotIsControlled(node);}};
-  this.fNodes.forEach(function(n){if(ROBOT_MACHINE_TYPES.has(n.type))n._game=self._factoryRobotRuntime;});
+  this.fNodes.forEach(function(n){if(ROBOT_MACHINE_TYPES.has(n.type)||MECHANICAL_TRANSFER_TYPES.has(n.type))n._game=self._factoryRobotRuntime;});
   this._factoryRobotControl=this.robotControlTopology(true,this.fNodes,this.fConns);
   
   // Reset power
@@ -13300,7 +13691,7 @@
   
   // Snapshot once so every INPUT on a multi-unit floor emits during the same
   // production tick. Re-checking after the first dispatch starved later inputs.
-  var factoryBusyAtTickStart=this.fTransit.length>0||this.fNodes.some(function(nd){return(nd.type===MACHINE_TYPES.REPEATER&&(nd.repeaterQueue.length>0||(nd.powerBurstQueue&&nd.powerBurstQueue.length>0)||nd.isBursting))||(nd.type===MACHINE_TYPES.LIGHTSWITCH&&nd.lightswitchBursting)||(nd.type===MACHINE_TYPES.LIGHT&&nd.lightTemporary)||(nd.type===MACHINE_TYPES.PULSE_SPLITTER&&nd.pulseSplitterQueue.length>0)||(nd.type===MACHINE_TYPES.QUEUE&&nd.queueBuffer.length>0)||(ROBOT_MACHINE_TYPES.has(nd)&&((nd.robotQueue&&nd.robotQueue.length)||Object.keys(nd.robotBuffer||{}).length));});
+  var factoryBusyAtTickStart=this.fTransit.length>0||this.fNodes.some(function(nd){return(nd.type===MACHINE_TYPES.REPEATER&&(nd.repeaterQueue.length>0||(nd.powerBurstQueue&&nd.powerBurstQueue.length>0)||nd.isBursting))||(nd.type===MACHINE_TYPES.LIGHTSWITCH&&nd.lightswitchBursting)||(nd.type===MACHINE_TYPES.LIGHT&&nd.lightTemporary)||(nd.type===MACHINE_TYPES.PULSE_SPLITTER&&nd.pulseSplitterQueue.length>0)||(nd.type===MACHINE_TYPES.QUEUE&&nd.queueBuffer.length>0)||(ROBOT_MACHINE_TYPES.has(nd)&&((nd.robotQueue&&nd.robotQueue.length)||Object.keys(nd.robotBuffer||{}).length))||(MECHANICAL_TRANSFER_TYPES.has(nd.type)&&((nd.mechanicalQueue&&nd.mechanicalQueue.length)||Object.keys(nd.mechanicalBuffer||{}).length));});
   // Spawner cycle
   this.fNodes.forEach(function(n) {
   if (n.type!==MACHINE_TYPES.SPAWNER) return;
@@ -13319,6 +13710,7 @@
   if(m.type===MACHINE_TYPES.PRESSURE_PLATE){m.pressurePlateShapes=[];m.pressurePlateSignalSent=false;}
   if(m.type===MACHINE_TYPES.REPEATER){m.powerBurstQueue=[];m.lastPowerBurstOutput=null;m.lastPowerBurstInputState=false;}
   if(ROBOT_MACHINE_TYPES.has(m.type)){m.robotQueue=[];m.robotBuffer={};m.robotDispatchIndex=0;m.robotState='WAITING FOR AI';}
+  if(MECHANICAL_TRANSFER_TYPES.has(m.type)){m.mechanicalQueue=[];m.mechanicalBuffer={};m.mechanicalIndex=0;m.mechanicalState='READY';}
   });
   var res=n.process([]);
   self.factoryDispatch(n.id,0,res[0]);
@@ -13333,7 +13725,7 @@
   var conn=this.fConns.find(function(c){return c.fid===item.fid&&c.tid===item.tid&&c.fp===item.fp&&c.tp===item.tp;});
   if (!conn||conn.intersected){this.fTransit.splice(i,1);continue;}
   if (item.spawnerPowerType==='yellow'){var prog=Math.min(1,item.progress);var totalWD=item.traveledDistance+(item.effectiveDistance*prog);var tiles=totalWD/80;item.sig.voltage=(item.originVoltage||10)-tiles*YELLOW_VOLT_PER_TILE;if(item.sig.voltage<=YELLOW_EPS){this.fTransit.splice(i,1);continue;}}
-  item.progress+=dt*0.15*self.factoryGetBonuses().transitSpeed/(item.distance||80);
+  item.progress+=dt*0.15*self.factoryGetBonuses().transitSpeed*Math.max(.35,Number(item.sig.transportSpeed)||1)/(item.distance||80);
   
   if (item.progress>=1) {
   var node=this.fNodes.find(function(n){return n.id===item.tid;});
@@ -13374,6 +13766,10 @@
   node.spinnerPendingRotation=true;
   } else if (node.type===MACHINE_TYPES.ROBOT_STACKER) {
   this.queueRobotStack(node,item.tp,item.sig);
+  } else if (node.type===MACHINE_TYPES.ASSEMBLY_ARM) {
+  this.queueMechanicalAssembly(node,item.tp,item.sig);
+  } else if (node.type===MACHINE_TYPES.CROSSOVER_CONVEYOR) {
+  var crossOut=item.tp===2?3:1;node.mechanicalState=item.tp===2?'LANE B':'LANE A';node._campaignSucceeded=true;this.factoryDispatch(node.id,crossOut,item.sig.clone());
   } else if (node.type===MACHINE_TYPES.MIXER) {
   if(!node.buffer)node.buffer={sig:item.sig,port:item.tp};
   else{if(node.buffer.sig.voltage>YELLOW_EPS&&item.sig.voltage>YELLOW_EPS){var res=node.process(node.buffer.port===0?[node.buffer.sig,item.sig]:[item.sig,node.buffer.sig])[0];this.factoryDispatch(node.id,2,res);}node.buffer=null;}
@@ -13413,6 +13809,7 @@
   // destination. This mirrors campaign behavior and makes robotics productive
   // in the long-term Factory instead of silently swallowing shapes.
   this.releaseRobotJobs(this.fNodes,now,function(node,job){self.factoryDispatch(node.id,job.outPort,job.sig);});
+  this.releaseMechanicalJobs(this.fNodes,now,function(node,job){self.factoryDispatch(node.id,job.outPort,job.sig);});
   
   // Handle spinner pending rotations - rotate after shape has left
   this.fNodes.forEach(function(n) {
@@ -13798,11 +14195,9 @@
   if (!def) issues.push(`${type}: missing sprite definition`);
   else {
   const cropKey = def.join(',');
-  // Robot bays are intentionally procedural temporary actors drawn over a
-  // registered chassis crop; their final character sheets can replace this later.
-  if (!ROBOT_VISUAL_TYPES.has(type) && cropOwners.has(cropKey)) issues.push(`${type}: duplicates sprite crop used by ${cropOwners.get(cropKey)}`);
-  else if(!ROBOT_VISUAL_TYPES.has(type)) cropOwners.set(cropKey, type);
-  if (def.length !== 5 || def[0] < 1 || def[0] > 6 || def.slice(1).some(v => !Number.isFinite(v) || v < 0) || def[3] <= 0 || def[4] <= 0 || def[1] + def[3] > 768 || def[2] + def[4] > 768) {
+  if (cropOwners.has(cropKey)) issues.push(`${type}: duplicates sprite crop used by ${cropOwners.get(cropKey)}`);
+  else cropOwners.set(cropKey, type);
+  if (def.length !== 5 || !FACTORY_ATLAS_SOURCES[def[0]] || def.slice(1).some(v => !Number.isFinite(v) || v < 0) || def[3] <= 0 || def[4] <= 0 || def[1] + def[3] > 768 || def[2] + def[4] > 768) {
   issues.push(`${type}: invalid 768x768 atlas crop`);
   }
   }
@@ -13847,6 +14242,22 @@
   if(dispatchAudit.robotQueue.length!==2||dispatchAudit.robotQueue[0].outPort!==1||dispatchAudit.robotQueue[1].outPort!==2)issues.push('robot_dispatcher: alternating delivery contract failed');
   const stackAudit=new Node('audit-stack',MACHINE_TYPES.ROBOT_STACKER,0,0,{});
   if(stackAudit.ports.filter(p=>p.type==='in').length!==2||stackAudit.ports.filter(p=>p.type==='out').length!==1)issues.push('robot_stacker: two-store mega-output contract failed');
+  const mechanicalAuditGame={simulationNow:()=>1000};
+  const clawAudit=new Node('audit-claw',MACHINE_TYPES.TRANSFER_CLAW,0,0,{});clawAudit._game=mechanicalAuditGame;clawAudit.process([robotSignal]);
+  if(clawAudit.mechanicalQueue.length!==1||clawAudit.mechanicalQueue[0].outPort!==1||clawAudit.mechanicalQueue[0].releaseAt!==1900)issues.push('transfer_claw: powered pick/swing/drop contract failed');
+  const diverterAudit=new Node('audit-diverter',MACHINE_TYPES.DIVERTER_ARM,0,0,{});diverterAudit._game=mechanicalAuditGame;diverterAudit.process([robotSignal]);diverterAudit.process([robotSignal]);
+  if(diverterAudit.mechanicalQueue.length!==2||diverterAudit.mechanicalQueue[0].outPort!==1||diverterAudit.mechanicalQueue[1].outPort!==2)issues.push('diverter_arm: alternating output contract failed');
+  const liftAudit=new Node('audit-lift',MACHINE_TYPES.ROLLER_LIFT,0,0,{});liftAudit._game=mechanicalAuditGame;liftAudit.process([robotSignal]);
+  const raisedAudit=liftAudit.mechanicalQueue[0]?.sig;if(!raisedAudit||raisedAudit.elevation!==1||raisedAudit.transportSpeed!==1.25)issues.push('roller_lift: elevation contract failed');
+  const highAudit=new Node('audit-high',MACHINE_TYPES.ELEVATED_CONVEYOR,0,0,{}),groundAudit=new AetherSignal('triangle','red'),highSignal=groundAudit.clone();highSignal.elevation=1;
+  if(highAudit.process([groundAudit]).length||highAudit.process([highSignal])[0]?.transportSpeed!==1.6)issues.push('elevated_conveyor: high-cargo interlock failed');
+  const dropAudit=new Node('audit-drop',MACHINE_TYPES.ROLLER_DROP,0,0,{}),droppedAudit=dropAudit.process([highSignal])[0];
+  if(!droppedAudit||droppedAudit.elevation!==0||droppedAudit.transportSpeed!==1)issues.push('roller_drop: lowering contract failed');
+  const crossAudit=new Node('audit-cross',MACHINE_TYPES.CROSSOVER_CONVEYOR,0,0,{});
+  if(crossAudit.ports.length!==4||crossAudit.ports[0].id!==0||crossAudit.ports[1].id!==1||crossAudit.ports[2].id!==2||crossAudit.ports[3].id!==3)issues.push('crossover_conveyor: isolated lane port contract failed');
+  const assemblyAudit=Object.create(Game.prototype),assemblyNode=new Node('audit-assembly',MACHINE_TYPES.ASSEMBLY_ARM,0,0,{});assemblyNode._game=mechanicalAuditGame;
+  assemblyAudit.queueMechanicalAssembly(assemblyNode,0,new AetherSignal('triangle','red'));assemblyAudit.queueMechanicalAssembly(assemblyNode,1,new AetherSignal('square','blue'));
+  const assemblyCargo=assemblyNode.mechanicalQueue[0]?.sig;if(!assemblyCargo||assemblyCargo.shape!=='heptagon'||assemblyCargo.topColor!=='red'||assemblyCargo.bottomColor!=='blue')issues.push('assembly_arm: two-input assembly contract failed');
   const topologyAudit=Game.prototype.factoryPowerTopology.call({waitingForSpawn:false,isPaused:false,nodes:[{id:'src',type:MACHINE_TYPES.SPAWNER,isPowered:false},{id:'bot',type:MACHINE_TYPES.ROBOT_COURIER,isPowered:false}],connections:[{fid:'src',fp:0,tid:'bot',tp:0,intersected:false}]});
   if(!topologyAudit.nodes.has('bot')||topologyAudit.connections.size!==1)issues.push('powered rollers: input reachability contract failed');
   const aiAuditNodes=[new Node('ai',MACHINE_TYPES.ROBOT_AI_CORE,0,0,{}),new Node('relay',MACHINE_TYPES.ROBOT_RELAY,80,0,{}),new Node('bot',MACHINE_TYPES.ROBOT_COURIER,160,0,{})];
@@ -13901,7 +14312,8 @@
   compatibleSocketPairs,
   paletteEntries: paletteTypes.length,
   sceneryCollisionContracts: 4,
-  factoryRobotPersistenceContracts: 1
+  factoryRobotPersistenceContracts: 1,
+  nativeMachineMechanicContracts: 7
   },
   issues,
   warnings,
