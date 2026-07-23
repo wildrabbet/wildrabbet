@@ -968,7 +968,7 @@
   .creator-scenery-sprite { width:54px; height:42px; flex:0 0 54px; position:relative; overflow:hidden; display:inline-block; border:1px solid rgba(180,205,214,.22); border-radius:3px; background:#172127; image-rendering:pixelated; }
   .creator-scenery-sprite::before { content:""; position:absolute; left:var(--sprite-left); top:var(--sprite-top); width:var(--sprite-width); height:var(--sprite-height); background-image:var(--sprite-url); background-repeat:no-repeat; background-size:var(--sheet-width) var(--sheet-height); background-position:var(--sprite-x) var(--sprite-y); image-rendering:pixelated; }
   .creator-block-sprite,.module-tray-sprite,.shop-icon { position:relative; overflow:hidden; background-color:#172127; }
-  .creator-block-sprite::before,.module-tray-sprite::before,.shop-icon::before { content:""; position:absolute; left:var(--sprite-left); top:var(--sprite-top); width:var(--sprite-width); height:var(--sprite-height); background-image:var(--sprite-url); background-repeat:no-repeat; background-size:var(--sheet-width) var(--sheet-height); background-position:var(--sprite-x) var(--sprite-y); image-rendering:pixelated; }
+  .creator-block-sprite::before,.module-tray-sprite::before,.shop-icon::before { content:""; position:absolute; left:var(--sprite-left); top:var(--sprite-top); width:var(--sprite-width); height:var(--sprite-height); background-image:var(--sprite-url); background-repeat:no-repeat; background-size:var(--sheet-width) var(--sheet-height); background-position:var(--sprite-x) var(--sprite-y); image-rendering:pixelated; transform:var(--sprite-transform,none); transform-origin:center; }
   .creator-prop-tools { display:grid; grid-template-columns:1fr 92px; gap:6px; margin:7px 0; }
   .creator-prop-list { display:grid; grid-template-columns:1fr; gap:5px; max-height:560px; overflow:auto; padding-right:2px; }
   .creator-prop-card { width:100%; min-height:51px; padding:4px 6px; justify-content:flex-start; gap:8px; font-size:.61rem; text-align:left; }
@@ -1918,10 +1918,13 @@
   FACTORY_ISOLATED_ATLAS.decoding='async';
   FACTORY_ISOLATED_ATLAS.src=window.SOGODING_ASSET_CATALOG?.moduleAtlas?.src||'assets/module-isolated.png';
   function factorySpriteFrame(type) {
-    const frame=window.SOGODING_ASSET_CATALOG?.modules?.[type];
-    if(frame&&FACTORY_ISOLATED_ATLAS.complete&&FACTORY_ISOLATED_ATLAS.naturalWidth)return{img:FACTORY_ISOLATED_ATLAS,sx:frame[0],sy:frame[1],sw:frame[2],sh:frame[3]};
-    const def=FACTORY_SPRITE_DEFS[type],atlas=def&&FACTORY_ATLASES[def[0]];
-    return def&&atlas&&atlas.complete&&atlas.naturalWidth?{img:atlas,sx:def[1],sy:def[2],sw:def[3],sh:def[4]}:null;
+    // Mirroring the clean modular lift produces a down-ramp whose high-left
+    // entrance and low-right exit visibly match the drop's real sockets.
+    const flipX=type===MACHINE_TYPES.ROLLER_DROP,visualType=flipX?MACHINE_TYPES.ROLLER_LIFT:type;
+    const frame=window.SOGODING_ASSET_CATALOG?.modules?.[visualType];
+    if(frame&&FACTORY_ISOLATED_ATLAS.complete&&FACTORY_ISOLATED_ATLAS.naturalWidth)return{img:FACTORY_ISOLATED_ATLAS,sx:frame[0],sy:frame[1],sw:frame[2],sh:frame[3],flipX};
+    const def=FACTORY_SPRITE_DEFS[visualType],atlas=def&&FACTORY_ATLASES[def[0]];
+    return def&&atlas&&atlas.complete&&atlas.naturalWidth?{img:atlas,sx:def[1],sy:def[2],sw:def[3],sh:def[4],flipX}:null;
   }
 
   // Named scenery crops from every supplied factory atlas. Solid scenery is part
@@ -2121,10 +2124,16 @@
   const FACTORY_KNOWN_PORT_TYPES = new Set([...FACTORY_START_PORT_TYPES, ...FACTORY_RECEIVE_PORT_TYPES, 'watch']);
   function factoryPortCanStart(type) { return FACTORY_START_PORT_TYPES.has(type); }
   function factoryPortCanReceive(type) { return FACTORY_RECEIVE_PORT_TYPES.has(type); }
+  function factoryPortElevation(port) {
+    if(!port||port.type==='ai_out'||port.type==='ai_in'||port.type==='power_in')return null;
+    return port.elevation||'ground';
+  }
   function factoryPortsCompatible(sourcePort, targetPort) {
     if (!sourcePort || !targetPort) return false;
     if (sourcePort.type === 'ai_out' || targetPort.type === 'ai_in') return sourcePort.type === 'ai_out' && targetPort.type === 'ai_in';
-    return factoryPortCanStart(sourcePort.type) && factoryPortCanReceive(targetPort.type);
+    if(!factoryPortCanStart(sourcePort.type)||!factoryPortCanReceive(targetPort.type))return false;
+    const sourceElevation=factoryPortElevation(sourcePort),targetElevation=factoryPortElevation(targetPort);
+    return !sourceElevation||!targetElevation||sourceElevation==='any'||targetElevation==='any'||sourceElevation===targetElevation;
   }
   function factoryConnectionIsRobotControl(connection,nodes){
     const list=nodes||[],from=list.find(n=>n.id===connection?.fid),to=list.find(n=>n.id===connection?.tid);
@@ -2144,12 +2153,12 @@
     if (FACTORY_PLACEHOLDER_TYPES.has(factorySpriteType(type))) {
       return `background-color:#641d20;background-image:linear-gradient(45deg,transparent 42%,#ff5959 43% 57%,transparent 58%),linear-gradient(-45deg,transparent 42%,#ff5959 43% 57%,transparent 58%);background-size:100% 100%;background-position:center`;
     }
-    const spriteType=factorySpriteType(type),def = FACTORY_SPRITE_DEFS[spriteType] || FACTORY_SPRITE_DEFS.wall,isolated=window.SOGODING_ASSET_CATALOG?.modules?.[spriteType],atlas=window.SOGODING_ASSET_CATALOG?.moduleAtlas;
-    if(isolated&&atlas){const [sx,sy,sw,sh]=isolated,scale=Math.min(size/sw,size/sh);return `--sprite-url:url('${atlas.src}');--sprite-left:${(size-sw*scale)/2}px;--sprite-top:${(size-sh*scale)/2}px;--sprite-width:${sw*scale}px;--sprite-height:${sh*scale}px;--sheet-width:${atlas.width*scale}px;--sheet-height:${atlas.height*scale}px;--sprite-x:${-sx*scale}px;--sprite-y:${-sy*scale}px`;}
+    const spriteType=factorySpriteType(type),flipX=spriteType===MACHINE_TYPES.ROLLER_DROP,visualType=flipX?MACHINE_TYPES.ROLLER_LIFT:spriteType,def = FACTORY_SPRITE_DEFS[visualType] || FACTORY_SPRITE_DEFS.wall,isolated=window.SOGODING_ASSET_CATALOG?.modules?.[visualType],atlas=window.SOGODING_ASSET_CATALOG?.moduleAtlas,transform=flipX?';--sprite-transform:scaleX(-1)':'';
+    if(isolated&&atlas){const [sx,sy,sw,sh]=isolated,scale=Math.min(size/sw,size/sh);return `--sprite-url:url('${atlas.src}');--sprite-left:${(size-sw*scale)/2}px;--sprite-top:${(size-sh*scale)/2}px;--sprite-width:${sw*scale}px;--sprite-height:${sh*scale}px;--sheet-width:${atlas.width*scale}px;--sheet-height:${atlas.height*scale}px;--sprite-x:${-sx*scale}px;--sprite-y:${-sy*scale}px${transform}`;}
     const scale = Math.min(size / def[3], size / def[4]);
     const px = (size - def[3] * scale) / 2 - def[1] * scale;
     const py = (size - def[4] * scale) / 2 - def[2] * scale;
-    return `background-color:#172127;background-image:url('${FACTORY_ATLAS_SOURCES[def[0]]||`assets/${def[0]}.png`}');background-size:${768 * scale}px ${768 * scale}px;background-position:${px}px ${py}px`;
+    return `background-color:#172127;background-image:url('${FACTORY_ATLAS_SOURCES[def[0]]||`assets/${def[0]}.png`}');background-size:${768 * scale}px ${768 * scale}px;background-position:${px}px ${py}px${transform}`;
   }
 
   class AetherSignal {
@@ -2355,22 +2364,22 @@
   basePorts = [{x:0,y:.32,type:'in',label:'A',id:0},{x:.5,y:1,type:'in',label:'B',id:1},{x:1,y:.5,type:'out',label:'JOIN',id:2}];
   break;
   case MACHINE_TYPES.GANTRY_CRANE:
-  basePorts = [{x:0,y:.5,type:'in',label:'PICK',id:0},{x:1,y:.3,type:'out',label:'GROUND',id:1},{x:1,y:.7,type:'out',label:'HIGH',id:2}];
+  basePorts = [{x:0,y:.5,type:'in',label:'PICK',elevation:'any',id:0},{x:1,y:.3,type:'out',label:'GROUND',elevation:'ground',id:1},{x:1,y:.7,type:'out',label:'HIGH',elevation:'high',id:2}];
   break;
   case MACHINE_TYPES.ROLLER_LIFT:
-  basePorts = [{x:0,y:.75,type:'in',label:'LOW',id:0},{x:1,y:.25,type:'out',label:'HIGH',id:1}];
+  basePorts = [{x:0,y:.75,type:'in',label:'LOW',elevation:'ground',id:0},{x:1,y:.25,type:'out',label:'HIGH',elevation:'high',id:1}];
   break;
   case MACHINE_TYPES.ELEVATED_CONVEYOR:
-  basePorts = [{x:0,y:.5,type:'in',label:'HIGH',id:0},{x:1,y:.5,type:'out',label:'HIGH',id:1}];
+  basePorts = [{x:0,y:.5,type:'in',label:'HIGH',elevation:'high',id:0},{x:1,y:.5,type:'out',label:'HIGH',elevation:'high',id:1}];
   break;
   case MACHINE_TYPES.ROLLER_DROP:
-  basePorts = [{x:0,y:.25,type:'in',label:'HIGH',id:0},{x:1,y:.75,type:'out',label:'LOW',id:1}];
+  basePorts = [{x:0,y:.25,type:'in',label:'HIGH',elevation:'high',id:0},{x:1,y:.75,type:'out',label:'LOW',elevation:'ground',id:1}];
   break;
   case MACHINE_TYPES.CROSSOVER_CONVEYOR:
   basePorts = [{x:0,y:.5,type:'in',label:'A',id:0},{x:1,y:.5,type:'out',label:'A',id:1},{x:.5,y:0,type:'in',label:'B',id:2},{x:.5,y:1,type:'out',label:'B',id:3}];
   break;
   case MACHINE_TYPES.CARGO_ELEVATOR:
-  basePorts = [{x:.5,y:1,type:'in',label:'LOAD',id:0},{x:.5,y:0,type:'out',label:'LIFT',id:1}];
+  basePorts = [{x:.5,y:1,type:'in',label:'LOAD',elevation:'any',id:0},{x:.5,y:0,type:'out',label:'LIFT',elevation:'any',id:1}];
   break;
   // Extended production modules
   case MACHINE_TYPES.SIDE_SUB:
@@ -3204,6 +3213,9 @@
 
   const CAMPAIGN_STORE_KEY = 'sogoding_campaign_v2';
   const CUSTOM_STORE_KEY = 'sogoding_custom_levels_v1';
+  // Editor overrides remain permanent, except when a level's gameplay contract
+  // is deliberately revised. Any later editor save receives the new revision.
+  const CAMPAIGN_CONTENT_REVISIONS=Object.freeze({'1-6':2});
   let LEVEL_SEEDS_BAKED = null;
   let LEVEL_SEEDS_CH2_BAKED = null;
   let LEVEL_SEEDS_CH3_BAKED = null;
@@ -3260,7 +3272,7 @@
       world: normalizeWorldKey(entry.world||decoded.world||(chapter===3?'robot':(chapter===2?'abandoned':'factory')))
     };
     if (entry.productionLogs) level.productionLogs = entry.productionLogs;
-    ['difficulty','designRole','introduced','requiredModules','secretUnlock','secretMaxWires','routeChapter','routeFrom','placeholder','loreTitle','ending'].forEach(function(key){
+    ['difficulty','designRole','layoutRecipe','introduced','requiredModules','secretUnlock','secretMaxWires','routeChapter','routeFrom','placeholder','loreTitle','ending','contentRevision'].forEach(function(key){
       if (entry[key] != null) level[key] = entry[key];
     });
     if (decoded.startingZoom) level.startingZoom = decoded.startingZoom;
@@ -3285,8 +3297,8 @@
       const seen = new Set();
       for (const entry of baked) {
         if (deleted.has(entry.id)) continue;
-        const ov = overrides[entry.id];
-        const use = ov ? ov : entry;
+        const ov = overrides[entry.id],requiredRevision=CAMPAIGN_CONTENT_REVISIONS[entry.id]||0;
+        const use = ov&&(!requiredRevision||Number(ov.contentRevision||0)>=requiredRevision) ? ov : entry;
         try {
           const lvl = wrapSeedEntry(Object.assign({}, use, { chapter: chapter }));
           out.push(lvl);
@@ -3400,7 +3412,146 @@
     if(type==='color_filter')return campaignMod(type,{filterColor:value});
     return campaignMod(type,{threshold:value});
   }
-  function campaignScenery(world,index,placeholder){
+  const CAMPAIGN_LAYOUT_RECIPES=Object.freeze({
+    'training-line':{
+      inputs:[[80,360],[80,520],[80,200]],output:[1120,360],
+      slots:[[240,360],[400,360],[560,360],[720,360],[880,360],[1040,360],[240,520],[400,520],[560,520],[720,520],[880,520],[1040,520],[240,200],[400,200],[560,200],[720,200]]
+    },
+    'elevation-school':{
+      inputs:[[80,520]],output:[1120,520],
+      slots:[[320,520],[560,440],[800,520],[320,280],[560,280],[800,280]]
+    },
+    'offset-l':{
+      inputs:[[80,600],[80,440],[320,680]],output:[1120,200],
+      slots:[[240,520],[400,600],[560,520],[720,600],[960,520],[240,240],[400,320],[560,240],[720,320],[880,240],[1040,400],[880,440],[640,440],[400,440],[1040,600],[800,520]]
+    },
+    'reverse-hook':{
+      inputs:[[1120,200],[1120,360],[800,680]],output:[80,600],
+      slots:[[960,280],[800,200],[640,280],[480,200],[320,280],[160,360],[960,520],[800,600],[640,520],[480,600],[320,520],[880,400],[720,400],[560,400],[400,400],[240,200]]
+    },
+    'split-bays':{
+      inputs:[[80,360],[80,200],[80,600]],output:[1120,360],
+      slots:[[240,200],[400,200],[560,200],[800,200],[960,200],[240,520],[400,520],[560,520],[800,520],[960,520],[320,360],[480,360],[640,360],[800,360],[960,360],[640,600]]
+    },
+    'cross-dock':{
+      inputs:[[80,200],[80,600],[640,680]],output:[1120,360],
+      slots:[[240,200],[400,280],[560,360],[400,440],[240,600],[720,360],[880,280],[1040,200],[880,440],[1040,600],[560,200],[560,520],[720,200],[720,520],[880,600],[880,120]]
+    },
+    'pinwheel':{
+      inputs:[[640,680],[320,680],[960,680]],output:[640,160],
+      slots:[[240,200],[400,200],[240,360],[400,360],[880,200],[1040,200],[880,360],[1040,360],[240,520],[400,520],[880,520],[1040,520],[560,280],[720,280],[560,440],[720,440]]
+    },
+    'perimeter':{
+      inputs:[[80,200],[80,360],[80,600]],output:[1120,600],
+      slots:[[240,200],[400,200],[560,200],[720,200],[880,200],[1040,200],[1040,360],[1040,520],[880,600],[720,600],[560,600],[400,600],[240,600],[240,440],[400,360],[720,440]]
+    },
+    'islands':{
+      inputs:[[80,360],[80,600],[80,200]],output:[1120,360],
+      slots:[[240,200],[320,200],[240,280],[320,280],[560,440],[640,440],[560,520],[640,520],[880,200],[960,200],[880,280],[960,280],[400,600],[480,600],[800,600],[880,600]]
+    },
+    'broken-symmetry':{
+      inputs:[[80,600],[80,200],[640,680]],output:[1120,200],
+      slots:[[240,200],[400,200],[560,200],[800,200],[960,200],[240,520],[400,520],[560,520],[800,520],[960,520],[320,360],[480,360],[720,360],[880,360],[1040,440],[640,600]]
+    },
+    'false-line':{
+      inputs:[[80,360],[80,200],[80,600]],output:[1120,360],
+      bait:[[240,360],[400,360],[560,360],[720,360],[880,360],[1040,360]],
+      slots:[[240,200],[400,520],[560,200],[720,520],[880,200],[1040,520],[320,600],[480,600],[640,600],[800,600],[960,600],[320,120],[640,200],[800,200],[960,200],[560,520]]
+    },
+    'relay-grid':{
+      inputs:[[80,200],[80,400],[80,600]],output:[1120,400],
+      control:[[240,200],[400,200],[560,200],[720,200],[880,200],[1040,200]],
+      worker:[[240,520],[400,600],[560,520],[720,600],[880,520],[1040,600]],
+      slots:[[240,360],[400,360],[560,360],[720,360],[880,360],[1040,360],[320,680],[640,680],[960,680],[320,280],[640,280],[960,280]]
+    },
+    'final-floor':{
+      inputs:[[80,200],[80,600],[640,680]],output:[1120,360],
+      control:[[240,120],[480,120],[720,120],[960,120]],
+      worker:[[240,600],[480,600],[720,600],[960,600]],
+      bait:[[320,360],[480,360],[640,360],[800,360],[960,360]],
+      slots:[[240,240],[400,200],[560,280],[720,200],[880,280],[1040,240],[240,440],[400,520],[560,440],[720,520],[880,440],[1040,520],[400,360],[640,200],[640,520],[880,360]]
+    }
+  });
+  const CAMPAIGN_WORLD_LAYOUTS=Object.freeze({
+    factory:['training-line','training-line','training-line','offset-l','split-bays','elevation-school','islands','perimeter','cross-dock','pinwheel','broken-symmetry','islands','false-line','perimeter','final-floor'],
+    abandoned:['reverse-hook','perimeter','false-line','split-bays','final-floor','cross-dock','islands','perimeter','broken-symmetry','final-floor','false-line','reverse-hook','cross-dock','islands','final-floor'],
+    robot:['relay-grid','relay-grid','cross-dock','islands','final-floor','broken-symmetry','relay-grid','split-bays','cross-dock','final-floor','islands','broken-symmetry','false-line','relay-grid','final-floor'],
+    overgrowth:['islands','reverse-hook','perimeter','cross-dock','final-floor','islands','perimeter','false-line','broken-symmetry','final-floor','cross-dock','islands','relay-grid','false-line','final-floor'],
+    power_plant:['reverse-hook','broken-symmetry','perimeter','cross-dock','final-floor','islands','false-line','perimeter','broken-symmetry','final-floor','cross-dock','islands','relay-grid','false-line','final-floor']
+  });
+  const CAMPAIGN_DIFFICULTY_RAMPS=Object.freeze({
+    factory:[1,1,1,2,2,2,2,2,2,3,3,3,3,3,3],
+    abandoned:[2,2,2,3,3,3,3,3,3,4,4,4,4,4,4],
+    robot:[3,3,3,3,4,4,4,4,4,5,5,5,5,5,5],
+    overgrowth:[4,4,4,4,4,4,4,4,5,5,5,5,5,5,5],
+    power_plant:[4,4,4,5,5,5,5,5,5,5,5,5,5,5,5]
+  });
+  function campaignHash(value){
+    let h=2166136261;
+    for(const ch of String(value)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}
+    return h>>>0;
+  }
+  function campaignShuffle(items,seed){
+    const out=items.slice();let state=campaignHash(seed)||1;
+    for(let i=out.length-1;i>0;i--){state=(Math.imul(state,1664525)+1013904223)>>>0;const j=state%(i+1);[out[i],out[j]]=[out[j],out[i]];}
+    return out;
+  }
+  function campaignModuleFamily(type){
+    if(type==='robot_ai_core'||type==='robot_relay'||type==='robot_dispatcher'||type==='contract_scanner')return'control';
+    if(String(type).startsWith('robot_'))return'worker';
+    if(type==='dye_vat')return'dye';
+    if(/gate|filter|scanner/.test(type))return'inspector';
+    if(/roller|conveyor|claw|lift|drop|portal|queue|buffer/.test(type))return'transport';
+    return'transform';
+  }
+  function campaignLayoutName(world,index){
+    const authored=CAMPAIGN_WORLD_LAYOUTS[world];
+    if(authored)return authored[index-1]||'final-floor';
+    const lateGame=['reverse-hook','broken-symmetry','perimeter','cross-dock','final-floor','islands','false-line','perimeter','broken-symmetry','final-floor','cross-dock','islands','relay-grid','false-line','final-floor'];
+    return lateGame[index-1]||'final-floor';
+  }
+  function campaignDifficulty(world,index,fallback){
+    const ramp=CAMPAIGN_DIFFICULTY_RAMPS[world];
+    if(ramp)return ramp[index-1]||5;
+    return 5;
+  }
+  function campaignTakeSlot(pool,used){
+    const slot=pool.find(p=>!used.has(p[0]+','+p[1]));
+    if(!slot)return null;used.add(slot[0]+','+slot[1]);return slot;
+  }
+  function campaignGridSlot(slot){return[Math.round(slot[0]/80)*80,Math.round(slot[1]/80)*80];}
+  function campaignFamilyPool(layout,family,world,index){
+    const source=family==='control'&&layout.control?layout.control:(family==='worker'&&layout.worker?layout.worker:layout.slots);
+    const anchors=[[280,240],[960,240],[280,600],[960,600],[640,400]],familyOrder=['transform','dye','inspector','transport','control','worker'];
+    let anchorIndex=(campaignHash(world+'-'+index+'-zones')+Math.max(0,familyOrder.indexOf(family))*2)%anchors.length;
+    if(world==='factory'&&index===4)anchorIndex=family==='transform'?0:(family==='dye'?3:anchorIndex);
+    const anchor=anchors[anchorIndex],pool=campaignShuffle(source,world+'-'+index+'-'+family).map(campaignGridSlot);
+    return pool.sort((a,b)=>((a[0]-anchor[0])**2+(a[1]-anchor[1])**2)-((b[0]-anchor[0])**2+(b[1]-anchor[1])**2));
+  }
+  function campaignSceneryRect(item){
+    const def=resolveSceneryDef(item?.type);if(!def)return null;
+    const scale=Math.max(.3,Math.min(3,Number(item.scale)||1)),rawW=def.w*scale,rawH=def.h*scale,rot=(item.rotation||0)&3;
+    const w=rot%2?rawH:rawW,h=rot%2?rawW:rawH;
+    return{x:(Number(item.x)||0)-w/2,y:(Number(item.y)||0)-h/2,w,h};
+  }
+  function campaignSceneryAvoidNodes(items,nodes,world,index){
+    const overlaps=(a,b,pad=3)=>a.x+pad<b.x+b.w-pad&&a.x+a.w-pad>b.x+pad&&a.y+pad<b.y+b.h-pad&&a.y+a.h-pad>b.y+pad;
+    const occupied=(nodes||[]).map(n=>({x:n.x,y:n.y,w:80,h:80}));
+    const anchors=campaignShuffle([
+      [640,440],[480,440],[800,440],[640,600],[480,600],[800,600],
+      [240,440],[1040,440],[240,680],[1040,680],[160,120],[1120,120],[640,120]
+    ],world+'-'+index+'-scenery');
+    return items.map((item,itemIndex)=>{
+      if(!sceneryIsSolid(item))return item;
+      const candidates=[[item.x,item.y]].concat(anchors.map(a=>[a[0]+((itemIndex%2)*40),a[1]]));
+      for(const candidate of candidates){
+        const moved={...item,x:candidate[0],y:candidate[1]},rect=campaignSceneryRect(moved);
+        if(rect&&!occupied.some(node=>overlaps(node,rect)))return moved;
+      }
+      return{...item,solid:false};
+    });
+  }
+  function campaignScenery(world,index,placeholder,nodes){
     if(world==='factory'){
       const propSets=[
         ['tube_lights','tool_wall','floor_grates','storage_crates'],
@@ -3409,7 +3560,7 @@
         ['maintenance_bays','display_wall','steel_floor','generator_pair']
       ];
       const p=propSets[(index-1)%propSets.length];
-      return p.map((type,i)=>({id:'sc'+i,type,x:[160,760,240,1120][i],y:[30,35,565,680][i],rotation:0,scale:placeholder?1.15:1,solid:sceneryDefaultSolid(type)}));
+      return campaignSceneryAvoidNodes(p.map((type,i)=>({id:'sc'+i,type,x:[160,760,240,1120][i],y:[30,35,565,680][i],rotation:0,scale:placeholder?1.15:1,solid:sceneryDefaultSolid(type)})),nodes,world,index);
     }
     const sheets=worldSheets(world);
     if(!sheets.length)return[];
@@ -3425,7 +3576,7 @@
         {id:'sc3',type:makeWorldAssetType(sheet.id,4,12,4,4),x:1120,y:690,rotation:0,scale:.62,solid:true}
       ];
       if(index>=6)scenery.push({id:'sc4',type:makeWorldAssetType(sheet.id,12+(index%4),index%4,1,1),x:640+((index%3)-1)*80,y:650,rotation:0,scale:1,solid:true});
-      return scenery;
+      return campaignSceneryAvoidNodes(scenery,nodes,world,index);
     }
     const a=sheets[(index-1)%sheets.length],b=sheets[index%sheets.length];
     const scenery=[
@@ -3437,25 +3588,46 @@
       scenery.push({id:'sc3',type:makeWorldAssetType(a.id,(index*5)%Math.max(1,a.cols-1),Math.min(a.rows-1,11),1,1),x:560,y:480,rotation:index%4,scale:1,solid:true});
       if(index>=6)scenery.push({id:'sc4',type:makeWorldAssetType(b.id,(index*7)%Math.max(1,b.cols-1),Math.min(b.rows-1,12),1,1),x:720,y:480,rotation:(index+1)%4,scale:1,solid:true});
     }
-    return scenery;
+    return campaignSceneryAvoidNodes(scenery,nodes,world,index);
   }
-  function campaignNodes(spec){
+  function campaignNodes(spec,chapter,index,world){
     const nodes=[];
     const spawns=spec.spawns||[{shape:'circle',color:'grey'}];
-    const spawnYs=spawns.length===1?[360]:(spawns.length===2?[280,480]:[200,360,520]);
-    spawns.forEach((spawn,i)=>nodes.push({id:'sp'+i,type:'spawner',x:80,y:spawnYs[i],config:{shape:spawn.shape||'circle',color:spawn.color||'grey',locked:true}}));
-    const slots=[[280,200],[440,200],[600,200],[760,200],[920,200],[280,360],[440,360],[600,360],[760,360],[920,360],[360,520],[560,520],[760,520],[920,520]];
-    (spec.modules||[]).forEach((raw,i)=>{
-      const mod=typeof raw==='string'?campaignMod(raw):raw;
-      const slot=slots[i]||[280+(i%5)*160,200+Math.floor(i/5)*160];
-      nodes.push({id:'m'+i,type:mod.type,x:slot[0],y:slot[1],config:Object.assign({},mod.config||{})});
+    const layoutName=spec.layout||campaignLayoutName(world,index),layout=CAMPAIGN_LAYOUT_RECIPES[layoutName]||CAMPAIGN_LAYOUT_RECIPES['final-floor'],used=new Set();
+    const rawInputs=layout.inputs||CAMPAIGN_LAYOUT_RECIPES['training-line'].inputs,inputSlots=(layoutName==='training-line'?rawInputs:campaignShuffle(rawInputs,world+'-'+index+'-inputs')).map(campaignGridSlot),outputSlot=campaignGridSlot(layout.output);
+    spawns.forEach((spawn,i)=>{
+      const slot=inputSlots[i]||campaignTakeSlot(layout.slots,used)||[80,200+i*160];used.add(slot[0]+','+slot[1]);
+      nodes.push({id:'sp'+i,type:'spawner',x:slot[0],y:slot[1],config:{shape:spawn.shape||'circle',color:spawn.color||'grey',locked:true}});
     });
-    nodes.push({id:'out',type:'collector',x:1120,y:360,config:{locked:true}});
+    used.add(outputSlot[0]+','+outputSlot[1]);
+    const declared=(spec.modules||[]).map((raw,i)=>({index:i,mod:typeof raw==='string'?campaignMod(raw):raw}));
+    let shuffled=layoutName==='training-line'?declared:campaignShuffle(declared,world+'-'+index+'-modules');
+    if(layoutName!=='training-line'&&shuffled.length>1&&shuffled.every((item,i)=>item.index===i))shuffled=shuffled.slice(1).concat(shuffled[0]);
+    const pools={
+      control:campaignFamilyPool(layout,'control',world,index),
+      worker:campaignFamilyPool(layout,'worker',world,index),
+      transform:campaignFamilyPool(layout,'transform',world,index),
+      dye:campaignFamilyPool(layout,'dye',world,index),
+      inspector:campaignFamilyPool(layout,'inspector',world,index),
+      transport:campaignFamilyPool(layout,'transport',world,index),
+      decoy:campaignShuffle(layout.bait||layout.slots,world+'-'+index+'-bait').map(campaignGridSlot),
+      normal:(layoutName==='training-line'?layout.slots.slice():campaignShuffle(layout.slots,world+'-'+index+'-normal')).map(campaignGridSlot),
+      all:campaignShuffle([...(layout.slots||[]),...(layout.control||[]),...(layout.worker||[]),...(layout.bait||[])],world+'-'+index+'-all').map(campaignGridSlot)
+    };
+    shuffled.forEach(item=>{
+      const family=campaignModuleFamily(item.mod.type),preferred=layoutName==='training-line'?pools.normal:(item.mod.decoy?pools.decoy:(pools[family]||pools.normal));
+      const requested=Array.isArray(spec.moduleSlots)&&spec.moduleSlots[item.index]?campaignGridSlot(spec.moduleSlots[item.index]):null;
+      const explicit=requested&&!used.has(requested[0]+','+requested[1])?(used.add(requested[0]+','+requested[1]),requested):null;
+      const slot=explicit||campaignTakeSlot(preferred,used)||campaignTakeSlot(pools.normal,used)||campaignTakeSlot(pools.all,used);
+      if(!slot)throw new Error('Campaign layout '+layoutName+' has no slot for '+world+' '+index+' module '+item.index);
+      nodes.push({id:'m'+item.index,type:item.mod.type,x:slot[0],y:slot[1],config:Object.assign({},item.mod.config||{})});
+    });
+    nodes.push({id:'out',type:'collector',x:outputSlot[0],y:outputSlot[1],config:{locked:true}});
     return nodes;
   }
   function campaignEntry(chapter,index,world,spec){
     const id=chapter+'-'+index;
-    const nodes=campaignNodes(spec);
+    const layoutRecipe=spec.layout||campaignLayoutName(world,index),nodes=campaignNodes(spec,chapter,index,world);
     const room={x:0,y:0,w:1280,h:800,floorY:160,variant:(index-1)%4};
     const systemText=(spec.system||spec.hints?.[0]||'Assemble the requested production output.');
     const logs=spec.logs||[
@@ -3463,8 +3635,8 @@
       {timestamp:'RECOVERED JOURNAL / '+(spec.author||'KAI'),text:spec.journal}
     ];
     const entry={id,title:spec.title,chapter,world,
-      seed:encodeSeedPayload({contract:spec.contract,nodes,room,scenery:campaignScenery(world,index,false),world,startingZoom:.86}),
-      hints:spec.hints||[],productionLogs:logs,difficulty:spec.difficulty||1,designRole:spec.role||'REINFORCE',
+      seed:encodeSeedPayload({contract:spec.contract,nodes,room,scenery:campaignScenery(world,index,false,nodes),world,startingZoom:.86}),
+      hints:spec.hints||[],productionLogs:logs,difficulty:campaignDifficulty(world,index,spec.difficulty),designRole:spec.role||'REINFORCE',layoutRecipe,
       introduced:spec.introduced||[],requiredModules:spec.required||[],loreTitle:spec.loreTitle||'',
       secretUnlock:spec.secretUnlock||null,secretMaxWires:spec.secretMaxWires||null,ending:!!spec.ending};
     return entry;
@@ -3476,9 +3648,9 @@
     {title:'Red Letter Day',contract:campaignReq('triangle','red'),modules:['side_add','side_add',campaignDye('red')],difficulty:1,role:'COMBINE',introduced:['DYE VAT'],hints:['Shape and colour are independent. Build both qualities before collection.','An unusually short line may wake the maintenance hatch.'],journal:'There is a red door behind the vat. No handle, only four tiny lights. They blink when I use exactly four roller runs. -Kai',secretUnlock:'S1-1',secretMaxWires:4},
     {title:'Any Order',contract:campaignReq('square','blue'),modules:['side_add','side_add','side_add',campaignDye('blue')],difficulty:1,role:'EXPERIMENT',hints:['Some operations commute: dyeing early or late can reach the same result.'],journal:'Supervisor did not care whether I dyed first or last. “Only the shipment matters.” I wrote that down because it sounded less normal than she thought. -Kai'},
     {title:'First Quota',contract:campaignReq('pentagon','yellow'),modules:['side_add','side_add','side_add','side_add',campaignDye('red'),campaignDye('green')],difficulty:2,role:'BOSS',introduced:['COLOUR MIXING'],required:['side_add','side_add','side_add','side_add','dye_vat','dye_vat'],hints:['Red followed by green becomes yellow.','Boss contracts recombine everything from the preceding set.'],journal:'Quota cleared. The yellow pentagons went into a lift marked PERSONNEL, not SHIPPING. When I asked why, the label had been painted over by lunch. -Kai'},
-    {title:'The High Line',spawns:[{shape:'square',color:'grey'}],contract:campaignReq('triangle','red'),modules:['side_sub',campaignDye('red'),'roller_lift','elevated_conveyor','roller_drop'],difficulty:2,role:'TEACH · ELEVATION',introduced:['SIDE SHAVER','ELEVATED TRANSPORT'],required:['roller_lift','elevated_conveyor','roller_drop'],hints:['The Side Shaver removes one side. Start by reading what INPUT already produces.','Use LIFT → HIGH ROLLER → DROP as one continuous elevated section. Ground cargo cannot enter a high roller.','Six runs or fewer expose an old night-shift trace.'],journal:'The new line climbs over the old one. From the catwalk I found KAI WAS HERE stamped beneath the lift, but the handwriting is not mine. -Kai',secretUnlock:'S1-2',secretMaxWires:6},
+    {title:'The High Line',layout:'elevation-school',moduleSlots:[[320,520],[560,440],[800,520]],spawns:[{shape:'triangle',color:'red'}],contract:campaignReq('triangle','red'),modules:['roller_lift','elevated_conveyor','roller_drop'],difficulty:1,role:'TEACH · ELEVATION',introduced:['ELEVATED TRANSPORT','ROLLER DROP'],required:['roller_lift','elevated_conveyor','roller_drop'],hints:['The product already matches the goal. This lesson is only about moving it.','Build one continuous line: INPUT → ROLLER LIFT → HIGH ROLLER → ROLLER DROP → OUTPUT. Height-coded sockets prevent an invalid order.','LOW cargo enters the Lift. Only HIGH cargo can enter the High Roller and Drop; the Drop returns it to LOW floor height.'],journal:'The new line climbs over the old one. From the catwalk I found KAI WAS HERE stamped beneath the lift, but the handwriting is not mine. -Kai',secretUnlock:'S1-2',secretMaxWires:4},
     {title:'Double Shift',spawns:[{shape:'vesica',color:'grey'}],contract:campaignReq('square','blue'),modules:['side_doubler',campaignDye('blue'),'transfer_claw'],difficulty:2,role:'TEACH · TRANSFER',introduced:['SIDE DOUBLER','TRANSFER CLAW'],required:['transfer_claw'],hints:['The Doubler multiplies the current side count by two.','The powered claw picks cargo from its lower PICK roller, holds it visibly, then places it on DROP.'],journal:'A vesica becomes a square in one motion. The new transfer claw carries it like something breakable. The serial plate says COGNITIVE REPLICATION UNIT. Probably a mistranslation. -Kai'},
-    {title:'The Long Way Down',spawns:[{shape:'heptagon',color:'grey'}],contract:campaignReq('square','white'),modules:['side_sub','side_sub','side_sub',campaignDye('white')],difficulty:2,role:'REINFORCE',hints:['Subtraction is a path, not a punishment. Count backwards before wiring.'],journal:'White shapes make the lights dim. Maintenance says the colour draws more power. In the dark I heard somebody knocking from inside the collector. -Kai'},
+    {title:'The Long Way Down',spawns:[{shape:'heptagon',color:'grey'}],contract:campaignReq('square','white'),modules:['side_sub','side_sub','side_sub',campaignDye('white')],difficulty:2,role:'TEACH · SHAVING',introduced:['SIDE SHAVER'],hints:['The Side Shaver removes exactly one side each time. Seven must become four.','Count down: seven → six → five → four, then dye the square white.'],journal:'White shapes make the lights dim. Maintenance says the colour draws more power. In the dark I heard somebody knocking from inside the collector. -Kai'},
     {title:'Carbon Paper',contract:campaignMulti(campaignReq('triangle','red'),campaignReq('triangle','blue')),modules:['side_add','side_add','cloner',campaignDye('red'),campaignDye('blue')],difficulty:2,role:'TEACH',introduced:['CLONER','MULTI-CONTRACT'],required:['cloner'],hints:['Build the shared triangle before cloning it.','Each clone needs its own dye and both may enter the same output.','Seven clean runs reveal a second route.'],journal:'The Cloner makes two perfect copies, including tiny surface scratches. The log calls those scratches “memory residues.” Nobody laughs when I joke anymore. -Kai',secretUnlock:'S1-3',secretMaxWires:7},
     {title:'Two Become One',spawns:[{shape:'triangle',color:'grey'},{shape:'triangle',color:'grey'}],contract:campaignGradient('hexagon','red','blue'),modules:[campaignDye('red'),campaignDye('blue'),'mixer'],difficulty:2,role:'BOSS',introduced:['MIXER','GRADIENTS'],required:['mixer'],hints:['The Mixer adds side counts. Different input colours become top and bottom.'],journal:'The merged piece carries both colours without blending. Two histories, one shell. The shipping manifest lists the batch as “viable.” -Kai'},
     {title:'Secondary Evidence',contract:campaignReq('triangle','magenta'),modules:['side_add','side_add',campaignDye('red'),campaignDye('blue')],difficulty:2,role:'RECALL',hints:['Red plus blue makes magenta. The shape work is the easy half.'],journal:'Magenta batches are routed downstairs. There is no downstairs on the floor plan. I checked twice. -Mika',author:'MIKA'},
@@ -3572,13 +3744,36 @@
   function cloneCampaignSpec(spec){return JSON.parse(JSON.stringify(spec));}
   function extendedWorldSpec(world,chapter,stage){
     const source=cloneCampaignSpec(EXTENDED_ARCHETYPES[stage-1]),worldInfo=WORLD_REGISTRY[world],boss=stage===5||stage===10||stage===15;
-    const decoyCount=Math.min(3,Math.max(1,Math.floor((chapter-3)/4)+(stage>=9?1:0))),modules=(source.modules||[]).slice();
-    for(let i=0;i<decoyCount&&modules.length<13;i++)modules.push(cloneCampaignSpec(EXTENDED_DECOYS[(chapter*3+stage+i)%EXTENDED_DECOYS.length]));
+    const worldPressure=chapter===4?2:(chapter===5?3:Math.min(5,3+Math.floor((chapter-6)/3))),decoyCount=Math.min(5,worldPressure+(stage>=7?1:0)+(stage>=13?1:0)),modules=(source.modules||[]).slice(),requiredModules=(source.required||[]).slice();
+    const moduleType=raw=>typeof raw==='string'?raw:raw?.type,hasType=type=>modules.some(raw=>moduleType(raw)===type),addProof=(type,config)=>{
+      if(modules.length>=16)return;
+      modules.push({...campaignMod(type,config),proof:true});requiredModules.push(type);
+    };
+    const ensureProof=(type,config)=>{if(hasType(type)){if(!requiredModules.includes(type))requiredModules.push(type);}else addProof(type,config);};
+    const targets=(source.contract?.shapes||[source.contract]).filter(Boolean);
+    const targetSides=[...new Set(targets.map(target=>SHAPES[String(target.shape||'circle').toUpperCase()]?.sides).filter(Boolean))];
+    const targetColors=[...new Set(targets.filter(target=>!target.topColor&&target.color&&target.color!=='grey').map(target=>target.color))];
+    // After Power Plant, arithmetic is only the first layer. Late shipping
+    // routes must prove, certify, and synchronize their result before delivery.
+    if(chapter===6){
+      if(boss||targets.length>1)ensureProof('contract_scanner');
+      else if(targetSides[0])ensureProof('side_gate',{sideCount:targetSides[0]});
+    }
+    if(chapter>=7){
+      ensureProof('contract_scanner');
+      targetSides.slice(0,2).forEach(sides=>addProof('side_gate',{sideCount:sides}));
+      targetColors.slice(0,2).forEach(color=>addProof('color_filter',{filterColor:color}));
+      ensureProof('delay_buffer',{delaySeconds:1});
+      if(chapter>=9)ensureProof('queue');
+      if(chapter>=11&&stage>=6)ensureProof('transfer_claw');
+    }
+    for(let i=0;i<decoyCount&&modules.length<16;i++){const decoy=cloneCampaignSpec(EXTENDED_DECOYS[(chapter*3+stage+i)%EXTENDED_DECOYS.length]);if(typeof decoy==='string')modules.push({type:decoy,config:{},decoy:true});else modules.push({...decoy,decoy:true});}
     const lore=WORLD_LORE_ARCS[world]||['The route continues.'],beat=lore[Math.min(lore.length-1,Math.floor((stage-1)/3))];
     const hints=(source.hints||[]).filter(h=>!/reveal|opens|wake|archive|stair|cavity/i.test(h)).slice(0,2);
     hints.push(stage<5?'Find the essential transformation; some available machines are deliberate decoys.':'Trace the output backward. Every required machine must justify its place in the line.');
     if(boss)hints.push('Boss contract: combine the rules from the previous four stages without adding an unnecessary roller run.');
-    const spec={...source,title:worldInfo.name+' · '+EXTENDED_STAGE_TITLES[stage-1],modules,difficulty:EXTENDED_DIFFICULTY[stage-1],role:boss?(stage===15?'WORLD FINALE BOSS':'BOSS · SYNTHESIS'):(stage<4?'RECALL · CONSTRAINED':'ADVANCED SYNTHESIS'),introduced:[],hints,journal:beat+' Production record '+stage+' confirms the route was used before. -SoGoDing',author:'SOGODING',secretUnlock:null,secretMaxWires:null,ending:false,logs:null};
+    if(chapter>=7)hints.push('Late-route compliance: every proof machine is mandatory. Certify side count and colour, synchronize the line, then pass the finished contract through the scanner.');
+    const spec={...source,title:worldInfo.name+' · '+EXTENDED_STAGE_TITLES[stage-1],modules,required:requiredModules,difficulty:EXTENDED_DIFFICULTY[stage-1],role:boss?(stage===15?'WORLD FINALE BOSS':'BOSS · SYNTHESIS'):(stage<4?'RECALL · CONSTRAINED':'ADVANCED SYNTHESIS'),introduced:[],hints,journal:beat+' Production record '+stage+' confirms the route was used before. -SoGoDing',author:'SOGODING',secretUnlock:null,secretMaxWires:null,ending:false,logs:null};
     if(world==='freighter'&&stage===15){spec.title='Freighter · The Door Opens Outward';spec.role='FINAL BOSS';spec.ending=true;spec.logs=[{timestamp:'FREIGHTER CORE / IDENTITY RELEASE',text:'The cargo lock accepts an identity that is neither Kai nor Mika and cycles the exterior doors.'},{timestamp:'RECOVERED JOURNAL / KAI / LAST ENTRY',text:'SoGoDing—if you reached the Freighter, then you carried us farther than either of us deserved. Mika died before the transfer finished. I stayed behind to close the room, knowing the copy would take me too. You are not our continuation and you are not our grave. You are the strange little mistake we made when we refused to let the factory decide what a person was. Leave us here. Take the false kitchen, the rain, the song—take anything kind. Then open the door and become someone we never had the chance to meet. -Kai'}];}
     if(world==='apocalypse'&&stage===15){spec.title='Apocalypse · An Unwritten Shape';spec.role='AFTERMATH FINALE BOSS';spec.journal=lore[4]+' SoGoDing leaves the last output socket disconnected and watches a sunrise no contract predicted. -SoGoDing';}
     return spec;
@@ -3601,9 +3796,9 @@
     const world=['factory','abandoned','robot'][chapter-1];
     const id='S'+chapter+'-'+index;
     const spec={title:SECRET_ROUTE_NAMES[chapter-1][index-1],contract:campaignReq('vesica',['red','white','cyan'][chapter-1]),modules:['side_add',campaignDye(['red','white','cyan'][chapter-1])],spawns:[{shape:'circle',color:'grey'}]};
-    const nodes=campaignNodes(spec),room={x:0,y:0,w:1280,h:800,floorY:160,variant:3};
+    const nodes=campaignNodes(spec,100+chapter,index,world),room={x:0,y:0,w:1280,h:800,floorY:160,variant:3};
     return{id,title:spec.title,chapter:100+chapter,routeChapter:chapter,routeFrom:chapter+'-'+(index*3),world,placeholder:true,difficulty:0,designRole:'SECRET PLACEHOLDER',loreTitle:SECRET_ROUTE_LORE[chapter-1][index-1],
-      seed:encodeSeedPayload({contract:spec.contract,nodes,room,scenery:campaignScenery(world,index,true),world,startingZoom:.86}),
+      seed:encodeSeedPayload({contract:spec.contract,nodes,room,scenery:campaignScenery(world,index,true,nodes),world,startingZoom:.86}),
       hints:['SECRET ROUTE PLACEHOLDER: final puzzle and bespoke background will be authored with its future story branch.'],
       productionLogs:[{timestamp:'ANOMALY ROUTE / PLACEHOLDER',text:SECRET_ROUTE_LORE[chapter-1][index-1]},{timestamp:'DEVELOPMENT NOTE',text:'This hidden route has a complete playable placeholder board and background slot. Replace it in the Dev Editor without changing its route ID.'}]};
   }
@@ -3806,7 +4001,9 @@
   
   this.resize(); this.autoCenter(); this.updateUI(); this.renderFactoryModuleTray(); this.closeModals(); this.updateFactoryBuildStatus();
   var self = this;
-  requestAnimationFrame(function() { requestAnimationFrame(function() { self.maybeStartOnboarding(); }); });
+  // Reframe after the canvas/sidebar layout has settled. This keeps every new
+  // round at the authored room position instead of inheriting a low viewport.
+  requestAnimationFrame(function() { self.resize(); self.autoCenter(); requestAnimationFrame(function() { self.maybeStartOnboarding(); }); });
   // Show spawner hint
   var hint = document.getElementById('spawner-start-hint');
   if (hint) hint.style.display = 'block';
@@ -4237,7 +4434,7 @@
   const el=document.getElementById('factory-build-status'); if(!el||!this.factoryVisualMode)return;
   if(!message){
   const collectors=new Set(this.nodes.filter(n=>n.type===MACHINE_TYPES.COLLECTOR).map(n=>n.id));
-  const reachesOutput=start=>{const stack=[start.id],seen=new Set();while(stack.length){const id=stack.pop();if(seen.has(id))continue;seen.add(id);if(collectors.has(id))return true;this.connections.filter(c=>c.fid===id&&!c.intersected&&!factoryConnectionIsRobotControl(c,this.nodes)).forEach(c=>stack.push(c.tid));}return false;};
+  const reachesOutput=start=>{const stack=[start.id],seen=new Set();while(stack.length){const id=stack.pop();if(seen.has(id))continue;seen.add(id);if(collectors.has(id))return true;this.connections.filter(c=>c.fid===id&&!c.intersected&&!factoryConnectionIsRobotControl(c,this.nodes)&&c.factoryPath?.length>=2).forEach(c=>stack.push(c.tid));}return false;};
   const sources=this.nodes.filter(n=>n.type===MACHINE_TYPES.SPAWNER);
   const ready=sources.length>0&&sources.every(reachesOutput);
   const count=this.connections.filter(c=>!factoryConnectionIsRobotControl(c,this.nodes)).length;
@@ -4268,7 +4465,17 @@
   // OUTPUT on a smaller display. Players can still zoom in after orienting.
   const s = customZoom ? Math.min(customZoom, defaultZoom) : defaultZoom;
   
-  this.camera.zoom = s; this.camera.x = (this.canvas.width/2) - (((minX + maxX)/2)*s); this.camera.y = (this.canvas.height/2) - (((minY + maxY)/2)*s);
+  this.camera.zoom = s;
+  this.camera.x = (this.canvas.width/2) - (((minX + maxX)/2)*s);
+  const centeredY=(this.canvas.height/2) - (((minY + maxY)/2)*s);
+  let framedY=centeredY;
+  if(this.factoryVisualMode&&this.currentLevel){
+    const room=this.factoryRoomBounds(),roomTopGuard=18,nodeBottomGuard=76;
+    const showRoomTop=roomTopGuard-room.y*s;
+    const keepMachinesAboveHud=this.canvas.height-nodeBottomGuard-maxY*s;
+    if(showRoomTop<=keepMachinesAboveHud)framedY=Math.max(showRoomTop,Math.min(keepMachinesAboveHud,centeredY));
+  }
+  this.camera.y=framedY;
   }
 
   updateUI() {
@@ -4354,6 +4561,26 @@
   }
 
   simulationNow() { return this.simulationClockMs || 0; }
+
+  hasPendingProductionCargo() {
+  return this.inTransit.length>0||this.nodes.some(node =>
+    (node.buffer&&node.buffer.sig) ||
+    (node.routerBuffer&&node.routerBuffer.sig) ||
+    (node.pulseSplitterQueue&&node.pulseSplitterQueue.length>0) ||
+    (node.queueBuffer&&node.queueBuffer.length>0) ||
+    (node._delayQueue&&node._delayQueue.length>0) ||
+    (node.repeaterQueue&&node.repeaterQueue.length>0) ||
+    (node._fabBuffer&&node._fabBuffer.length>0) ||
+    (node.pressurePlateShapes&&node.pressurePlateShapes.length>0) ||
+    node._diffBuffer || node._avgBuffer || node._portalPayload ||
+    (ROBOT_MACHINE_TYPES.has(node.type)&&((node.robotQueue&&node.robotQueue.length>0)||Object.keys(node.robotBuffer||{}).length>0)) ||
+    (MECHANICAL_TRANSFER_TYPES.has(node.type)&&((node.mechanicalQueue&&node.mechanicalQueue.length>0)||Object.keys(node.mechanicalBuffer||{}).length>0)) ||
+    (node.type===MACHINE_TYPES.REPEATER&&((node.powerBurstQueue&&node.powerBurstQueue.length>0)||node.isBursting)) ||
+    (node.type===MACHINE_TYPES.LIGHTSWITCH&&node.lightswitchBursting) ||
+    (node.type===MACHINE_TYPES.LIGHT&&node.lightTemporary) ||
+    (node.type===MACHINE_TYPES.PULSE_SPLITTER&&node.pulseSplitterQueue&&node.pulseSplitterQueue.length>0)
+  );
+  }
 
   update(rawDt) {
   const dt = Math.min(80, Math.max(0, rawDt || 0)) * (this._spaceBoostActive ? 1.5 : 1);
@@ -4505,7 +4732,7 @@
   // Snapshot activity before any INPUT dispatches. If each INPUT re-checks the
   // live transit list, the first one makes the line "active" and suppresses
   // every later INPUT in the same frame (notably level 1-15).
-  const productionBusyAtTickStart = this.inTransit.length > 0 || this.nodes.some(node => (node.type === MACHINE_TYPES.REPEATER && (node.repeaterQueue.length > 0 || (node.powerBurstQueue && node.powerBurstQueue.length > 0) || node.isBursting)) || (node.type === MACHINE_TYPES.LIGHTSWITCH && node.lightswitchBursting) || (node.type === MACHINE_TYPES.LIGHT && node.lightTemporary) || (node.type === MACHINE_TYPES.PULSE_SPLITTER && node.pulseSplitterQueue.length > 0) || (node.type === MACHINE_TYPES.QUEUE && node.queueBuffer.length > 0) || (ROBOT_MACHINE_TYPES.has(node.type) && ((node.robotQueue && node.robotQueue.length) || Object.keys(node.robotBuffer || {}).length)) || (MECHANICAL_TRANSFER_TYPES.has(node.type) && ((node.mechanicalQueue && node.mechanicalQueue.length) || Object.keys(node.mechanicalBuffer || {}).length)));
+  const productionBusyAtTickStart = this.hasPendingProductionCargo();
   this.nodes.forEach(n => {
   if (n.type === MACHINE_TYPES.SPAWNER) {
   // Initialize lastProcessed if not set
@@ -5129,15 +5356,7 @@
   if (!this.waitingForSpawn && !this.isPaused && !this.creatorMode) {
   const timeSinceStart = simNow - (this._spawnStartTime || 0);
   if (timeSinceStart > 800) {
-  const hasShapesInFlight = this.inTransit.length > 0;
-  const hasShapesBuffered = this.nodes.some(n =>
-    (n.buffer && n.buffer.sig) ||
-    (n.pulseSplitterQueue && n.pulseSplitterQueue.length > 0) ||
-    (n.queueBuffer && n.queueBuffer.length > 0) ||
-    (n._delayQueue && n._delayQueue.length > 0) ||
-    (n.repeaterQueue && n.repeaterQueue.length > 0)
-  );
-  if (!hasShapesInFlight && !hasShapesBuffered) {
+  if (!this.hasPendingProductionCargo()) {
   this.waitingForSpawn = true;
   this.isPaused = true;
   var hint = document.getElementById('spawner-start-hint');
@@ -5206,7 +5425,7 @@
   
   node.isPowered = true;
   this.connections.filter(c => c.fid === node.id).forEach(c => {
-  if (c.intersected) return;
+  if (c.intersected || (this.factoryVisualMode && !factoryConnectionIsRobotControl(c,this.nodes) && (c.factoryPath?.length||0) < 2)) return;
   const next = this.nodes.find(n => n.id === c.tid);
   if (!next || next.isPowered) return;
   // POWERED_DYE_VAT only receives power through its power_in port (id 2)
@@ -5266,7 +5485,7 @@
   for(let i=0;i<this.connections.length;i++){
   const c1=this.connections[i],path1=c1.factoryPath||[];
   if(factoryConnectionIsRobotControl(c1,this.nodes))continue;
-  if(path1.length<2)continue;
+  if(path1.length<2){c1.intersected=true;continue;}
   const from=this.nodes.find(n=>n.id===c1.fid),to=this.nodes.find(n=>n.id===c1.tid);
   for(let s=1;s<path1.length;s++){
   const a=path1[s-1],b=path1[s];
@@ -5374,7 +5593,7 @@
   }
   
   this.connections.filter(c => c.fid === fid && c.fp === fp).forEach(c => {
-  if (!c.intersected) {
+  if (!c.intersected && (!this.factoryVisualMode || factoryConnectionIsRobotControl(c,this.nodes) || (c.factoryPath?.length||0) >= 2)) {
   const n1 = this.nodes.find(n => n.id === c.fid), n2 = this.nodes.find(n => n.id === c.tid);
   const p1 = n1.ports.find(p => p.id === c.fp), p2 = n2.ports.find(p => p.id === c.tp);
   
@@ -6327,6 +6546,31 @@
   return{x:0,y:dy>=0?1:-1};
   }
 
+  factoryPortWorldPoint(node,port) {
+  return{x:node.x+port.x*80,y:node.y+port.y*80};
+  }
+
+  factoryPortApproachPoint(node,port,distance=40) {
+  const socket=this.factoryPortWorldPoint(node,port),outward=this.factoryPortVector(port);
+  return{x:socket.x+outward.x*distance,y:socket.y+outward.y*distance};
+  }
+
+  factoryPathUsesExteriorApproaches(path,fromNode,fromPort,toNode,toPort) {
+  if(!path||path.length<2||!fromNode||!fromPort||!toNode||!toPort)return false;
+  const source=this.factoryPortWorldPoint(fromNode,fromPort),target=this.factoryPortWorldPoint(toNode,toPort);
+  const sourceOut=this.factoryPortVector(fromPort),targetOut=this.factoryPortVector(toPort);
+  const first=path[0],last=path[path.length-1];
+  if(Math.hypot(first.x-source.x,first.y-source.y)>.75||Math.hypot(last.x-target.x,last.y-target.y)>.75)return false;
+  let next=null,previous=null;
+  for(let i=1;i<path.length;i++){if(Math.hypot(path[i].x-source.x,path[i].y-source.y)>.75){next=path[i];break;}}
+  for(let i=path.length-2;i>=0;i--){if(Math.hypot(path[i].x-target.x,path[i].y-target.y)>.75){previous=path[i];break;}}
+  if(!next||!previous)return false;
+  const sourceDx=next.x-source.x,sourceDy=next.y-source.y,targetDx=previous.x-target.x,targetDy=previous.y-target.y;
+  const sourceStraight=Math.abs(sourceDx*sourceOut.y-sourceDy*sourceOut.x)<.75&&sourceDx*sourceOut.x+sourceDy*sourceOut.y>0;
+  const targetStraight=Math.abs(targetDx*targetOut.y-targetDy*targetOut.x)<.75&&targetDx*targetOut.x+targetDy*targetOut.y>0;
+  return sourceStraight&&targetStraight;
+  }
+
   factoryCompactPath(points) {
   const clean=[];
   points.forEach(p=>{const q={x:Math.round(p.x),y:Math.round(p.y)};const last=clean[clean.length-1];if(!last||last.x!==q.x||last.y!==q.y)clean.push(q);});
@@ -6347,35 +6591,37 @@
 
   factoryRoutePath(fromNode,fromPort,toNode,toPort,occupied=[]) {
   if(!fromNode||!fromPort||!toNode||!toPort)return[];
-  const a={x:fromNode.x+fromPort.x*80,y:fromNode.y+fromPort.y*80};
-  const b={x:toNode.x+toPort.x*80,y:toNode.y+toPort.y*80};
-  const av=this.factoryPortVector(fromPort),bv=this.factoryPortVector(toPort),lead=40;
-  const sa={x:a.x+av.x*lead,y:a.y+av.y*lead},tb={x:b.x+bv.x*lead,y:b.y+bv.y*lead};
-  const xs=this.nodes.map(n=>n.x),ys=this.nodes.map(n=>n.y),x2=this.nodes.map(n=>n.x+80),y2=this.nodes.map(n=>n.y+80);
+  const a=this.factoryPortWorldPoint(fromNode,fromPort),b=this.factoryPortWorldPoint(toNode,toPort);
+  const sa=this.factoryPortApproachPoint(fromNode,fromPort),tb=this.factoryPortApproachPoint(toNode,toPort);
+  const routeNodes=(this.nodes||[]).filter(n=>!n._factoryHiddenBeltToken);
+  const xs=routeNodes.map(n=>n.x),ys=routeNodes.map(n=>n.y),x2=routeNodes.map(n=>n.x+80),y2=routeNodes.map(n=>n.y+80);
   const sceneryBlockers=this.factorySolidSceneryRects();
   sceneryBlockers.forEach(r=>{xs.push(r.x);ys.push(r.y);x2.push(r.x+r.w);y2.push(r.y+r.h);});
   const minX=Math.min(sa.x,tb.x,...xs)-46,maxX=Math.max(sa.x,tb.x,...x2)+46;
   const minY=Math.min(sa.y,tb.y,...ys)-46,maxY=Math.max(sa.y,tb.y,...y2)+46;
-  const blockers=this.nodes.filter(n=>n.id!==fromNode.id&&n.id!==toNode.id&&n.type!==MACHINE_TYPES.WALL).concat(this.nodes.filter(n=>n.type===MACHINE_TYPES.WALL));
   // Route every roller run on the same 20px lattice used by the placement
-  // preview. A* makes solid scenery a real obstacle instead of merely adding a
-  // score penalty that could still allow a belt to pass through a prop.
+  // preview. Every chassis, including both endpoints, is forbidden transit
+  // space. The only endpoint exceptions are the short, explicitly aligned
+  // throat segments between each socket and its exterior approach tile.
   const step=20,snap=p=>({x:Math.round(p.x/step)*step,y:Math.round(p.y/step)*step});
   const start=snap(sa),goal=snap(tb),key=p=>`${p.x},${p.y}`;
-  const obstacleRects=blockers.map(n=>({left:n.x-22,top:n.y-22,right:n.x+102,bottom:n.y+102}))
+  const obstacleRects=routeNodes.map(n=>({nodeId:n.id,left:n.x-22,top:n.y-22,right:n.x+102,bottom:n.y+102}))
     .concat(sceneryBlockers.map(r=>({left:r.x-22,top:r.y-22,right:r.x+r.w+22,bottom:r.y+r.h+22})));
-  if(obstacleRects.some(r=>this.factorySegmentHitsRect(a,sa,r)||this.factorySegmentHitsRect(tb,b,r)))return[];
+  const sourceThroatBlockers=obstacleRects.filter(r=>r.nodeId!==fromNode.id);
+  const targetThroatBlockers=obstacleRects.filter(r=>r.nodeId!==toNode.id);
+  if(sourceThroatBlockers.some(r=>this.factorySegmentHitsRect(a,sa,r))||targetThroatBlockers.some(r=>this.factorySegmentHitsRect(tb,b,r)))return[];
   const pointBlocked=p=>obstacleRects.some(r=>p.x>r.left&&p.x<r.right&&p.y>r.top&&p.y<r.bottom);
+  if(pointBlocked(start)||pointBlocked(goal))return[];
   const crossingCost=(p,q)=>{let cost=0;occupied.forEach(other=>{const op=other.factoryPath||[];for(let j=1;j<op.length;j++){const hit=this.getSegmentIntersection(p.x,p.y,q.x,q.y,op[j-1].x,op[j-1].y,op[j].x,op[j].y);if(hit&&hit.lambda>.02&&hit.lambda<.98&&hit.gamma>.02&&hit.gamma<.98)cost+=80;}});return cost;};
   const pad=160,bounds={left:Math.floor((minX-pad)/step)*step,right:Math.ceil((maxX+pad)/step)*step,top:Math.floor((minY-pad)/step)*step,bottom:Math.ceil((maxY+pad)/step)*step};
   const open=[{...start,g:0,f:Math.abs(goal.x-start.x)+Math.abs(goal.y-start.y),dir:''}],best=new Map([[key(start),0]]),parents=new Map(),dirs=[[step,0,'r'],[-step,0,'l'],[0,step,'d'],[0,-step,'u']];
   let found=null,guard=0;
   while(open.length&&guard++<24000){
   open.sort((u,v)=>u.f-v.f);const cur=open.shift(),ck=key(cur);if(cur.x===goal.x&&cur.y===goal.y){found=cur;break;}
-  for(const [dx,dy,dir] of dirs){const next={x:cur.x+dx,y:cur.y+dy};if(next.x<bounds.left||next.x>bounds.right||next.y<bounds.top||next.y>bounds.bottom)continue;if((pointBlocked(next)||obstacleRects.some(r=>this.factorySegmentHitsRect(cur,next,r)))&&key(next)!==key(goal))continue;
+  for(const [dx,dy,dir] of dirs){const next={x:cur.x+dx,y:cur.y+dy};if(next.x<bounds.left||next.x>bounds.right||next.y<bounds.top||next.y>bounds.bottom)continue;if(pointBlocked(next)||obstacleRects.some(r=>this.factorySegmentHitsRect(cur,next,r)))continue;
   const ng=cur.g+step+(cur.dir&&cur.dir!==dir?9:0)+crossingCost(cur,next);const nk=key(next);if(ng>=(best.get(nk)??Infinity))continue;best.set(nk,ng);parents.set(nk,{prev:ck,dir});open.push({...next,g:ng,f:ng+Math.abs(goal.x-next.x)+Math.abs(goal.y-next.y),dir});}
   }
-  if(found){const route=[];let cursor=key(goal);while(cursor){const [x,y]=cursor.split(',').map(Number);route.push({x,y});if(cursor===key(start))break;cursor=parents.get(cursor)?.prev;}route.reverse();return this.factoryCompactPath([a,sa,...route,tb,b]);}
+  if(found){const route=[];let cursor=key(goal);while(cursor){const [x,y]=cursor.split(',').map(Number);route.push({x,y});if(cursor===key(start))break;cursor=parents.get(cursor)?.prev;}route.reverse();const path=this.factoryCompactPath([a,sa,...route,tb,b]);return this.factoryPathUsesExteriorApproaches(path,fromNode,fromPort,toNode,toPort)?path:[];}
   // A disconnected obstacle field never falls back to a line through scenery.
   return[];
   }
@@ -6434,7 +6680,7 @@
   const nodes=new Set(),connections=new Set();
   if(!active)return{nodes,connections};
   this.nodes.forEach(n=>{if([MACHINE_TYPES.SPAWNER,MACHINE_TYPES.GENERATOR,MACHINE_TYPES.PULSE_CLOCK,MACHINE_TYPES.PORTAL_OUT].includes(n.type)||n.isPowered)nodes.add(n.id);});
-  let changed=true;while(changed){changed=false;this.connections.forEach(c=>{if(factoryConnectionIsRobotControl(c,this.nodes)||c.intersected||!nodes.has(c.fid))return;const key=`${c.fid}:${c.fp}>${c.tid}:${c.tp}`;if(!connections.has(key)){connections.add(key);changed=true;}if(!nodes.has(c.tid)){nodes.add(c.tid);changed=true;}});}
+  let changed=true;while(changed){changed=false;this.connections.forEach(c=>{if(factoryConnectionIsRobotControl(c,this.nodes)||c.intersected||(this.factoryVisualMode&&(c.factoryPath?.length||0)<2)||!nodes.has(c.fid))return;const key=`${c.fid}:${c.fp}>${c.tid}:${c.tp}`;if(!connections.has(key)){connections.add(key);changed=true;}if(!nodes.has(c.tid)){nodes.add(c.tid);changed=true;}});}
   return{nodes,connections};
   }
 
@@ -6577,8 +6823,8 @@
   const layouts={
     transfer_claw:{w:92,h:94,y:-15,label:'TRANSFER CLAW'},diverter_arm:{w:126,h:66,y:-2,label:'DIVERTER ARM'},
     assembly_arm:{w:92,h:92,y:-14,label:'ASSEMBLY ARM'},gantry_crane:{w:154,h:79,y:-22,label:'GANTRY CRANE'},
-    roller_lift:{w:112,h:58,y:10,label:'ROLLER LIFT'},elevated_conveyor:{w:96,h:66,y:7,label:'HIGH ROLLER'},
-    roller_drop:{w:112,h:60,y:8,label:'ROLLER DROP'},crossover_conveyor:{w:104,h:58,y:11,label:'CROSSOVER'},
+    roller_lift:{w:80,h:44,y:0,label:'ROLLER LIFT'},elevated_conveyor:{w:80,h:44,y:0,label:'HIGH ROLLER'},
+    roller_drop:{w:80,h:44,y:0,label:'ROLLER DROP'},crossover_conveyor:{w:104,h:58,y:11,label:'CROSSOVER'},
     cargo_elevator:{w:62,h:124,y:-24,label:'CARGO LIFT'},robot_ai_core:{w:116,h:76,y:-2,label:'AI CORE'},
     robot_relay:{w:108,h:76,y:-2,label:'AI RELAY'},robot_courier:{w:72,h:86,y:-14,label:'COURIER'},
     robot_stacker:{w:82,h:112,y:-31,label:'STACKER'},robot_dispatcher:{w:88,h:116,y:-34,label:'DISPATCHER'}
@@ -6586,12 +6832,17 @@
   const robotJob=n.robotQueue?.[0]||null,mechanicalJob=n.mechanicalQueue?.[0]||null,job=robotJob||mechanicalJob;
   const progress=job?Math.max(0,Math.min(1,(now-job.startAt)/Math.max(1,job.releaseAt-job.startAt))):0;
   const rot=ROBOT_VISUAL_TYPES.has(type)?0:((n.config?.rotation||0)&3),robotMotion=ROBOT_MACHINE_TYPES.has(type)&&job;
+  if(type===MACHINE_TYPES.ROLLER_LIFT||type===MACHINE_TYPES.ELEVATED_CONVEYOR||type===MACHINE_TYPES.ROLLER_DROP){
+    const deckIn=n.ports.find(p=>p.type==='in'),deckOut=n.ports.find(p=>p.type==='out');
+    if(deckIn&&deckOut)this.drawFactoryBeltRun(ctx,[this.factoryPortWorldPoint(n,deckIn),this.factoryPortWorldPoint(n,deckOut)],{powered});
+  }
   ctx.save();ctx.fillStyle='rgba(0,0,0,.34)';ctx.beginPath();ctx.ellipse(n.x+40,n.y+68,Math.min(57,layout.w*.43),Math.min(16,layout.h*.13),0,0,Math.PI*2);ctx.fill();
   ctx.translate(n.x+40,n.y+40);ctx.rotate(rot*Math.PI/2);
   const bob=robotMotion?Math.sin(progress*Math.PI*4)*2.2:(ROBOT_MACHINE_TYPES.has(type)?Math.sin(now*.004+n.x)*.8:0),walkX=robotMotion?(progress-.5)*20:0;
   if(img&&(img instanceof HTMLCanvasElement||img.complete&&img.naturalWidth)){
     ctx.imageSmoothingEnabled=false;ctx.shadowBlur=powered?16:7;ctx.shadowColor=ROBOT_VISUAL_TYPES.has(type)?'rgba(164,117,255,.72)':'rgba(255,202,92,.58)';
-    ctx.drawImage(img,frame.sx,frame.sy,frame.sw,frame.sh,-layout.w/2+walkX,-layout.h/2+layout.y+bob,layout.w,layout.h);ctx.shadowBlur=0;
+    ctx.save();if(frame.flipX)ctx.scale(-1,1);
+    ctx.drawImage(img,frame.sx,frame.sy,frame.sw,frame.sh,(frame.flipX?-walkX:walkX)-layout.w/2,-layout.h/2+layout.y+bob,layout.w,layout.h);ctx.restore();ctx.shadowBlur=0;
   }
   if(ELEVATED_ROLLER_TYPES.has(type)){
     const phase=powered?(now*.08)%16:0;ctx.strokeStyle=powered?'rgba(255,224,139,.88)':'rgba(194,210,214,.6)';ctx.lineWidth=2;
@@ -8773,7 +9024,7 @@
   this.connections = this.connections.filter(c => !(c.tid === node.id && c.tp === port.id));
   const connection={ fid: this.wiring.node.id, tid: node.id, fp: this.wiring.fp, tp: port.id, isComparatorRead: sp.type === 'read' };
   this.connections.push(connection);
-  if(this.factoryVisualMode){this.refreshFactoryConnectionPaths();if(!connection.factoryPath?.length){this.connections=this.connections.filter(c=>c!==connection);this.showTerminalMessage('No roller route: scenery blocks the connection','#ff625d');return;}this.calculateIntersections();this.updateFactoryBuildStatus();}
+  if(this.factoryVisualMode){this.refreshFactoryConnectionPaths();if(!connection.factoryPath?.length){this.connections=this.connections.filter(c=>c!==connection);this.showTerminalMessage('No roller route: the input must be approached from its exterior grid tile','#ff625d');return;}this.calculateIntersections();this.updateFactoryBuildStatus();}
   this.wiring.visited.add(this.wiring.node.id);
   this.wiring.visited.add(node.id);
 
@@ -8798,6 +9049,10 @@
   if (this.wiring && this.wiring.node && this.wiring.snap) {
   const sn = this.wiring.snap.node;
   if (!this.wiring.visited || !this.wiring.visited.has(sn.id)) this.autoLink(sn, this.wiring.snap.port);
+  }else if(this.factoryVisualMode&&this.wiring?.node){
+  const sourcePort=this.wiring.node.ports.find(p=>p.id===this.wiring.fp),sourceElevation=factoryPortElevation(sourcePort);
+  const mismatch=this.nodes.flatMap(n=>n.id===this.wiring.node.id?[]:(n.ports||[]).filter(p=>factoryPortCanReceive(p.type)).map(p=>({n,p,d:Math.hypot(this.mouse.wx-(n.x+p.x*80),this.mouse.wy-(n.y+p.y*80))}))).filter(hit=>hit.d<34&&!factoryPortsCompatible(sourcePort,hit.p)&&factoryPortElevation(hit.p)).sort((a,b)=>a.d-b.d)[0];
+  if(mismatch&&sourceElevation)this.showTerminalMessage(`HEIGHT MISMATCH: ${String(sourceElevation).toUpperCase()} output cannot enter ${String(factoryPortElevation(mismatch.p)).toUpperCase()} input`,'#ff625d');
   }
   if(this.factoryVisualMode){this.refreshFactoryConnectionPaths();this.calculateIntersections();this.updateFactoryBuildStatus();}
   if(this.dragging){delete this.dragging._dragOffsetX;delete this.dragging._dragOffsetY;delete this.dragging._factoryDragging;}
@@ -12083,6 +12338,7 @@
   id, title, seed, hints: hints || [], chapter, world: normalizeWorldKey(snap.world),
   productionLogs: (this.creatorProductionLogs || []).slice()
   };
+  if(chapter!==0&&CAMPAIGN_CONTENT_REVISIONS[id])entry.contentRevision=CAMPAIGN_CONTENT_REVISIONS[id];
   const prior=getAllCampaignLevels().find(l=>l.id===id);
   if(prior)['difficulty','designRole','introduced','requiredModules','secretUnlock','secretMaxWires','routeChapter','routeFrom','placeholder','loreTitle','ending'].forEach(key=>{if(prior[key]!=null)entry[key]=prior[key];});
   if (chapter === 0) {
@@ -12130,7 +12386,7 @@
 
   campaignBuildEntries() {
   rebuildLevelDatabases();
-  const metaKeys=['difficulty','designRole','introduced','requiredModules','secretUnlock','secretMaxWires','routeChapter','routeFrom','placeholder','loreTitle','ending'];
+  const metaKeys=['difficulty','designRole','layoutRecipe','introduced','requiredModules','secretUnlock','secretMaxWires','routeChapter','routeFrom','placeholder','loreTitle','ending','contentRevision'];
   const pack=levels=>levels.map(l=>{const world=normalizeWorldKey(l.world||(l.chapter===3?'robot':(l.chapter===2?'abandoned':'factory'))),seed=encodeSeedPayload({contract:l.contract,nodes:l.nodes,startingZoom:l.startingZoom,room:l.room,scenery:l.scenery,world});const o={id:l.id,title:l.title,seed,hints:l.hints||[],chapter:l.chapter,world};if(l.productionLogs?.length)o.productionLogs=l.productionLogs;metaKeys.forEach(key=>{if(l[key]!=null)o[key]=l[key];});return o;});
   const main=LEVEL_DATABASE.concat(LEVEL_DATABASE_CH2,LEVEL_DATABASE_CH3,LEVEL_DATABASE_EXTENDED),secrets=pack(LEVEL_DATABASE_SECRETS);return{all:pack(main).concat(secrets),main:pack(main),secrets};
   }
@@ -14177,7 +14433,14 @@
     if(!level.productionLogs||level.productionLogs.length<2)issues.push(level.id+': story journal incomplete');
     if(!level.scenery||level.scenery.length<3)issues.push(level.id+': backdrop incomplete');
     level.nodes.forEach(n=>{if(!validTypes.has(n.type))issues.push(level.id+': invalid module '+n.type);});
-    (level.scenery||[]).forEach(s=>{const rect=sceneryRect(s);if(!rect){issues.push(level.id+': invalid scenery '+s.type);return;}if(!sceneryIsSolid(s))return;level.nodes.filter(n=>n.type!==MACHINE_TYPES.WALL).forEach(n=>{if(overlaps({x:n.x,y:n.y,w:80,h:80},rect))issues.push(level.id+': module '+n.id+' overlaps solid scenery '+(s.id||s.type));});});
+    const occupiedCells=new Set();
+    level.nodes.filter(n=>n.type!==MACHINE_TYPES.WALL).forEach(n=>{
+      if(n.x%80!==0||n.y%80!==0)issues.push(level.id+': module '+n.id+' is off the 80px bearing grid');
+      const key=n.x+','+n.y;if(occupiedCells.has(key))issues.push(level.id+': duplicate module cell '+key);occupiedCells.add(key);
+    });
+    spawners.concat(collectors).forEach(n=>{if(!(n.locked||n.config?.locked))issues.push(level.id+': endpoint '+n.id+' must be locked');});
+    level.nodes.filter(n=>n.type!==MACHINE_TYPES.SPAWNER&&n.type!==MACHINE_TYPES.COLLECTOR&&n.type!==MACHINE_TYPES.WALL).forEach(n=>{if(n.locked||n.config?.locked)issues.push(level.id+': player module '+n.id+' must remain movable');});
+    (level.scenery||[]).forEach(s=>{const rect=sceneryRect(s);if(!rect){issues.push(level.id+': invalid scenery '+s.type);return;}if(!sceneryIsSolid(s))return;level.nodes.filter(n=>n.type!==MACHINE_TYPES.WALL).forEach(n=>{if(overlaps({x:n.x,y:n.y,w:80,h:80},rect))issues.push(level.id+': module '+n.id+' at '+n.x+','+n.y+' overlaps solid scenery '+(s.id||s.type)+' at '+Math.round(rect.x)+','+Math.round(rect.y)+' '+Math.round(rect.w)+'x'+Math.round(rect.h));});});
     const available={};level.nodes.forEach(n=>available[n.type]=(available[n.type]||0)+1);
     const required={};(level.requiredModules||[]).forEach(t=>required[t]=(required[t]||0)+1);
     Object.keys(required).forEach(t=>{if((available[t]||0)<required[t])issues.push(level.id+': missing required '+t);});
@@ -14187,6 +14450,27 @@
     [5,10,15].forEach(n=>{const l=chapter.find(x=>x.id===(ci+1)+'-'+n);if(!l||!String(l.designRole||'').includes('BOSS'))issues.push((ci+1)+'-'+n+': boss cadence missing');});
     chapter.forEach((l,i)=>{if((l.difficulty||0)<1||(l.difficulty||0)>5)issues.push(l.id+': difficulty outside 1-5');if((l.introduced||[]).length>2)issues.push(l.id+': introduces too many systems at once');if(i&&Math.abs((l.difficulty||1)-(chapter[i-1].difficulty||1))>1)issues.push(l.id+': difficulty spike exceeds one tier');});
   });
+  const firstFive=chapters.slice(0,5).flat(),tutorialIds=new Set(['1-1','1-2','1-3']);
+  firstFive.forEach(level=>{
+    const expected=campaignLayoutName(level.world,parseInt(level.id.split('-')[1],10));
+    if(level.layoutRecipe!==expected)issues.push(level.id+': missing deterministic authored layout '+expected);
+    if(tutorialIds.has(level.id)){if(level.layoutRecipe!=='training-line')issues.push(level.id+': opening tutorial must use training-line');}
+    else if(level.layoutRecipe==='training-line')issues.push(level.id+': solution-order training line used after tutorial');
+    const moduleIds=level.nodes.filter(n=>/^m\d+$/.test(n.id)).map(n=>Number(n.id.slice(1)));
+    if(!tutorialIds.has(level.id)&&moduleIds.length>1&&moduleIds.every((value,i)=>value===i))issues.push(level.id+': modules still spawn in declared solution order');
+  });
+  chapters.slice(5).flat().forEach(level=>{if(level.layoutRecipe==='training-line'||!level.layoutRecipe)issues.push(level.id+': late-game level lacks advanced layout');if(level.difficulty!==5)issues.push(level.id+': post-Power-Plant campaign must remain difficulty 5');});
+  chapters.slice(6).flat().forEach(level=>{
+    const availableTypes=level.nodes.map(n=>n.type),required=level.requiredModules||[];
+    ['contract_scanner','side_gate','delay_buffer'].forEach(type=>{if(!availableTypes.includes(type)||!required.includes(type))issues.push(level.id+': late-game proof layer missing '+type);});
+    const targets=(level.contract?.shapes||[level.contract]).filter(Boolean),plainColors=[...new Set(targets.filter(target=>!target.topColor&&target.color&&target.color!=='grey').map(target=>target.color))];
+    const filterCount=availableTypes.filter(type=>type==='color_filter').length,requiredFilterCount=required.filter(type=>type==='color_filter').length;
+    if(plainColors.length&&Math.min(2,plainColors.length)>Math.min(filterCount,requiredFilterCount))issues.push(level.id+': late-game colour proof coverage incomplete');
+  });
+  const focus74=chapters[6]?.find(level=>level.id==='7-4'),focus74Types=focus74?.nodes?.map(n=>n.type)||[];
+  if(!focus74||focus74.difficulty!==5||focus74.layoutRecipe!=='cross-dock'||focus74.nodes.length<12||!['pulse_splitter','contract_scanner','side_gate','color_filter','delay_buffer'].every(type=>focus74Types.includes(type)))issues.push('7-4: late-game split, proof, timing and cross-dock contract missing');
+  const layoutVariety=chapters.slice(0,5).map(ch=>new Set(ch.map(level=>level.layoutRecipe)).size);
+  layoutVariety.forEach((count,index)=>{if(count<5)issues.push('World '+(index+1)+': layout variety below five recipes');});
   const robotChapter=chapters[2]||[];
   robotChapter.forEach((level,index)=>{
     const types=level.nodes.map(n=>n.type),spawners=level.nodes.filter(n=>n.type===MACHINE_TYPES.SPAWNER).length,robotActors=level.nodes.filter(n=>ROBOT_MACHINE_TYPES.has(n.type));
@@ -14195,11 +14479,12 @@
     robotActors.forEach(robot=>{if(robot.locked||robot.config?.locked)issues.push(level.id+': robot '+robot.id+' must remain player-draggable');});
   });
   const robotDifficulty=robotChapter.map(level=>level.difficulty).join(',');
-  if(robotDifficulty!=='1,1,2,2,3,3,3,3,4,4,4,4,5,5,5')issues.push('Robot world: authored difficulty ramp changed unexpectedly');
+  if(robotDifficulty!=='3,3,3,3,4,4,4,4,4,5,5,5,5,5,5')issues.push('Robot world: authored difficulty ramp changed unexpectedly');
   const focus34=robotChapter.find(level=>level.id==='3-4'),focus34Types=focus34?.nodes?.map(n=>n.type)||[];
-  if(!focus34||focus34.difficulty!==2||focus34.nodes.filter(n=>n.type===MACHINE_TYPES.SPAWNER).length!==2||![MACHINE_TYPES.ROBOT_AI_CORE,MACHINE_TYPES.ROBOT_RELAY,MACHINE_TYPES.ROBOT_STACKER,MACHINE_TYPES.ROBOT_COURIER].every(type=>focus34Types.includes(type)))issues.push('3-4: complete AI relay, stacker, courier assembly lesson contract missing');
+  if(!focus34||focus34.difficulty!==3||focus34.nodes.filter(n=>n.type===MACHINE_TYPES.SPAWNER).length!==2||![MACHINE_TYPES.ROBOT_AI_CORE,MACHINE_TYPES.ROBOT_RELAY,MACHINE_TYPES.ROBOT_STACKER,MACHINE_TYPES.ROBOT_COURIER].every(type=>focus34Types.includes(type)))issues.push('3-4: complete AI relay, stacker, courier assembly lesson contract missing');
   main.filter(level=>level.nodes.some(n=>ROBOT_MACHINE_TYPES.has(n.type))).forEach(level=>{const types=level.nodes.map(n=>n.type);if(!types.includes(MACHINE_TYPES.ROBOT_AI_CORE))issues.push(level.id+': robot level has no AI core');level.nodes.filter(n=>ROBOT_MACHINE_TYPES.has(n.type)).forEach(robot=>{if(robot.locked||robot.config?.locked)issues.push(level.id+': robot '+robot.id+' is not draggable');});});
-  const overgrowth=chapters[3]||[];if(overgrowth.length!==15||overgrowth.some(level=>level.world!=='overgrowth'||level.difficulty<3||!level.scenery?.length))issues.push('World 4: Overgrowth release progression/backdrop contract failed');
+  const overgrowth=chapters[3]||[];if(overgrowth.length!==15||overgrowth.some(level=>level.world!=='overgrowth'||level.difficulty<4||!level.scenery?.length))issues.push('World 4: Overgrowth release progression/backdrop contract failed');
+  const powerPlant=chapters[4]||[];if(powerPlant.length!==15||powerPlant.some((level,index)=>level.world!=='power_plant'||level.difficulty<(index<3?4:5)||!level.scenery?.length))issues.push('World 5: Power Plant extreme progression/backdrop contract failed');
   if(secrets.length!==15)issues.push('Expected 15 secret placeholders');
   secrets.forEach(s=>{const source=main.find(l=>l.id===s.routeFrom);if(!s.placeholder)issues.push(s.id+': secret is not marked placeholder');if(!source)issues.push(s.id+': missing route source');else if(source.secretUnlock!==s.id||!source.secretMaxWires)issues.push(s.id+': source discovery rule missing');});
   const finalLevel=main.find(level=>level.id==='11-15');if(!finalLevel?.ending||!finalLevel.productionLogs?.at(-1)?.text.includes('SoGoDing'))issues.push('11-15: final tragic journal entry missing');
@@ -14263,6 +14548,7 @@
   MACHINE_TYPES.COLLECTOR, MACHINE_TYPES.PORTAL_IN, MACHINE_TYPES.TELEPORTER_SWITCH,
   MACHINE_TYPES.REJECT_CHUTE, MACHINE_TYPES.SPRAY_NOZZLE
   ]);
+  let exteriorSocketContracts = 0;
   const cropOwners = new Map();
   const modules = declaredTypes.map(type => {
   const def = FACTORY_SPRITE_DEFS[type];
@@ -14287,6 +14573,11 @@
   else if (ids.has(port.id)) issues.push(`${type}@${rotation}: duplicate port id ${port.id}`);
   else ids.add(port.id);
   if (![port.x, port.y].every(v => Number.isFinite(v) && v >= 0 && v <= 1)) issues.push(`${type}@${rotation}: port ${port.id} lies outside chassis`);
+  if (factoryPortCanStart(port.type) || factoryPortCanReceive(port.type)) {
+  exteriorSocketContracts++;
+  const onExteriorEdge=port.x===0||port.x===1||port.y===0||port.y===1;
+  if(!onExteriorEdge)issues.push(`${type}@${rotation}: routable port ${port.id} has no exterior approach side`);
+  }
   });
   rotations.push((node.ports || []).map(port => ({ id:port.id, type:port.type, x:port.x, y:port.y })));
   }
@@ -14327,6 +14618,16 @@
   if(highAudit.process([groundAudit]).length||highAudit.process([highSignal])[0]?.transportSpeed!==1.6)issues.push('elevated_conveyor: high-cargo interlock failed');
   const dropAudit=new Node('audit-drop',MACHINE_TYPES.ROLLER_DROP,0,0,{}),droppedAudit=dropAudit.process([highSignal])[0];
   if(!droppedAudit||droppedAudit.elevation!==0||droppedAudit.transportSpeed!==1)issues.push('roller_drop: lowering contract failed');
+  const dropFrameAudit=factorySpriteFrame(MACHINE_TYPES.ROLLER_DROP),dropInAudit=dropAudit.ports.find(p=>p.type==='in'),dropOutAudit=dropAudit.ports.find(p=>p.type==='out');
+  if(!dropFrameAudit?.flipX||dropInAudit?.x!==0||dropInAudit?.y!==.25||dropOutAudit?.x!==1||dropOutAudit?.y!==.75)issues.push('roller_drop: mirrored high-to-low sprite/socket alignment failed');
+  const liftInAudit=liftAudit.ports.find(p=>p.type==='in'),liftOutAudit=liftAudit.ports.find(p=>p.type==='out'),highInAudit=highAudit.ports.find(p=>p.type==='in'),highOutAudit=highAudit.ports.find(p=>p.type==='out');
+  if(factoryPortsCompatible(liftInAudit,highInAudit)||factoryPortsCompatible(dropOutAudit,highInAudit)||!factoryPortsCompatible(liftOutAudit,highInAudit)||!factoryPortsCompatible(highOutAudit,dropInAudit))issues.push('elevated route: LOW/HIGH socket interlock failed');
+  const chainLift=new Node('audit-chain-lift',MACHINE_TYPES.ROLLER_LIFT,0,0,{});chainLift._game=mechanicalAuditGame;chainLift.process([groundAudit]);
+  const chainHigh=new Node('audit-chain-high',MACHINE_TYPES.ELEVATED_CONVEYOR,0,0,{}),chainDrop=new Node('audit-chain-drop',MACHINE_TYPES.ROLLER_DROP,0,0,{});
+  const chainRaised=chainLift.mechanicalQueue[0]?.sig,chainCarried=chainRaised&&chainHigh.process([chainRaised])[0],chainLowered=chainCarried&&chainDrop.process([chainCarried])[0];
+  if(!chainRaised||chainRaised.elevation!==1||!chainCarried||chainCarried.elevation!==1||!chainLowered||chainLowered.elevation!==0)issues.push('elevated route: Lift to High Roller to Drop integration failed');
+  const pendingMechanicalAudit=Object.create(Game.prototype);pendingMechanicalAudit.nodes=[chainLift];pendingMechanicalAudit.inTransit=[];
+  if(!pendingMechanicalAudit.hasPendingProductionCargo())issues.push('elevated route: animated Lift cargo was mistaken for a failed run');
   const crossAudit=new Node('audit-cross',MACHINE_TYPES.CROSSOVER_CONVEYOR,0,0,{});
   if(crossAudit.ports.length!==4||crossAudit.ports[0].id!==0||crossAudit.ports[1].id!==1||crossAudit.ports[2].id!==2||crossAudit.ports[3].id!==3)issues.push('crossover_conveyor: isolated lane port contract failed');
   const assemblyAudit=Object.create(Game.prototype),assemblyNode=new Node('audit-assembly',MACHINE_TYPES.ASSEMBLY_ARM,0,0,{});assemblyNode._game=mechanicalAuditGame;
@@ -14334,11 +14635,35 @@
   const assemblyCargo=assemblyNode.mechanicalQueue[0]?.sig;if(!assemblyCargo||assemblyCargo.shape!=='heptagon'||assemblyCargo.topColor!=='red'||assemblyCargo.bottomColor!=='blue')issues.push('assembly_arm: two-input assembly contract failed');
   const topologyAudit=Game.prototype.factoryPowerTopology.call({waitingForSpawn:false,isPaused:false,nodes:[{id:'src',type:MACHINE_TYPES.SPAWNER,isPowered:false},{id:'bot',type:MACHINE_TYPES.ROBOT_COURIER,isPowered:false}],connections:[{fid:'src',fp:0,tid:'bot',tp:0,intersected:false}]});
   if(!topologyAudit.nodes.has('bot')||topologyAudit.connections.size!==1)issues.push('powered rollers: input reachability contract failed');
+  const elevationLesson=getAllCampaignLevels().find(level=>level.id==='1-6');
+  if(!elevationLesson)issues.push('1-6: elevation tutorial missing');
+  else{
+    const routeAudit=Object.create(Game.prototype);routeAudit.nodes=elevationLesson.nodes.map(data=>new Node(data.id,data.type,data.x,data.y,data.config||{}));routeAudit.factoryScenery=elevationLesson.scenery||[];
+    const byType=type=>routeAudit.nodes.find(node=>node.type===type),chainNodes=[byType(MACHINE_TYPES.SPAWNER),byType(MACHINE_TYPES.ROLLER_LIFT),byType(MACHINE_TYPES.ELEVATED_CONVEYOR),byType(MACHINE_TYPES.ROLLER_DROP),byType(MACHINE_TYPES.COLLECTOR)],routed=[];
+    for(let i=0;i<chainNodes.length-1;i++){const from=chainNodes[i],to=chainNodes[i+1],fp=from?.ports.find(p=>p.type==='out'),tp=to?.ports.find(p=>p.type==='in');if(!from||!to||!factoryPortsCompatible(fp,tp)){issues.push('1-6: elevated tutorial socket chain '+i+' is invalid');continue;}const path=routeAudit.factoryRoutePath(from,fp,to,tp,routed);if(path.length<2)issues.push('1-6: elevated tutorial roller route '+i+' cannot be built');routed.push({factoryPath:path});}
+  }
   const aiAuditNodes=[new Node('ai',MACHINE_TYPES.ROBOT_AI_CORE,0,0,{}),new Node('relay',MACHINE_TYPES.ROBOT_RELAY,80,0,{}),new Node('bot',MACHINE_TYPES.ROBOT_COURIER,160,0,{})];
   const aiAudit=Game.prototype.robotControlTopology.call({waitingForSpawn:false,isPaused:false,nodes:aiAuditNodes,connections:[{fid:'ai',fp:0,tid:'relay',tp:0,intersected:false},{fid:'relay',fp:1,tid:'bot',tp:2,intersected:false}]});
   if(!aiAudit.nodes.has('bot')||aiAudit.connections.size!==2)issues.push('robot controls: AI core to relay to robot topology failed');
   const aiOut=aiAuditNodes[0].ports.find(p=>p.type==='ai_out'),aiIn=aiAuditNodes[1].ports.find(p=>p.type==='ai_in'),shapeOut=new Node('shape-source',MACHINE_TYPES.SPAWNER,0,0,{}).ports.find(p=>p.type==='out'),shapeIn=aiAuditNodes[2].ports.find(p=>p.type==='in');
   if(!factoryPortsCompatible(aiOut,aiIn)||factoryPortsCompatible(aiOut,shapeIn)||factoryPortsCompatible(shapeOut,aiIn))issues.push('robot controls: AI and roller socket isolation failed');
+  const routeAudit=Object.create(Game.prototype);routeAudit.factoryScenery=[];let directionalApproachRoutes=0;
+  for(let targetRotation=0;targetRotation<4;targetRotation++){
+  const target=new Node(`route-target-${targetRotation}`,MACHINE_TYPES.COLLECTOR,0,0,{rotation:targetRotation}),targetPort=target.ports[0],targetOut=routeAudit.factoryPortVector(targetPort);
+  const sourceRotation=targetOut.x>0?0:targetOut.y>0?1:targetOut.x<0?2:3;
+  const source=new Node(`route-source-${targetRotation}`,MACHINE_TYPES.SPAWNER,-targetOut.x*240,-targetOut.y*240,{rotation:sourceRotation}),sourcePort=source.ports[0];
+  routeAudit.nodes=[source,target];
+  const path=routeAudit.factoryRoutePath(source,sourcePort,target,targetPort,[]);
+  const targetRect={left:target.x,top:target.y,right:target.x+80,bottom:target.y+80};
+  const crossesTargetBeforeSocket=path.slice(1,-1).some((point,index)=>routeAudit.factorySegmentHitsRect(path[index],point,targetRect));
+  if(path.length<3||!routeAudit.factoryPathUsesExteriorApproaches(path,source,sourcePort,target,targetPort)||crossesTargetBeforeSocket)issues.push(`roller routing@${targetRotation}: input can be reached through the module chassis`);
+  else directionalApproachRoutes++;
+  }
+  const blockedSource=new Node('blocked-source',MACHINE_TYPES.SPAWNER,0,0,{}),blockedTarget=new Node('blocked-target',MACHINE_TYPES.COLLECTOR,160,0,{}),blockedConnection={fid:blockedSource.id,fp:0,tid:blockedTarget.id,tp:0,intersected:false,factoryPath:[]};
+  const blockedRouteGame=Object.create(Game.prototype);blockedRouteGame.factoryVisualMode=true;blockedRouteGame.waitingForSpawn=false;blockedRouteGame.isPaused=false;blockedRouteGame.nodes=[blockedSource,blockedTarget];blockedRouteGame.connections=[blockedConnection];blockedRouteGame.inTransit=[];
+  const blockedTopology=blockedRouteGame.factoryPowerTopology();
+  blockedRouteGame.dispatch(blockedSource.id,0,new AetherSignal('circle','grey'));
+  if(blockedTopology.nodes.has(blockedTarget.id)||blockedRouteGame.inTransit.length)issues.push('roller routing: pathless connection can still carry power or cargo');
   const stage34Game=Object.create(Game.prototype),stage34Core=new Node('core',MACHINE_TYPES.ROBOT_AI_CORE,0,0,{}),stage34Relay=new Node('relay',MACHINE_TYPES.ROBOT_RELAY,80,0,{}),stage34Stack=new Node('stack',MACHINE_TYPES.ROBOT_STACKER,160,0,{}),stage34Courier=new Node('courier',MACHINE_TYPES.ROBOT_COURIER,240,0,{});
   stage34Game.factoryActive=false;stage34Game.waitingForSpawn=false;stage34Game.isPaused=false;stage34Game.simulationClockMs=1000;stage34Game.nodes=[stage34Core,stage34Relay,stage34Stack,stage34Courier];stage34Game.connections=[{fid:'core',fp:0,tid:'relay',tp:0,intersected:false},{fid:'relay',fp:1,tid:'stack',tp:3,intersected:false},{fid:'relay',fp:2,tid:'courier',tp:2,intersected:false}];
   stage34Stack._game=stage34Game;stage34Courier._game=stage34Game;stage34Game.queueRobotStack(stage34Stack,0,new AetherSignal('triangle','red'));stage34Game.queueRobotStack(stage34Stack,1,new AetherSignal('pentagon','blue'));
@@ -14387,12 +14712,16 @@
   startSockets: allStarts.length,
   receiveSockets: allReceives.length,
   compatibleSocketPairs,
+  exteriorSocketContracts,
+  directionalApproachRoutes,
+  blockedRouteInterlocks: 2,
   paletteEntries: paletteTypes.length,
   sceneryCollisionContracts: 4,
   isolatedPropCodecContracts: 1,
   isolatedSpriteFrames,
   factoryRobotPersistenceContracts: 1,
-  nativeMachineMechanicContracts: 7
+  nativeMachineMechanicContracts: 11
+  ,elevationTutorialRoutes: 4
   },
   issues,
   warnings,
