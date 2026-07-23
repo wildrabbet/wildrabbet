@@ -1987,17 +1987,21 @@
   const WORLD_SHEET_MAP = Object.fromEntries(WORLD_ASSET_SHEETS.map(sheet=>[sheet.id,sheet]));
   const WORLD_SHEET_INDEX = Object.fromEntries(WORLD_ASSET_SHEETS.map((sheet,index)=>[sheet.id,index]));
   const WORLD_SHEET_IMAGES = {};
-  WORLD_ASSET_SHEETS.forEach(sheet=>{const img=new Image();img.src=sheet.src;WORLD_SHEET_IMAGES[sheet.id]=img;});
+  function worldSheetImage(sheetId){
+    const sheet=WORLD_SHEET_MAP[sheetId];if(!sheet)return null;
+    if(!WORLD_SHEET_IMAGES[sheetId]){const img=new Image();img.decoding='async';img.src=sheet.src;WORLD_SHEET_IMAGES[sheetId]=img;}
+    return WORLD_SHEET_IMAGES[sheetId];
+  }
   const WORLD_PRESET_SIZES = [{id:'compact',w:800,h:640,wall:160},{id:'standard',w:1200,h:800,wall:160},{id:'wide',w:1600,h:800,wall:160},{id:'grand',w:1920,h:1120,wall:160}];
   function normalizeWorldKey(key){return WORLD_REGISTRY[key]?key:'factory';}
   function worldRoomPresets(key){const world=WORLD_REGISTRY[normalizeWorldKey(key)];return WORLD_PRESET_SIZES.map((p,i)=>({...p,name:world.presetNames[i],variant:i}));}
   function worldSheets(key){return WORLD_ASSET_SHEETS.filter(sheet=>sheet.world===normalizeWorldKey(key));}
   function makeWorldAssetType(sheetId,col,row,cols=1,rows=1){return `asset|${sheetId}|${col}|${row}|${cols}|${rows}`;}
   function parseWorldAssetType(type){const p=String(type||'').split('|');if(p[0]!=='asset'||!WORLD_SHEET_MAP[p[1]])return null;const sheet=WORLD_SHEET_MAP[p[1]],col=Math.max(0,Math.min(sheet.cols-1,Number(p[2])||0)),row=Math.max(0,Math.min(sheet.rows-1,Number(p[3])||0)),cols=Math.max(1,Math.min(sheet.cols-col,Number(p[4])||1)),rows=Math.max(1,Math.min(sheet.rows-row,Number(p[5])||1));return{sheet,col,row,cols,rows};}
-  function resolveSceneryDef(type){
+  function resolveSceneryDef(type,loadImage=false){
   const legacy=FACTORY_SCENERY_MAP[type];if(legacy)return{...legacy,img:FACTORY_ATLASES[legacy.atlas]};
   const asset=parseWorldAssetType(type);if(!asset)return null;const {sheet,col,row,cols,rows}=asset;
-  return{id:type,name:`${sheet.label} · R${String(row+1).padStart(2,'0')} C${String(col+1).padStart(2,'0')} · ${cols}×${rows}`,category:sheet.pack,sx:col*48,sy:row*48,sw:cols*48,sh:rows*48,w:cols*48,h:rows*48,img:WORLD_SHEET_IMAGES[sheet.id],sheet};
+  return{id:type,name:`${sheet.label} · R${String(row+1).padStart(2,'0')} C${String(col+1).padStart(2,'0')} · ${cols}×${rows}`,category:sheet.pack,sx:col*48,sy:row*48,sw:cols*48,sh:rows*48,w:cols*48,h:rows*48,img:loadImage?worldSheetImage(sheet.id):null,sheet};
   }
   function sceneryTypeIsValid(type){return !!resolveSceneryDef(type);}
   function sceneryDefaultSolid(type){const def=resolveSceneryDef(type);return !!def&&!['Floors','Lighting'].includes(def.category);}
@@ -8096,14 +8100,14 @@
   }
 
   drawFactoryScenery(ctx,scenery) {
-  (scenery||[]).forEach(item=>{const def=resolveSceneryDef(item.type),img=def?.img;if(!def||!img||!img.complete||!img.naturalWidth)return;const scale=Math.max(.3,Math.min(3,Number(item.scale)||1)),w=def.w*scale,h=def.h*scale;ctx.save();ctx.translate(Number(item.x)||0,Number(item.y)||0);ctx.rotate(((item.rotation||0)&3)*Math.PI/2);ctx.imageSmoothingEnabled=false;ctx.drawImage(img,def.sx,def.sy,def.sw,def.sh,-w/2,-h/2,w,h);ctx.restore();});
+  (scenery||[]).forEach(item=>{const def=resolveSceneryDef(item.type,true),img=def?.img;if(!def||!img||!img.complete||!img.naturalWidth)return;const scale=Math.max(.3,Math.min(3,Number(item.scale)||1)),w=def.w*scale,h=def.h*scale;ctx.save();ctx.translate(Number(item.x)||0,Number(item.y)||0);ctx.rotate(((item.rotation||0)&3)*Math.PI/2);ctx.imageSmoothingEnabled=false;ctx.drawImage(img,def.sx,def.sy,def.sw,def.sh,-w/2,-h/2,w,h);ctx.restore();});
   }
 
   drawFactoryRoom(ctx,roomOverride=null,sceneryOverride=null,cameraOverride=null,canvasOverride=null,worldOverride=null) {
   const room=normalizeFactoryRoom(roomOverride||this.factoryRoomBounds(),this.nodes||[]),camera=cameraOverride||this.camera,canvas=canvasOverride||this.canvas,zoom=camera.zoom||1;
   const worldKey=normalizeWorldKey(worldOverride||(this.creatorMode&&!this.creatorPlayMode?this.creatorWorld:null)||this.currentWorld||this.currentLevel?.world),theme=WORLD_REGISTRY[worldKey];
   const vx=-camera.x/zoom,vy=-camera.y/zoom,vw=canvas.width/zoom,vh=canvas.height/zoom,wallH=Math.max(80,room.floorY-room.y);
-  const signature=worldSheets(worldKey).find(s=>!/Auto-tile/i.test(s.file))||worldSheets(worldKey)[0],signatureImg=signature&&WORLD_SHEET_IMAGES[signature.id];
+  const signature=worldSheets(worldKey).find(s=>!/Auto-tile/i.test(s.file))||worldSheets(worldKey)[0],signatureImg=signature&&worldSheetImage(signature.id);
   ctx.save();
   ctx.fillStyle=theme.bg;ctx.fillRect(vx-120,vy-120,vw+240,vh+240);
   // World-specific atmosphere outside the authored room.
