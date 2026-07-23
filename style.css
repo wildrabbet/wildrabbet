@@ -4685,11 +4685,11 @@ body.ub-zoomed.page-infinityzoom{
   color:#eee; padding:8px 10px; font:inherit;
 }
 .gpt-foot{ margin-top:8px; font-size:11px; opacity:.55; }
-.gpt-paywall{
+.gpt-naptime{
   margin-top:10px; padding:12px; border-radius:8px;
   background:#2a1010; border:1px solid #833; text-align:center;
 }
-.gpt-wallet{
+.gpt-carrot{
   display:block; margin:8px 0; padding:8px; border-radius:6px;
   background:#0d0d0d; word-break:break-all; font-size:11px; color:#f5d76e;
 }

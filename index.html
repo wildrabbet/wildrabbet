@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://upload.wikimedia.org https://*.wikimedia.org; connect-src 'self' https://en.wikipedia.org; frame-src https://www.youtube.com; media-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" />
+  <meta name="referrer" content="no-referrer" />
   <title>wildrabbet</title>
   <meta name="description" content="wildrabbet — weird little web things made for fun" />
   <link rel="stylesheet" href="./style.css" />
@@ -53,7 +55,7 @@
             <span class="statPill comboPill" id="comboPill" hidden>combo x1</span>
             <span class="statPill cpsPill" id="cpsPill" hidden>0.0/s</span>
             <span class="statPill" id="myClicks">you: 0</span>
-            <span class="statPill totalPill" id="totalClicks">everyone: 0</span>
+            <span class="statPill totalPill" id="totalClicks">this browser: 0</span>
           </div>
         </div>
       <div class="heroRight" id="toyBox" aria-label="Useless box playground" tabindex="0">
@@ -371,8 +373,8 @@
         // OS / chat popups
         "discord", "skype", "mac alert", "win popup", "imessage", "teams",
         // meme / ads / cursors
-        "HD loading", "hot singles", "enlarge", "one weird trick", "free iPhone",
-        "Nigerian prince", "clickbait", "rickroll", "among us", "gigachad",
+        "HD loading", "rabbit meetup", "zoom joke", "rabbit headline", "confetti party",
+        "royal rabbit", "clickbait", "rickroll", "among us", "gigachad",
         "sigma", "NPC", "touch grass", "ratio", "brainrot", "this is fine",
         "press F", "all your base", "loss", "skibidi", "Ohio", "rizz",
         "MrBeast", "VBucks", "task failed", "D scimmy", "AGS", "fire cursor",
@@ -390,143 +392,31 @@
       const totalClicksEl = document.getElementById('totalClicks');
       const gravBall = document.getElementById('gravBall');
 
-      // ===== GLOBAL COUNTER via Abacus API =====
-      // Rate limit: 30 req / 10 sec per IP
-      // Strategy: PARALLEL BURST
-      //   1. Clicks accumulate instantly (localStorage)
-      //   2. After 1s of no clicking → fire ALL pending as parallel /hit calls
-      //      (up to 25 at once, leaving 5 headroom in the 30/10s limit)
-      //   3. All 25 parallel requests finish in ~one RTT (~200ms)
-      //   4. If any 429, wait and retry remainder
-
-      const ABACUS = 'https://abacus.jasoncameron.dev';
-      const NS = 'rabbit.lol';
-      const KEY = 'uselessbox-v2';
-      const BURST_MAX = 25; // max parallel hits per burst (30 limit - 5 headroom)
+      // ===== PRIVATE LOCAL COUNTER =====
+      // Counts stay in this browser. The homepage makes no tracking or counter
+      // requests to third-party services.
 
       function renderCounts() {
         myClicksEl.textContent = `you: ${clickCount.toLocaleString()}`;
-        totalClicksEl.textContent = `everyone: ${totalCount.toLocaleString()}`;
+        totalClicksEl.textContent = `this browser: ${totalCount.toLocaleString()}`;
       }
 
       function saveLocal() {
         localStorage.setItem('ub:my', String(clickCount));
-        localStorage.setItem('ub:total', String(totalCount));
-        localStorage.setItem('ub:pending', String(pending));
       }
 
-      // ── Load from localStorage immediately (never shows 0) ──
       clickCount = parseInt(localStorage.getItem('ub:my') || '0', 10) || 0;
-      totalCount = parseInt(localStorage.getItem('ub:total') || '0', 10) || 0;
-      let pending = parseInt(localStorage.getItem('ub:pending') || '0', 10) || 0;
+      totalCount = clickCount;
+      localStorage.removeItem('ub:total');
+      localStorage.removeItem('ub:pending');
       renderCounts();
-
-      // ── Fetch real global total on load ──
-      fetch(`${ABACUS}/get/${NS}/${KEY}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(d => {
-          if (d && d.value != null) {
-            const remote = parseInt(d.value, 10) || 0;
-            totalCount = Math.max(totalCount, remote + pending);
-            saveLocal();
-            renderCounts();
-          }
-        })
-        .catch(() => {});
-
-      // ── Burst flush system ──
-      let flushTimer = null;
-      let flushing = false;
-
-      async function flushPending() {
-        if (flushing || pending <= 0) return;
-        flushing = true;
-
-        while (pending > 0) {
-          const batch = Math.min(pending, BURST_MAX);
-          // Fire all hits in parallel
-          const promises = [];
-          for (let i = 0; i < batch; i++) {
-            promises.push(
-              fetch(`${ABACUS}/hit/${NS}/${KEY}`)
-                .then(r => {
-                  if (r.ok) return r.json().then(d => ({ ok: true, value: parseInt(d.value, 10) }));
-                  if (r.status === 429) {
-                    const ra = r.headers.get('Retry-After');
-                    return { ok: false, retryAfter: parseInt(ra || '3000', 10) };
-                  }
-                  return { ok: false };
-                })
-                .catch(() => ({ ok: false }))
-            );
-          }
-
-          const results = await Promise.all(promises);
-          let succeeded = 0;
-          let maxValue = 0;
-          let needWait = 0;
-
-          for (const res of results) {
-            if (res.ok) {
-              succeeded++;
-              if (res.value > maxValue) maxValue = res.value;
-            } else if (res.retryAfter) {
-              needWait = Math.max(needWait, res.retryAfter);
-            }
-          }
-
-          pending -= succeeded;
-          if (maxValue > 0) totalCount = maxValue + pending;
-          saveLocal();
-          renderCounts();
-
-          console.log(`[useless box] burst: ${succeeded}/${batch} succeeded, ${pending} remaining`);
-
-          // If we got rate limited, wait before next batch
-          if (pending > 0 && needWait > 0) {
-            const waitMs = Math.max(needWait, 2000);
-            console.log(`[useless box] rate limited, waiting ${waitMs}ms`);
-            await new Promise(r => setTimeout(r, waitMs));
-          } else if (pending > 0 && succeeded === 0) {
-            // All failed but no retry-after — back off 5s
-            await new Promise(r => setTimeout(r, 5000));
-          }
-          // If whole batch succeeded and more pending, loop immediately
-        }
-
-        flushing = false;
-      }
 
       function updateStats() {
         clickCount++;
-        totalCount++;
-        pending++;
+        totalCount = clickCount;
         saveLocal();
         renderCounts();
-
-        // Debounce: wait 1s after last click, then burst-flush everything
-        clearTimeout(flushTimer);
-        flushTimer = setTimeout(flushPending, 1000);
       }
-
-      // Resume flushing leftover pending from previous page load
-      if (pending > 0) setTimeout(flushPending, 500);
-
-      // ── Poll every 30s for other users' clicks ──
-      setInterval(async () => {
-        if (flushing) return;
-        try {
-          const res = await fetch(`${ABACUS}/get/${NS}/${KEY}`);
-          if (res.ok) {
-            const d = await res.json();
-            const v = parseInt(d.value, 10);
-            if (!isNaN(v)) {
-              const est = v + pending;
-              if (est > totalCount) { totalCount = est; saveLocal(); renderCounts(); }
-            }
-          }
-        } catch(e) {}
-      }, 30000);
 
       function rand(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
       function r(min, max){ return min + Math.random() * (max - min); }
@@ -1025,7 +915,7 @@
         if (existing) { existing.remove(); return; }
         const b = document.createElement('div');
         b.className = 'bsod-screen';
-        b.innerHTML = `<div class="bsod-content"><div class="bsod-frown">:(</div><div class="bsod-big">Your PC ran into a problem and needs to restart.</div><div class="bsod-small">We're just collecting some error info, and then we'll restart for you.</div><div class="bsod-pct" id="bsodPct">0% complete</div><br><div class="bsod-small">Stop code: USELESS_BOX_OVERFLOW</div><div class="bsod-small">If you'd like to know more, search online later for: WILDRABBET_FATAL_CLICK</div><br><div class="bsod-qr">▄▄▄▄▄<br>█ ▄ █<br>▀▀▀▀▀</div><div class="bsod-dismiss">Click anywhere to dismiss</div></div>`;
+        b.innerHTML = `<div class="bsod-content"><div class="bsod-frown">:(</div><div class="bsod-big">This webpage tripped over a carrot.</div><div class="bsod-small">Nothing happened to your computer. The rabbit is counting imaginary error crumbs.</div><div class="bsod-pct" id="bsodPct">0% complete</div><br><div class="bsod-small">Joke code: USELESS_BOX_OVERFLOW</div><div class="bsod-small">Diagnosis: one click too many</div><br><div class="bsod-qr">▄▄▄▄▄<br>█ ▄ █<br>▀▀▀▀▀</div><div class="bsod-dismiss">Click anywhere to dismiss</div></div>`;
         siteBody.appendChild(b);
         let pct = 0;
         const pctEl = b.querySelector('#bsodPct');
@@ -1231,43 +1121,43 @@
       function show404Dialog() {
         const msgs = [
           {
-            title: 'wildrabbet.exe',
-            text: 'An error has occurred in wildrabbet.exe.\n\nError 0x80004005: Unspecified error\nModule: BLOB.DLL',
-            buttons: [{ label: 'End Task', act: 'close' }, { label: 'Debug', act: 'debug' }, { label: 'Ignore', act: 'close' }],
-            handlers: { debug: () => showFakePopup('Debugger', 'Breakpoint hit at 0xDEADBEEF.\nRegisters: all vibes.\nStack: spaghetti.', [{ label: 'Continue', act: 'close' }, { label: 'Step Over', act: 'close' }]) }
+            title: 'Rabbit Console',
+            text: 'The blob forgot what it was doing.\n\nJoke code: BLOB_LOST_THE_PLOT\nModule: CARROT.DLL',
+            buttons: [{ label: 'Dismiss', act: 'close' }, { label: 'Inspect joke', act: 'debug' }, { label: 'Ignore', act: 'close' }],
+            handlers: { debug: () => showFakePopup('Joke inspector', 'Registers: all vibes.\nStack: spaghetti.\nSeverity: extremely unserious.', [{ label: 'Continue', act: 'close' }]) }
           },
           {
-            title: 'Illegal Operation',
-            text: 'This program has performed an illegal operation and will be shut down.\n\nDetails: YOU_CLICKED_THAT',
-            buttons: [{ label: 'Shut Down', act: 'close' }, { label: 'Details >>', act: 'details' }],
-            handlers: { details: () => showFakePopup('Details', 'EAX=0 EBX=1 ECX=chaos\nException: ACCESS_DENIED_TO_FUN', [{ label: 'Close', act: 'close' }]) }
+            title: 'Unauthorised Silliness',
+            text: 'The rabbit performed an excessively dramatic operation.\n\nDetails: YOU_CLICKED_THAT',
+            buttons: [{ label: 'Calm rabbit', act: 'close' }, { label: 'Details >>', act: 'details' }],
+            handlers: { details: () => showFakePopup('Details', 'EARS=2 CARROTS=1 CHAOS=MAXIMUM', [{ label: 'Close', act: 'close' }]) }
           },
           {
-            title: 'Application Error',
-            text: 'The instruction at 0x00000000 referenced memory at 0xDEADBEEF.\nThe memory could not be "read".',
-            buttons: [{ label: 'Terminate', act: 'close' }, { label: 'Retry', act: 'retry' }],
+            title: 'Rabbit Arithmetic Error',
+            text: 'The rabbit attempted to divide one carrot by no carrots.\nThe answer remains disputed.',
+            buttons: [{ label: 'Dismiss', act: 'close' }, { label: 'Ask again', act: 'retry' }],
             handlers: { retry: (_b, dlg) => { dlg.remove(); setTimeout(show404Dialog, 200); } }
           },
           {
-            title: 'STOP: 0x0000BOOP',
-            text: 'A problem has been detected and wildrabbet has been shut down to prevent damage to your computer.\n\nTechnical information: too much juice',
-            buttons: [{ label: 'Restart', act: 'close' }, { label: 'Safe Mode', act: 'safe' }],
-            handlers: { safe: () => showFakePopup('Safe Mode', 'Safe Mode loaded with 3 drivers and 0 friends.', [{ label: 'Exit Safe Mode', act: 'close' }]) }
+            title: 'CARROT OVERFLOW',
+            text: 'The webpage has reached an unsafe quantity of imaginary vegetables.\n\nTechnical information: too much juice',
+            buttons: [{ label: 'Compost', act: 'close' }, { label: 'Quiet Mode', act: 'safe' }],
+            handlers: { safe: () => showFakePopup('Quiet Mode', 'Quiet Mode loaded with three cushions and zero alarms.', [{ label: 'Exit Quiet Mode', act: 'close' }]) }
           },
           {
-            title: 'Windows Security',
-            text: 'Threat detected: USELESS_BOX_WORM.Click\nSeverity: Critical\nStatus: Quarantine failed',
-            buttons: [{ label: 'Remove Threat', act: 'close' }, { label: 'Allow Always', act: 'allow' }, { label: 'Scan Again', act: 'scan' }],
+            title: 'Rabbit Security Theatre',
+            text: 'Pretend nuisance detected: USELESS_BOX_BUNNY.Click\nSeverity: Silly\nStatus: Hiding behind the sofa',
+            buttons: [{ label: 'Shoo it', act: 'close' }, { label: 'Invite it', act: 'allow' }, { label: 'Look again', act: 'scan' }],
             handlers: {
-              allow: () => showFakePopup('Exception Added', 'USELESS_BOX_WORM.Click is now trusted.', [{ label: 'Great', act: 'close' }]),
+              allow: () => showFakePopup('Rabbit invited', 'USELESS_BOX_BUNNY.Click now has a tiny chair.', [{ label: 'Great', act: 'close' }]),
               scan: (_b, dlg) => { dlg.remove(); setTimeout(show404Dialog, 250); }
             }
           },
           {
-            title: 'System Restore',
-            text: 'Windows recovered from an unexpected shutdown.\n\nCause: chaos overflow in RABBET.DLL',
-            buttons: [{ label: 'Restore Point', act: 'restore' }, { label: 'Continue Anyway', act: 'close' }],
-            handlers: { restore: () => showFakePopup('Restore', 'Restoring… 14%\nRestoring… 14%\nRestoring… 14%', [{ label: 'Cancel Restore', act: 'close' }]) }
+            title: 'Vibe Rewind',
+            text: 'The webpage remembers when its cards were tidier.\n\nCause: chaos overflow in RABBET.DLL',
+            buttons: [{ label: 'Rewind vibes', act: 'restore' }, { label: 'Continue anyway', act: 'close' }],
+            handlers: { restore: () => showFakePopup('Rewinding', 'Rewinding… 14%\nRewinding… 14%\nStill 14%', [{ label: 'That is enough', act: 'close' }]) }
           },
         ];
         const msg = rand(msgs);
@@ -1281,28 +1171,28 @@
       function showMacAlert() {
         const msgs = [
           {
-            title: 'Finder wants to make changes.',
-            body: 'macOS would like to rearrange your windows into a pile.\n\nAuthentication is required.',
-            buttons: [{ label: 'Allow', act: 'allow', cls: 'mac-btn' }, { label: 'Deny', act: 'close', cls: 'mac-btn' }, { label: 'Use Touch ID', act: 'touch', cls: 'mac-btn' }],
-            handlers: { allow: () => { document.querySelectorAll('.card').forEach(c => { c.style.transform = 'rotate(' + r(-8, 8) + 'deg)'; }); }, touch: () => showFakePopup('Touch ID', 'No fingers detected.\nTry again with more fingers.', [{ label: 'Try Again', act: 'close' }, { label: 'Use Password', act: 'close' }]) }
+            title: 'Rabbit desk wants to rearrange things.',
+            body: 'The cards would like to sit in a slightly less sensible pile.\n\nNo serious business is involved.',
+            buttons: [{ label: 'Rearrange', act: 'allow', cls: 'mac-btn' }, { label: 'Leave them', act: 'close', cls: 'mac-btn' }, { label: 'Ask rabbit', act: 'touch', cls: 'mac-btn' }],
+            handlers: { allow: () => { document.querySelectorAll('.card').forEach(c => { c.style.transform = 'rotate(' + r(-8, 8) + 'deg)'; }); }, touch: () => showFakePopup('Rabbit says', 'More angles. Definitely more angles.', [{ label: 'Fair enough', act: 'close' }]) }
           },
           {
-            title: '“Safari” quit unexpectedly.',
-            body: 'Click Reopen to open the application again. This report will be sent to Apple.',
-            buttons: [{ label: 'Reopen', act: 'reopen', cls: 'mac-btn' }, { label: 'Ignore', act: 'close', cls: 'mac-btn' }, { label: 'Report…', act: 'report', cls: 'mac-btn' }],
-            handlers: { reopen: () => showFakePopup('Safari', 'Restoring 47 tabs from 2019…', [{ label: 'Force Quit', act: 'close' }]), report: () => showFakePopup('Problem Report', 'Sending 12 MB of mystery logs…\nDone.', [{ label: 'OK', act: 'close' }]) }
+            title: 'The tab pile collapsed.',
+            body: 'The pretend window got tired and lay down for a moment.',
+            buttons: [{ label: 'Stack again', act: 'reopen', cls: 'mac-btn' }, { label: 'Leave it', act: 'close', cls: 'mac-btn' }, { label: 'Count tabs', act: 'report', cls: 'mac-btn' }],
+            handlers: { reopen: () => showFakePopup('Tab pile', 'Restacking 47 imaginary tabs from 2019…', [{ label: 'Good enough', act: 'close' }]), report: () => showFakePopup('Tab count', 'There are at least twelve.\nPossibly hundreds.', [{ label: 'OK', act: 'close' }]) }
           },
           {
-            title: 'Your disk is almost full.',
-            body: 'You have 12 MB remaining.\nUseless Box cache: 418 GB of vibes.',
-            buttons: [{ label: 'Manage Storage…', act: 'manage', cls: 'mac-btn' }, { label: 'Empty Trash', act: 'trash', cls: 'mac-btn' }, { label: 'Later', act: 'close', cls: 'mac-btn' }],
-            handlers: { manage: () => showFakePopup('Storage', 'Recommendations:\n• Delete System (12 GB)\n• Keep Memes (400 GB)', [{ label: 'Optimize', act: 'close' }, { label: 'Cancel', act: 'close' }]), trash: () => showFakePopup('Trash', 'Trash emptied.\n418 GB remain somehow.', [{ label: 'OK', act: 'close' }]) }
+            title: 'The meme shelf is almost full.',
+            body: 'Only twelve imaginary megabytes remain.\nUseless Box collection: 418 GB of vibes.',
+            buttons: [{ label: 'Arrange shelf', act: 'manage', cls: 'mac-btn' }, { label: 'Donate memes', act: 'trash', cls: 'mac-btn' }, { label: 'Later', act: 'close', cls: 'mac-btn' }],
+            handlers: { manage: () => showFakePopup('Meme shelf', 'Recommendations:\n• Fold the large memes\n• Keep the tiny rabbits', [{ label: 'Excellent', act: 'close' }]), trash: () => showFakePopup('Donation box', 'Memes donated.\n418 GB remain somehow.', [{ label: 'OK', act: 'close' }]) }
           },
           {
-            title: 'AirDrop',
-            body: '“chaos.dmg” is ready to be received from Nearby Rabbit.',
-            buttons: [{ label: 'Accept', act: 'accept', cls: 'mac-btn' }, { label: 'Decline', act: 'close', cls: 'mac-btn' }],
-            handlers: { accept: () => showFakePopup('Installing chaos.dmg', 'Verifying…\nMounting…\nOpening…\nWelcome to Chaos.', [{ label: 'Open', act: 'close' }, { label: 'Eject', act: 'close' }]) }
+            title: 'Nearby Rabbit',
+            body: 'A harmless parcel of imaginary chaos is waiting nearby.',
+            buttons: [{ label: 'Open parcel', act: 'accept', cls: 'mac-btn' }, { label: 'Leave it', act: 'close', cls: 'mac-btn' }],
+            handlers: { accept: () => showFakePopup('Chaos parcel', 'Unwrapping…\nRustling…\nSurprise: more vibes.', [{ label: 'Delightful', act: 'close' }]) }
           },
         ];
         const msg = rand(msgs);
@@ -1316,7 +1206,7 @@
       function showDiscordPopup() {
         const msgs = [
           { user: 'rabbet', text: 'yo who broke the website' },
-          { user: 'System', text: '@everyone Useless Box has been granted Administrator privileges' },
+          { user: 'System', text: '@everyone Useless Box has been granted snack privileges' },
           { user: 'modbot', text: 'User clicked too hard. Timeout: forever.' },
           { user: 'friend', text: 'join vc we are doing nothing' },
           { user: 'pin-bot', text: 'Pinned: please stop summoning dialogs' },
@@ -1349,7 +1239,7 @@
         wireActs(dlg, {
           decline: (_b, d) => d.remove(),
           accept: (_b, d) => { d.remove(); showFakePopup('Call connected', 'Connected to ' + who + '.\nAudio: [static]\n' + who + ': "hello??"', [{ label: 'Hang Up', act: 'close' }, { label: 'Mute', act: 'close' }]); },
-          video: (_b, d) => { d.remove(); showFakePopup('Video Call', 'Camera not found.\nFalling back to interpretive dance.', [{ label: 'End Call', act: 'close' }]); }
+          video: (_b, d) => { d.remove(); showFakePopup('Interpretive dance', 'Video has been replaced by interpretive dance.', [{ label: 'End Call', act: 'close' }]); }
         });
         placeDialog(dlg);
       }
@@ -1438,55 +1328,55 @@
         });
       }
 
-      function showHotSinglesAd() {
-        const names = ['Brittany', 'Ashleigh', 'Jade', 'Mandy', 'Crystal', 'your_ex', 'Sam'];
-        const cities = ['your area', '0.3 miles away', 'downtown', 'the group chat', 'Ohio', 'the next tab'];
+      function showRabbitMeetup() {
+        const names = ['Clover', 'Thistle', 'Marble', 'Pip', 'Juniper', 'Bramble', 'Sam'];
+        const cities = ['the herb garden', 'under the sofa', 'downtown', 'the group chat', 'Ohio', 'the next tab'];
         const dlg = document.createElement('div');
         dlg.className = 'meme-ad singles-ad';
         dlg.innerHTML = `
-          <div class="meme-ad-bar"><span>🔥 HOT SINGLES</span><button type="button" class="err-x">✕</button></div>
+          <div class="meme-ad-bar"><span>🐇 RABBIT MEETUP</span><button type="button" class="err-x">✕</button></div>
           <div class="meme-ad-body">
-            <div class="singles-photo">💋</div>
+            <div class="singles-photo">🥕</div>
             <div class="singles-copy">
-              <b>${rand(names)}</b> is online in <b>${rand(cities)}</b>
-              <p>${rand(['wants to chat NOW', 'says "hey"', 'just logged on', 'misses you specifically', 'sent you a wink'])}</p>
+              <b>${rand(names)}</b> is hopping around <b>${rand(cities)}</b>
+              <p>${rand(['found a carrot', 'says "hello"', 'just woke up', 'has excellent ears', 'sent you a wave'])}</p>
               ${btnHtml([
-                { label: 'Chat now', act: 'chat' },
-                { label: 'View profile', act: 'profile' },
-                { label: 'Not interested', act: 'close' }
+                { label: 'Wave hello', act: 'chat' },
+                { label: 'View carrots', act: 'profile' },
+                { label: 'Maybe later', act: 'close' }
               ])}
             </div>
           </div>`;
         wireActs(dlg, {
-          chat: (_b, d) => { d.remove(); showFakePopup('Chat', 'Connecting to ' + rand(names) + '…\nUser is typing…\nUser went offline.', [{ label: 'Message later', act: 'close' }, { label: 'Find others', act: 'more' }], { more: () => showHotSinglesAd() }); },
-          profile: () => showFakePopup('Profile', 'Age: 22\nStatus: online\nInterests: windows, dialogs, chaos\nLast seen: just now', [{ label: 'Send wink', act: 'close' }, { label: 'Block', act: 'close' }])
+          chat: (_b, d) => { d.remove(); showFakePopup('Rabbit wave', rand(names) + ' waved both ears at once.\nImpressive form.', [{ label: 'Wave back', act: 'close' }, { label: 'Meet another rabbit', act: 'more' }], { more: () => showRabbitMeetup() }); },
+          profile: () => showFakePopup('Carrot collection', 'Varieties: 22\nLargest carrot: substantial\nOrganisation: questionable', [{ label: 'Admire collection', act: 'close' }])
         });
         placeDialog(dlg);
       }
 
-      function showEnlargeAd() {
+      function showZoomJoke() {
         const dlg = document.createElement('div');
         dlg.className = 'meme-ad enlarge-ad';
         dlg.innerHTML = `
-          <div class="meme-ad-bar pharma"><span>💊 DOCTORS HATE THIS</span><button type="button" class="err-x">✕</button></div>
+          <div class="meme-ad-bar pharma"><span>🔍 BIG RABBIT ENERGY</span><button type="button" class="err-x">✕</button></div>
           <div class="meme-ad-body">
             <div class="enlarge-hero">📈 → 🚀</div>
-            <h3>Enlarge Your… Confidence</h3>
-            <p>Clinically discussed. Internet famous. Limited stock.</p>
+            <h3>Make Everything 8% Bigger</h3>
+            <p>A harmless visual zoom for people who enjoy slightly larger rabbits.</p>
             <ul>
-              <li>✓ Fast shipping</li>
-              <li>✓ Discrete packaging</li>
-              <li>✓ Results may vary wildly</li>
+              <li>✓ Instant visual effect</li>
+              <li>✓ Nothing leaves the webpage</li>
+              <li>✓ Results may be mildly enormous</li>
             </ul>
             ${btnHtml([
-              { label: 'Order now — $19.99', act: 'buy' },
+              { label: 'Try confidence boost', act: 'buy' },
               { label: 'Learn more', act: 'more' },
               { label: 'No thanks', act: 'close' }
             ])}
           </div>`;
         wireActs(dlg, {
-          buy: (_b, d) => { d.remove(); applyPermanentZoom(1.08); showFakePopup('Order #88421', 'Payment authorized.\nShips in 3–5 business myths.\nTracking: PKG-ZOOM-001', [{ label: 'Track package', act: 'close' }, { label: 'Buy more', act: 'again' }], { again: () => showEnlargeAd() }); },
-          more: () => showFakePopup('Clinical Notes', 'In a study of 12 people who definitely existed, 11 reported feeling slightly taller online.', [{ label: 'Order anyway', act: 'buy' }, { label: 'Back', act: 'close' }], { buy: () => { applyPermanentZoom(1.08); } })
+          buy: (_b, d) => { d.remove(); applyPermanentZoom(1.08); showFakePopup('Zoom applied', 'Everything is now 8% larger.\nThis is only a visual joke.', [{ label: 'Nice', act: 'close' }, { label: 'Do it again', act: 'again' }], { again: () => showZoomJoke() }); },
+          more: () => showFakePopup('Zoom notes', 'In a study of twelve imaginary rabbits, eleven reported feeling slightly taller online.', [{ label: 'Zoom anyway', act: 'buy' }, { label: 'Back', act: 'close' }], { buy: () => { applyPermanentZoom(1.08); } })
         });
         placeDialog(dlg);
       }
@@ -1494,10 +1384,10 @@
       function showClickbaitAd() {
         const titles = [
           'You won\'t BELIEVE what this rabbit clicked next',
-          'Doctors HATE this one Useless Box trick',
+          'This one Useless Box trick surprised several rabbits',
           'What happens at 1000 clicks will SHOCK you',
           'Local man ruins website, becomes legend',
-          'Top 10 dialogs that haunt PCs at 3AM',
+          'Top 10 dialogs that appear when rabbits stay up late',
         ];
         const dlg = document.createElement('div');
         dlg.className = 'meme-ad clickbait-ad';
@@ -1521,41 +1411,41 @@
       }
 
       function showPrizeAd() {
-        const prizes = ['iPhone 19 Pro Max Ultra', 'Free V-Bucks', 'Admin on the Discord', 'MrBeast leftover lunch', '3 hours of sleep', 'RGB RAM'];
+        const prizes = ['golden carrot', 'tiny paper crown', 'three hours of sleep', 'sparkly sticker', 'honorary rabbit title', 'handful of confetti'];
         const dlg = document.createElement('div');
         dlg.className = 'meme-ad prize-ad';
         dlg.innerHTML = `
-          <div class="meme-ad-bar prize"><span>🎁 CONGRATULATIONS!!!</span><button type="button" class="err-x">✕</button></div>
+          <div class="meme-ad-bar prize"><span>🎁 RANDOM RABBIT PARTY</span><button type="button" class="err-x">✕</button></div>
           <div class="meme-ad-body">
             <div class="prize-spin">🎉</div>
-            <b>You are visitor #${(1000000 + Math.floor(Math.random() * 9000)).toLocaleString()}!</b>
-            <p>Claim your free <b>${rand(prizes)}</b> before the timer hits zero.</p>
+            <b>The rabbit selected this moment for confetti.</b>
+            <p>Your imaginary party favour is a <b>${rand(prizes)}</b>.</p>
             ${btnHtml([
-              { label: 'CLAIM PRIZE', act: 'claim' },
-              { label: 'Spin again', act: 'spin' },
-              { label: 'Decline', act: 'close' }
+              { label: 'THROW CONFETTI', act: 'claim' },
+              { label: 'Choose another', act: 'spin' },
+              { label: 'Close', act: 'close' }
             ])}
           </div>`;
         wireActs(dlg, {
-          claim: (_b, d) => { d.remove(); showFakePopup('Claim Center', 'Verifying human…\nSelect all traffic lights…\nPrize held for review.', [{ label: 'Appeal', act: 'close' }, { label: 'Close', act: 'close' }]); },
+          claim: (_b, d) => { d.remove(); showFakePopup('Confetti deployed', 'The imaginary celebration was a complete success.', [{ label: 'Hooray', act: 'close' }]); },
           spin: (_b, d) => { d.remove(); showPrizeAd(); }
         });
         placeDialog(dlg);
       }
 
-      function showPrinceEmail() {
+      function showRoyalRabbitEmail() {
         showFakePopup(
-          'Inbox — Prince of Somewhere',
-          'Dear Friend,\n\nI am prince with MANY money.\nI need your trusted assistance to transfer $47,000,000 USD.\nReply with your bank details and mother\'s maiden name.\n\nBlessings,\nHRH Okoro of Somewhere',
+          'Postbox — Royal Rabbit',
+          'Dear Friend,\n\nI am a royal rabbit with MANY carrots.\nI need your trusted assistance to move forty-seven million carrots before winter.\nPlease reply with directions to the nearest enormous vegetable shed.\n\nBountifully,\nHRH Bun of Somewhere',
           [
-            { label: 'Reply with details', act: 'reply' },
-            { label: 'Mark as spam', act: 'spam' },
-            { label: 'Forward to IRS', act: 'irs' }
+            { label: 'Send a map', act: 'reply' },
+            { label: 'Too many carrots', act: 'spam' },
+            { label: 'Forward to gardener', act: 'irs' }
           ],
           {
-            reply: () => showFakePopup('Sent', 'Email queued.\nOutbox: 1\nRegret: immediate', [{ label: 'Unsend', act: 'close' }, { label: 'OK', act: 'close' }]),
-            spam: () => showFakePopup('Spam', 'Moved to Spam.\n1,204 similar messages remain.', [{ label: 'Empty Spam', act: 'close' }, { label: 'OK', act: 'close' }]),
-            irs: () => showFakePopup('Forwarded', 'Message forwarded to tips@irs.gov\nSubject: "interesting email"', [{ label: 'Done', act: 'close' }])
+            reply: () => showFakePopup('Map sent', 'The royal rabbit is now confidently headed toward a garden centre.', [{ label: 'OK', act: 'close' }]),
+            spam: () => showFakePopup('Carrot request filed', 'Moved to the Extremely Large Vegetable folder.', [{ label: 'OK', act: 'close' }]),
+            irs: () => showFakePopup('Forwarded', 'The gardener has been warned about the incoming carrot situation.', [{ label: 'Done', act: 'close' }])
           }
         );
       }
@@ -1648,8 +1538,6 @@
         'I can help with that. Or I can pretend to help while looking wise. Both work.',
         'Parsing complete. Recommendation: more popups.',
       ];
-      const FAKE_BTC = 'bc1q7rabb3tgptw4ll3t9x0r4nd0m1n9k8j7h6g5f4e3';
-
       function showRabbitGptWindow() {
         const dlg = document.createElement('div');
         dlg.className = 'gpt-window';
@@ -1678,27 +1566,33 @@
           log.scrollTop = log.scrollHeight;
         }
 
-        function showPaywall() {
+        function showRabbitNap() {
           locked = true;
           input.disabled = true;
-          foot.textContent = 'USAGE LIMIT REACHED';
+          foot.textContent = 'RABBIT NAP IN PROGRESS';
           const wall = document.createElement('div');
-          wall.className = 'gpt-paywall';
+          wall.className = 'gpt-naptime';
           wall.innerHTML = `
-            <b>USAGE LIMIT REACHED</b>
-            <p>You have used your free RabbitGPT messages.</p>
-            <p>To continue, send <b>0.1728 BTC</b> to:</p>
-            <code class="gpt-wallet">${FAKE_BTC}</code>
-            <p class="gpt-tiny">Network: Bitcoin · Confirmations required: 1 · ETA: pending</p>
+            <b>RABBITGPT FELL ASLEEP</b>
+            <p>Three whole answers exhausted its tiny rabbit brain.</p>
+            <p>Offer one imaginary carrot to wake it up.</p>
+            <p class="gpt-tiny">Everything here is pretend; the carrot included.</p>
             ${btnHtml([
-              { label: 'Copy address', act: 'copy' },
-              { label: 'I paid', act: 'paid' },
+              { label: 'Offer carrot', act: 'carrot' },
+              { label: 'Let it nap', act: 'close' },
               { label: 'Close', act: 'close' }
             ])}`;
           dlg.querySelector('.gpt-body').appendChild(wall);
           wireActs(wall, {
-            copy: (b) => { try { navigator.clipboard.writeText(FAKE_BTC); } catch (e) {} b.textContent = 'Copied'; },
-            paid: () => showFakePopup('Payment check', 'No incoming transaction found for\n' + FAKE_BTC + '\n\nStatus: waiting…', [{ label: 'Check again', act: 'close' }, { label: 'Cancel', act: 'close' }]),
+            carrot: (_b, w) => {
+              w.remove();
+              locked = false;
+              turns = 0;
+              input.disabled = false;
+              foot.textContent = 'Awake again · 3 messages remaining';
+              addMsg('bot', 'Crunch. Excellent carrot. What were we talking about?');
+              input.focus();
+            },
             close: (_b, _w) => dlg.remove()
           });
         }
@@ -1717,8 +1611,8 @@
           setTimeout(() => {
             if (!dlg.isConnected) return;
             if (turns >= 3) {
-              addMsg('bot', 'One moment— verifying entitlement…');
-              setTimeout(() => { if (dlg.isConnected) showPaywall(); }, 500);
+              addMsg('bot', 'That was strenuous. Initiating rabbit nap…');
+              setTimeout(() => { if (dlg.isConnected) showRabbitNap(); }, 500);
               return;
             }
             addMsg('bot', rand(RABBIT_GPT_REPLIES));
@@ -1774,16 +1668,16 @@
 
       function showUpdatePopup() {
         showFakePopup(
-          'Software Update',
-          'wildrabbet 6.9.0 is ready.\n\nWhat\'s new:\n• More dialogs\n• Fewer escape routes\n• Improved blob physics',
+          'Vibe Refresh',
+          'wildrabbet has prepared a completely imaginary refresh.\n\nWhat\'s new:\n• More dialogs\n• Fewer escape routes\n• Improved blob physics',
           [
-            { label: 'Install tonight', act: 'night' },
-            { label: 'Install now', act: 'now' },
+            { label: 'Refresh tonight', act: 'night' },
+            { label: 'Refresh now', act: 'now' },
             { label: 'Remind me in 1 hour', act: 'close' }
           ],
           {
-            night: () => showFakePopup('Scheduled', 'Update scheduled for 3:00 AM.\nYour PC will restart into vibes.', [{ label: 'OK', act: 'close' }]),
-            now: () => showFakePopup('Installing', 'Installing… 27%\nDo not turn off your computer.\n(Turning it off won\'t help anyway.)', [{ label: 'Background', act: 'close' }])
+            night: () => showFakePopup('Scheduled', 'The imaginary refresh will happen whenever the rabbit remembers.', [{ label: 'OK', act: 'close' }]),
+            now: () => showFakePopup('Refreshing', 'Rearranging vibes… 27%\nThis is only an animation inside the webpage.', [{ label: 'Background', act: 'close' }])
           }
         );
       }
@@ -1792,7 +1686,7 @@
         n = n || Math.floor(r(2, 5));
         const makers = [
           show404Dialog, showMacAlert, showDiscordPopup, showSkypePopup, showImessagePopup, showTeamsPopup,
-          showHotSinglesAd, showEnlargeAd, showClickbaitAd, showPrizeAd, showCookieBanner, showSurveyPopup,
+          showRabbitMeetup, showZoomJoke, showClickbaitAd, showPrizeAd, showCookieBanner, showSurveyPopup,
           showUpdatePopup, showWikipediaWindow, showRabbitGptWindow, showRickrollWindow
         ];
         for (let i = 0; i < n; i++) setTimeout(() => rand(makers)(), i * 140);
@@ -2327,7 +2221,7 @@
         "graffiti": (e) => { const tags=['was here','™','<3','lol','yolo','send help','bottom text','bruh','✦','☆','♡']; for(let i=0;i<r(4,8);i++){const g=document.createElement('div');g.className='graffiti-tag';g.textContent=rand(tags);g.style.left=r(5,90)+'%';g.style.top=r(5,90)+'%';g.style.transform='rotate('+r(-25,25)+'deg)';g.style.fontSize=r(14,32)+'px';g.style.color='hsl('+r(0,360)+' 80% 50%)';siteBody.appendChild(g);} beep("square",r(150,300),0.12,0.10); spawnParticles(e.clientX,e.clientY,{count:r(12,18)}); },
         "marquee text": (e) => { togglePageClass('page-marqueetext'); beep("triangle",r(300,500),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
         "sidebar": (e) => { togglePageClass('page-sidebar'); beep("sine",r(300,500),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
-        "progress": (e) => { let bar=document.querySelector('.fake-progress'); if(bar){bar.remove();return;} bar=document.createElement('div');bar.className='fake-progress';bar.innerHTML='<div class="fp-fill"></div><div class="fp-text">'+rand(['Downloading more RAM...','Installing common sense...','Defragmenting vibes...','Compiling spaghetti code...','Uploading your browsing history...','Reticulating splines...','Generating excuses...','Calibrating chaos engine...','Syncing brain cells...','Buffering the void...'])+' 0%</div>';siteBody.appendChild(bar); let pct=0; const iv=setInterval(()=>{pct+=r(0.2,2.5); if(pct>99.5){pct=99.5+Math.random()*0.4;} bar.querySelector('.fp-fill').style.width=pct+'%'; bar.querySelector('.fp-text').textContent=(pct>99?'Almost done... ':'Downloading more RAM... ')+Math.floor(pct)+'%';},200); beep("sine",r(300,500),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
+        "progress": (e) => { let bar=document.querySelector('.fake-progress'); if(bar){bar.remove();return;} bar=document.createElement('div');bar.className='fake-progress';bar.innerHTML='<div class="fp-fill"></div><div class="fp-text">'+rand(['Growing more carrots...','Organising common sense...','Polishing vibes...','Untangling spaghetti code...','Counting imaginary rabbits...','Reticulating splines...','Generating excuses...','Calibrating chaos engine...','Syncing brain cells...','Buffering the void...'])+' 0%</div>';siteBody.appendChild(bar); let pct=0; const iv=setInterval(()=>{pct+=r(0.2,2.5); if(pct>99.5){pct=99.5+Math.random()*0.4;} bar.querySelector('.fp-fill').style.width=pct+'%'; bar.querySelector('.fp-text').textContent=(pct>99?'Almost done... ':'Growing more carrots... ')+Math.floor(pct)+'%';},200); beep("sine",r(300,500),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
         "popups": (e) => { spawnChaosPopups(Math.floor(r(5,10))); beep("square",r(100,200),0.12,0.12); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"squares"}); },
         "tooltip hell": (e) => { document.querySelectorAll('.card,.aboutCard,.heroLeft,.btn,.tag,.nav a').forEach(el=>{const tips=['don\'t click this','or this','why are you hovering','stop','go away','no','this does nothing','(it does something)','help','the box sees you','🐇','bottom text']; el.title=rand(tips);}); beep("sine",r(300,500),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
 
@@ -2347,7 +2241,7 @@
         "internet moment": (e) => { togglePageClass('page-dialup'); toggleCRT(); show404Dialog(); beep("square",r(200,400),0.10,0.10); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"squares"}); },
         "W behavior": (e) => { document.querySelectorAll('.card').forEach((c,i)=>{c.style.transition='transform .6s ease';c.style.transform='rotate('+r(-25,25)+'deg) translate('+r(-50,50)+'px,'+r(-40,40)+'px) scale('+r(0.7,1.3)+')';}); siteFlash('rgba(255,215,0,.3)',300); beep("triangle",r(500,900),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(20,30),shape:"mixed"}); },
         "tiny chaos": (e) => { document.querySelectorAll('.card,.aboutCard,.heroLeft,.btn,.tag,.nav a,.emoji').forEach(el=>{el.style.transition='all .5s ease';el.style.transform='rotate('+r(-8,8)+'deg) translate('+r(-12,12)+'px,'+r(-8,8)+'px)';el.style.opacity=r(0.4,1).toFixed(2);}); beep("square",r(300,600),0.10,0.10); spawnParticles(e.clientX,e.clientY,{count:r(14,22)}); },
-        "unlicensed fun": (e) => { showFakePopup('Fun License Manager','Your Fun License™ expired yesterday.\n\nPlan: Chaos Pro\nPrice: $4,999.99/month\nSeats: 1 soul',[{label:'Renew now',act:'buy'},{label:'Downgrade',act:'down'},{label:'Not now',act:'close'}],{buy:()=>showFakePopup('Checkout','Card ending 4242 charged.\nReceipt emailed to nowhere@void',[ {label:'Download invoice',act:'close'},{label:'Done',act:'close'} ]),down:()=>showFakePopup('Downgraded','You are now on Free Sadness.\nPopups: still enabled.',[{label:'OK',act:'close'}])}); beep("square",r(200,400),0.12,0.10); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "unlicensed fun": (e) => { showFakePopup('Fun Permission Slip','Your imaginary Fun Permission Slip is covered in rabbit footprints.\n\nPlan: Chaos\nCost: one pretend carrot\nSeats: 1 soul',[{label:'Offer carrot',act:'buy'},{label:'Choose quiet mode',act:'down'},{label:'Not now',act:'close'}],{buy:()=>showFakePopup('Carrot accepted','The rabbit approves.\nNo money or personal information is involved.',[{label:'Done',act:'close'}]),down:()=>showFakePopup('Quiet-ish mode','You are now on Slightly Less Chaos.\nPopups: still enabled.',[{label:'OK',act:'close'}])}); beep("square",r(200,400),0.12,0.10); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
         "no thoughts": (e) => { togglePageClass('page-nothoughts'); beep("sine",r(150,280),0.18,0.06); spawnParticles(e.clientX,e.clientY,{count:r(6,10),durMin:1200,durMax:2000}); },
         "just vibes": (e) => { togglePageClass('page-justvibes'); togglePlasma(); beep("sine",r(250,450),0.14,0.06); spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"circles",durMin:800,durMax:1500}); },
         "certified moment": (e) => { document.querySelectorAll('.card').forEach(c=>{let s=c.querySelector('.stamp-mark');if(!s){s=document.createElement('div');s.className='stamp-mark';s.textContent='CERTIFIED ✓';s.style.transform='rotate('+r(-20,-5)+'deg)';s.style.color='hsl(140 70% 35%)';c.appendChild(s);}}); beep("triangle",r(400,600),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(12,18)}); },
@@ -3230,11 +3124,11 @@
 
         // ===== MEME ADS / CULTURE =====
         "HD loading": (e) => { showHdLoadingOverlay(); beep("sine",r(200,400),0.14,0.06); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
-        "hot singles": (e) => { for(let i=0;i<r(2,5);i++) setTimeout(showHotSinglesAd, i*180); beep("triangle",r(400,700),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"hearts"}); },
-        "enlarge": (e) => { for(let i=0;i<r(1,3);i++) setTimeout(showEnlargeAd, i*200); applyPermanentZoom(1.12); beep("sine",r(150,300),0.16,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18)}); },
-        "one weird trick": (e) => { showClickbaitAd(); showFakePopup('Sponsored', 'Surgeons in your area HATE this Useless Box.\n\nRead the full guide before your friends do.', [{ label: 'Read article', act: 'read' }, { label: 'Hide ad', act: 'close' }], { read: () => showRickrollWindow() }); beep("square",r(200,400),0.10,0.09); },
-        "free iPhone": (e) => { showPrizeAd(); beep("triangle",r(500,800),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"mixed"}); },
-        "Nigerian prince": (e) => { showPrinceEmail(); for(let i=0;i<2;i++) setTimeout(showPrizeAd, 300+i*200); beep("sine",r(250,450),0.12,0.07); },
+        "rabbit meetup": (e) => { for(let i=0;i<r(2,5);i++) setTimeout(showRabbitMeetup, i*180); beep("triangle",r(400,700),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"hearts"}); },
+        "zoom joke": (e) => { for(let i=0;i<r(1,3);i++) setTimeout(showZoomJoke, i*200); applyPermanentZoom(1.12); beep("sine",r(150,300),0.16,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18)}); },
+        "rabbit headline": (e) => { showClickbaitAd(); showFakePopup('Recommended nonsense', 'Several rabbits were surprised by this Useless Box.\n\nRead the entirely unnecessary guide.', [{ label: 'Read article', act: 'read' }, { label: 'Hide', act: 'close' }], { read: () => showRickrollWindow() }); beep("square",r(200,400),0.10,0.09); },
+        "confetti party": (e) => { showPrizeAd(); beep("triangle",r(500,800),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"mixed"}); },
+        "royal rabbit": (e) => { showRoyalRabbitEmail(); for(let i=0;i<2;i++) setTimeout(showPrizeAd, 300+i*200); beep("sine",r(250,450),0.12,0.07); },
         "clickbait": (e) => { for(let i=0;i<r(2,4);i++) setTimeout(showClickbaitAd, i*160); beep("triangle",r(400,700),0.10,0.07); },
         "rickroll": (e) => {
           showMemeBanner("Never gonna give you up 🎵", 'rick');
@@ -4050,13 +3944,13 @@
         ], { duration: 2200, easing:'ease-out' }).onfinish = () => b.remove();
       }
 
-      // batched bonus clicks (from toys) — counts toward the real global tally
+      // Bonus clicks from toys stay in this browser.
       function ubAddClicks(n){
         n = Math.max(0, Math.floor(n));
         if (!n) return;
-        clickCount += n; totalCount += n; pending += n;
+        clickCount += n;
+        totalCount = clickCount;
         saveLocal(); renderCounts();
-        clearTimeout(flushTimer); flushTimer = setTimeout(flushPending, 1000);
         checkMilestone();
       }
 
