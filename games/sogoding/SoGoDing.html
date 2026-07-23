@@ -965,7 +965,15 @@
     text-shadow:0 1px 3px #000,0 0 5px #000; box-shadow:inset 0 0 0 1px rgba(255,255,255,.04),0 3px 7px rgba(0,0,0,.4);
   }
   .creator-block-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .creator-scenery-sprite { width:54px; height:42px; flex:0 0 54px; border:1px solid rgba(180,205,214,.22); border-radius:3px; background-position:center; image-rendering:pixelated; }
+  .creator-scenery-sprite { width:54px; height:42px; flex:0 0 54px; position:relative; overflow:hidden; display:inline-block; border:1px solid rgba(180,205,214,.22); border-radius:3px; background:#172127; image-rendering:pixelated; }
+  .creator-scenery-sprite::before { content:""; position:absolute; left:var(--sprite-left); top:var(--sprite-top); width:var(--sprite-width); height:var(--sprite-height); background-image:var(--sprite-url); background-repeat:no-repeat; background-size:var(--sheet-width) var(--sheet-height); background-position:var(--sprite-x) var(--sprite-y); image-rendering:pixelated; }
+  .creator-block-sprite,.module-tray-sprite,.shop-icon { position:relative; overflow:hidden; background-color:#172127; }
+  .creator-block-sprite::before,.module-tray-sprite::before,.shop-icon::before { content:""; position:absolute; left:var(--sprite-left); top:var(--sprite-top); width:var(--sprite-width); height:var(--sprite-height); background-image:var(--sprite-url); background-repeat:no-repeat; background-size:var(--sheet-width) var(--sheet-height); background-position:var(--sprite-x) var(--sprite-y); image-rendering:pixelated; }
+  .creator-prop-tools { display:grid; grid-template-columns:1fr 92px; gap:6px; margin:7px 0; }
+  .creator-prop-list { display:grid; grid-template-columns:1fr; gap:5px; max-height:560px; overflow:auto; padding-right:2px; }
+  .creator-prop-card { width:100%; min-height:51px; padding:4px 6px; justify-content:flex-start; gap:8px; font-size:.61rem; text-align:left; }
+  .creator-prop-card .creator-block-name { display:block; color:#e7ecee; }
+  .creator-prop-card .prop-size { display:block; margin-top:2px; color:rgba(185,205,212,.48); font-family:var(--font-mono); font-size:.52rem; }
   .creator-palette-tabs { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:12px; }
   .creator-palette-tabs .active { background:rgba(212,175,55,.26); border-color:var(--brass); color:#fff; }
   #creator-inspector {
@@ -1258,7 +1266,10 @@
   }
 
   </style>
+  <script src="assets/prop-catalog.js"></script>
   <script>
+  document.documentElement.dataset.assetCatalogLoaded=String(!!window.SOGODING_ASSET_CATALOG);
+  document.documentElement.dataset.assetCatalogSheets=String(Object.keys(window.SOGODING_ASSET_CATALOG?.sheets||{}).length);
   window.addEventListener('error',function(event){
     document.documentElement.dataset.initError=(event.error&&event.error.stack)||event.message||'Unknown startup error';
   });
@@ -1903,6 +1914,16 @@
     robot_dispatcher:[11,284,176,116,154]
   };
 
+  const FACTORY_ISOLATED_ATLAS = new Image();
+  FACTORY_ISOLATED_ATLAS.decoding='async';
+  FACTORY_ISOLATED_ATLAS.src=window.SOGODING_ASSET_CATALOG?.moduleAtlas?.src||'assets/module-isolated.png';
+  function factorySpriteFrame(type) {
+    const frame=window.SOGODING_ASSET_CATALOG?.modules?.[type];
+    if(frame&&FACTORY_ISOLATED_ATLAS.complete&&FACTORY_ISOLATED_ATLAS.naturalWidth)return{img:FACTORY_ISOLATED_ATLAS,sx:frame[0],sy:frame[1],sw:frame[2],sh:frame[3]};
+    const def=FACTORY_SPRITE_DEFS[type],atlas=def&&FACTORY_ATLASES[def[0]];
+    return def&&atlas&&atlas.complete&&atlas.naturalWidth?{img:atlas,sx:def[1],sy:def[2],sw:def[3],sh:def[4]}:null;
+  }
+
   // Named scenery crops from every supplied factory atlas. Solid scenery is part
   // of the puzzle floorplan; floor markings and lights remain decorative.
   const FACTORY_SCENERY_DEFS = [
@@ -2010,6 +2031,8 @@
   const WORLD_SHEET_MAP = Object.fromEntries(WORLD_ASSET_SHEETS.map(sheet=>[sheet.id,sheet]));
   const WORLD_SHEET_INDEX = Object.fromEntries(WORLD_ASSET_SHEETS.map((sheet,index)=>[sheet.id,index]));
   const WORLD_SHEET_IMAGES = {};
+  const WORLD_PROP_CACHE = new Map();
+  const WORLD_PROP_META = new Map();
   function worldSheetImage(sheetId){
     const sheet=WORLD_SHEET_MAP[sheetId];if(!sheet)return null;
     if(!WORLD_SHEET_IMAGES[sheetId]){const img=new Image();img.decoding='async';img.src=sheet.src;WORLD_SHEET_IMAGES[sheetId]=img;}
@@ -2021,20 +2044,52 @@
   function worldSheets(key){return WORLD_ASSET_SHEETS.filter(sheet=>sheet.world===normalizeWorldKey(key));}
   function makeWorldAssetType(sheetId,col,row,cols=1,rows=1){return `asset|${sheetId}|${col}|${row}|${cols}|${rows}`;}
   function parseWorldAssetType(type){const p=String(type||'').split('|');if(p[0]!=='asset'||!WORLD_SHEET_MAP[p[1]])return null;const sheet=WORLD_SHEET_MAP[p[1]],col=Math.max(0,Math.min(sheet.cols-1,Number(p[2])||0)),row=Math.max(0,Math.min(sheet.rows-1,Number(p[3])||0)),cols=Math.max(1,Math.min(sheet.cols-col,Number(p[4])||1)),rows=Math.max(1,Math.min(sheet.rows-row,Number(p[5])||1));return{sheet,col,row,cols,rows};}
+  function makeWorldPropType(sheetId,x,y,w,h){return `prop|${sheetId}|${x}|${y}|${w}|${h}`;}
+  function parseWorldPropType(type){const p=String(type||'').split('|');if(p[0]!=='prop'||!WORLD_SHEET_MAP[p[1]])return null;const sheet=WORLD_SHEET_MAP[p[1]],x=Math.max(0,Math.min(sheet.width-1,Number(p[2])||0)),y=Math.max(0,Math.min(sheet.height-1,Number(p[3])||0)),w=Math.max(1,Math.min(sheet.width-x,Number(p[4])||1)),h=Math.max(1,Math.min(sheet.height-y,Number(p[5])||1));return{sheet,x,y,w,h};}
   function resolveSceneryDef(type,loadImage=false){
   const legacy=FACTORY_SCENERY_MAP[type];if(legacy)return{...legacy,img:FACTORY_ATLASES[legacy.atlas]};
+  const prop=parseWorldPropType(type);if(prop){const {sheet,x,y,w,h}=prop,meta=WORLD_PROP_META.get(type);return{id:type,name:meta?.name||`${sheet.label} · Isolated Prop`,category:meta?.category||sheet.pack,sx:x,sy:y,sw:w,sh:h,w,h,img:loadImage?worldSheetImage(sheet.id):null,sheet};}
   const asset=parseWorldAssetType(type);if(!asset)return null;const {sheet,col,row,cols,rows}=asset;
   return{id:type,name:`${sheet.label} · R${String(row+1).padStart(2,'0')} C${String(col+1).padStart(2,'0')} · ${cols}×${rows}`,category:sheet.pack,sx:col*48,sy:row*48,sw:cols*48,sh:rows*48,w:cols*48,h:rows*48,img:loadImage?worldSheetImage(sheet.id):null,sheet};
   }
   function sceneryTypeIsValid(type){return !!resolveSceneryDef(type);}
-  function sceneryDefaultSolid(type){const def=resolveSceneryDef(type);return !!def&&!['Floors','Lighting'].includes(def.category);}
+  function sceneryDefaultSolid(type){const def=resolveSceneryDef(type);return !!def&&!['Floors','Floor Detail','Wall Detail','Lighting','Signs & Details'].includes(def.category);}
   function sceneryIsSolid(item){return !!item&&(item.solid==null?sceneryDefaultSolid(item.type):!!item.solid);}
 
   function factorySceneryIconStyle(type, width=52, height=42) {
   const def=resolveSceneryDef(type);if(!def)return 'background:#641d20';
   const scale=Math.min(width/def.sw,height/def.sh),px=(width-def.sw*scale)/2-def.sx*scale,py=(height-def.sh*scale)/2-def.sy*scale;
   const src=def.sheet?def.sheet.src:`assets/${def.atlas}.png`,iw=def.sheet?.width||768,ih=def.sheet?.height||768;
-  return `background-color:#172127;background-image:url('${src}');background-repeat:no-repeat;background-size:${iw*scale}px ${ih*scale}px;background-position:${px}px ${py}px`;
+  return `--sprite-url:url('${src}');--sprite-left:${(width-def.sw*scale)/2}px;--sprite-top:${(height-def.sh*scale)/2}px;--sprite-width:${def.sw*scale}px;--sprite-height:${def.sh*scale}px;--sheet-width:${iw*scale}px;--sheet-height:${ih*scale}px;--sprite-x:${-def.sx*scale}px;--sprite-y:${-def.sy*scale}px`;
+  }
+
+  function classifyWorldProp(width,height,pixels) {
+    const ratio=width/Math.max(1,height),coverage=pixels/Math.max(1,width*height);
+    if(width>=260&&height>=150)return['Large Installations','Large Installation'];
+    if(ratio>=3.2&&height<115)return['Structures','Long Structure'];
+    if(height>=150&&width<115)return['Utilities','Tower / Vertical Fixture'];
+    if(width>=150&&height>=95)return['Machinery','Machine Bank'];
+    if(width>=105&&height<42)return['Floor Detail','Floor Detail'];
+    if(width>=110&&height<90)return['Workstations','Console / Workbench'];
+    if(height>=95&&width<95)return['Storage','Cabinet / Storage'];
+    if(width<=42&&height<=42)return['Signs & Details',coverage<.24?'Sign / Marker':'Small Detail'];
+    if(width<=82&&height<=82)return['Workshop Props','Workshop Prop'];
+    return['Machinery','Industrial Prop'];
+  }
+  async function scanWorldSheetProps(sheet) {
+    if(WORLD_PROP_CACHE.has(sheet.id))return WORLD_PROP_CACHE.get(sheet.id);
+    const promise=Promise.resolve().then(()=>{
+      const prepared=window.SOGODING_ASSET_CATALOG?.sheets?.[sheet.id]||[],counters={};
+      return prepared.map(part=>{
+        const [x,y,w,h,pixels]=part,[category,baseName]=classifyWorldProp(w,h,pixels);
+        counters[baseName]=(counters[baseName]||0)+1;const type=makeWorldPropType(sheet.id,x,y,w,h),name=`${baseName} ${String(counters[baseName]).padStart(2,'0')}`;
+        const prop={type,name,category,sheetId:sheet.id,sw:w,sh:h};WORLD_PROP_META.set(type,{name:`${sheet.file.replace(/\.png$/i,'')} · ${name}`,category});return prop;
+      });
+    });
+    WORLD_PROP_CACHE.set(sheet.id,promise);return promise;
+  }
+  async function worldPremadeProps(worldKey) {
+    const groups=await Promise.all(worldSheets(worldKey).map(scanWorldSheetProps));return groups.flat();
   }
 
   function factoryRoomFromNodes(nodes) {
@@ -2089,7 +2144,8 @@
     if (FACTORY_PLACEHOLDER_TYPES.has(factorySpriteType(type))) {
       return `background-color:#641d20;background-image:linear-gradient(45deg,transparent 42%,#ff5959 43% 57%,transparent 58%),linear-gradient(-45deg,transparent 42%,#ff5959 43% 57%,transparent 58%);background-size:100% 100%;background-position:center`;
     }
-    const def = FACTORY_SPRITE_DEFS[factorySpriteType(type)] || FACTORY_SPRITE_DEFS.wall;
+    const spriteType=factorySpriteType(type),def = FACTORY_SPRITE_DEFS[spriteType] || FACTORY_SPRITE_DEFS.wall,isolated=window.SOGODING_ASSET_CATALOG?.modules?.[spriteType],atlas=window.SOGODING_ASSET_CATALOG?.moduleAtlas;
+    if(isolated&&atlas){const [sx,sy,sw,sh]=isolated,scale=Math.min(size/sw,size/sh);return `--sprite-url:url('${atlas.src}');--sprite-left:${(size-sw*scale)/2}px;--sprite-top:${(size-sh*scale)/2}px;--sprite-width:${sw*scale}px;--sprite-height:${sh*scale}px;--sheet-width:${atlas.width*scale}px;--sheet-height:${atlas.height*scale}px;--sprite-x:${-sx*scale}px;--sprite-y:${-sy*scale}px`;}
     const scale = Math.min(size / def[3], size / def[4]);
     const px = (size - def[3] * scale) / 2 - def[1] * scale;
     const py = (size - def[4] * scale) / 2 - def[2] * scale;
@@ -3058,7 +3114,7 @@
   }
   function sg2EncodeLevel(level) {
   const w = new Sg2W();
-  w.u8(0x53); w.u8(0x47); w.u8(0x04);
+    w.u8(0x53); w.u8(0x47); w.u8(0x05);
   let flags = 8; if (level.startingZoom) flags |= 1; if(level.room)flags|=2;if(level.scenery?.length)flags|=4;w.u8(flags);
     if (flags & 1) w.u8(Math.round(Math.max(0.3, Math.min(2.5, level.startingZoom)) * 10));
     w.u8(Math.max(0,WORLD_KEYS.indexOf(normalizeWorldKey(level.world))));
@@ -3100,13 +3156,13 @@
       if (f2 & 16) w.u8(Math.round(cfg.delaySeconds * 10) & 255);
     }
     if(flags&2){const room=normalizeFactoryRoom(level.room,nodes);w.i16(room.x);w.i16(room.y);w.i16(room.w);w.i16(room.h);w.i16(room.floorY);w.u8(room.variant||0);w.u8(room.autoWallBackdrop===false?0:1);}
-    if(flags&4){const scenery=(level.scenery||[]).filter(s=>sceneryTypeIsValid(s.type)).slice(0,255);w.u8(scenery.length);for(const s of scenery){const asset=parseWorldAssetType(s.type);if(asset){w.u8(1);w.u8(WORLD_SHEET_INDEX[asset.sheet.id]);w.u8(asset.col);w.u8(asset.row);w.u8(asset.cols);w.u8(asset.rows);}else{w.u8(0);w.u8(Math.max(0,FACTORY_SCENERY_TYPES.indexOf(s.type)));}w.i16(Math.round(s.x||0));w.i16(Math.round(s.y||0));w.u8(((s.rotation||0)&3)|(sceneryIsSolid(s)?0:128)|(s.layer==='wall'?4:0)|(s.wallPanel?8:0));w.u8(Math.max(3,Math.min(30,Math.round((s.scale||1)*10))));}}
+    if(flags&4){const scenery=(level.scenery||[]).filter(s=>sceneryTypeIsValid(s.type)).slice(0,255);w.u8(scenery.length);for(const s of scenery){const prop=parseWorldPropType(s.type),asset=parseWorldAssetType(s.type);if(prop){w.u8(2);w.u8(WORLD_SHEET_INDEX[prop.sheet.id]);w.u16(prop.x);w.u16(prop.y);w.u16(prop.w);w.u16(prop.h);}else if(asset){w.u8(1);w.u8(WORLD_SHEET_INDEX[asset.sheet.id]);w.u8(asset.col);w.u8(asset.row);w.u8(asset.cols);w.u8(asset.rows);}else{w.u8(0);w.u8(Math.max(0,FACTORY_SCENERY_TYPES.indexOf(s.type)));}w.i16(Math.round(s.x||0));w.i16(Math.round(s.y||0));w.u8(((s.rotation||0)&3)|(sceneryIsSolid(s)?0:128)|(s.layer==='wall'?4:0)|(s.wallPanel?8:0));w.u8(Math.max(3,Math.min(30,Math.round((s.scale||1)*10))));}}
     return w.bytes();
   }
   function sg2DecodeLevel(bytes) {
     const r = new Sg2R(bytes);
     if (r.u8() !== 0x53 || r.u8() !== 0x47) throw new Error('bad SG2');
-    const version=r.u8();if(version!==2&&version!==3&&version!==4)throw new Error('unsupported SG2 version');
+    const version=r.u8();if(version!==2&&version!==3&&version!==4&&version!==5)throw new Error('unsupported SG2 version');
     const flags = r.u8();
     let startingZoom; if (flags & 1) startingZoom = r.u8() / 10;
     let world=null;if(version>=3&&(flags&8))world=WORLD_KEYS[r.u8()]||'factory';
@@ -3140,7 +3196,7 @@
     }
     let room=null,scenery=[];
     if((flags&2)&&r.remaining()>=10){const roomData={x:r.i16(),y:r.i16(),w:r.i16(),h:r.i16(),floorY:r.i16()};if(version>=3&&r.remaining())roomData.variant=r.u8();if(version>=4&&r.remaining())roomData.autoWallBackdrop=r.u8()!==0;room=normalizeFactoryRoom(roomData,nodes);}
-    if((flags&4)&&r.remaining()){const sceneryCount=r.u8();for(let i=0;i<sceneryCount;i++){let type;if(version>=3){if(r.remaining()<8)break;const kind=r.u8();if(kind===1){const sheet=WORLD_ASSET_SHEETS[r.u8()],col=r.u8(),row=r.u8(),cols=r.u8(),rows=r.u8();if(sheet)type=makeWorldAssetType(sheet.id,col,row,cols,rows);}else type=FACTORY_SCENERY_TYPES[r.u8()];}else{if(r.remaining()<7)break;type=FACTORY_SCENERY_TYPES[r.u8()];}const x=r.i16(),y=r.i16(),packedRotation=r.u8(),rotation=packedRotation&3,solid=(packedRotation&128)===0,layer=version>=4&&(packedRotation&4)?'wall':'floor',wallPanel=version>=4&&!!(packedRotation&8),scale=r.u8()/10;if(type&&sceneryTypeIsValid(type))scenery.push({id:'s'+i,type,x,y,rotation,scale,solid,layer,wallPanel});}}
+    if((flags&4)&&r.remaining()){const sceneryCount=r.u8();for(let i=0;i<sceneryCount;i++){let type;if(version>=3){if(r.remaining()<2)break;const kind=r.u8();if(kind===2&&version>=5){if(r.remaining()<9)break;const sheet=WORLD_ASSET_SHEETS[r.u8()],px=r.u16(),py=r.u16(),pw=r.u16(),ph=r.u16();if(sheet)type=makeWorldPropType(sheet.id,px,py,pw,ph);}else if(kind===1){if(r.remaining()<5)break;const sheet=WORLD_ASSET_SHEETS[r.u8()],col=r.u8(),row=r.u8(),cols=r.u8(),rows=r.u8();if(sheet)type=makeWorldAssetType(sheet.id,col,row,cols,rows);}else type=FACTORY_SCENERY_TYPES[r.u8()];}else{if(r.remaining()<7)break;type=FACTORY_SCENERY_TYPES[r.u8()];}if(r.remaining()<6)break;const x=r.i16(),y=r.i16(),packedRotation=r.u8(),rotation=packedRotation&3,solid=(packedRotation&128)===0,layer=version>=4&&(packedRotation&4)?'wall':'floor',wallPanel=version>=4&&!!(packedRotation&8),scale=r.u8()/10;if(type&&sceneryTypeIsValid(type))scenery.push({id:'s'+i,type,x,y,rotation,scale,solid,layer,wallPanel});}}
     const level = { contract, nodes, room:room||factoryRoomFromNodes(nodes), scenery, world };
     if (startingZoom) level.startingZoom = startingZoom;
     return level;
@@ -6517,7 +6573,7 @@
   }
 
   drawFactoryNativeMachine(n,powered=false) {
-  const ctx=this.ctx,type=n.type,def=FACTORY_SPRITE_DEFS[type],img=def&&FACTORY_ATLASES[def[0]],now=this.factoryActive?Date.now():this.simulationNow();
+  const ctx=this.ctx,type=n.type,def=FACTORY_SPRITE_DEFS[type],frame=factorySpriteFrame(type),img=frame?.img,now=this.factoryActive?Date.now():this.simulationNow();
   const layouts={
     transfer_claw:{w:92,h:94,y:-15,label:'TRANSFER CLAW'},diverter_arm:{w:126,h:66,y:-2,label:'DIVERTER ARM'},
     assembly_arm:{w:92,h:92,y:-14,label:'ASSEMBLY ARM'},gantry_crane:{w:154,h:79,y:-22,label:'GANTRY CRANE'},
@@ -6533,9 +6589,9 @@
   ctx.save();ctx.fillStyle='rgba(0,0,0,.34)';ctx.beginPath();ctx.ellipse(n.x+40,n.y+68,Math.min(57,layout.w*.43),Math.min(16,layout.h*.13),0,0,Math.PI*2);ctx.fill();
   ctx.translate(n.x+40,n.y+40);ctx.rotate(rot*Math.PI/2);
   const bob=robotMotion?Math.sin(progress*Math.PI*4)*2.2:(ROBOT_MACHINE_TYPES.has(type)?Math.sin(now*.004+n.x)*.8:0),walkX=robotMotion?(progress-.5)*20:0;
-  if(img&&img.complete&&img.naturalWidth){
+  if(img&&(img instanceof HTMLCanvasElement||img.complete&&img.naturalWidth)){
     ctx.imageSmoothingEnabled=false;ctx.shadowBlur=powered?16:7;ctx.shadowColor=ROBOT_VISUAL_TYPES.has(type)?'rgba(164,117,255,.72)':'rgba(255,202,92,.58)';
-    ctx.drawImage(img,def[1],def[2],def[3],def[4],-layout.w/2+walkX,-layout.h/2+layout.y+bob,layout.w,layout.h);ctx.shadowBlur=0;
+    ctx.drawImage(img,frame.sx,frame.sy,frame.sw,frame.sh,-layout.w/2+walkX,-layout.h/2+layout.y+bob,layout.w,layout.h);ctx.shadowBlur=0;
   }
   if(ELEVATED_ROLLER_TYPES.has(type)){
     const phase=powered?(now*.08)%16:0;ctx.strokeStyle=powered?'rgba(255,224,139,.88)':'rgba(194,210,214,.6)';ctx.lineWidth=2;
@@ -6597,7 +6653,7 @@
   drawFactoryMountedMachine(n, ghost=false, ghostCell=null) {
   const ctx=this.ctx;const ox=n.x,oy=n.y;
   if(ghost&&ghostCell){n.x=ghostCell.x;n.y=ghostCell.y;ctx.save();ctx.globalAlpha=.52;}
-  const type=factorySpriteType(n.type);const placeholder=FACTORY_PLACEHOLDER_TYPES.has(type);const def=FACTORY_SPRITE_DEFS[type];
+  const type=factorySpriteType(n.type);const placeholder=FACTORY_PLACEHOLDER_TYPES.has(type);const def=FACTORY_SPRITE_DEFS[type],frame=def?factorySpriteFrame(type):null;
   const powered=!!this._factoryPower?.nodes?.has(n.id)||n.isPowered||this.connections.some(c=>c.fid===n.id&&this.inTransit.some(t=>t.fid===c.fid));
   if(n.type!==MACHINE_TYPES.WALL&&!SPRITE_NATIVE_TYPES.has(n.type))this.drawFactoryMachineFoundation(n,powered);
   ctx.save();
@@ -6611,14 +6667,14 @@
   ctx.strokeStyle='#ff6666';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(n.x+21,n.y+5);ctx.lineTo(n.x+59,n.y+48);ctx.moveTo(n.x+59,n.y+5);ctx.lineTo(n.x+21,n.y+48);ctx.stroke();
   ctx.fillStyle='#fff';ctx.font='800 7px Orbitron';ctx.textAlign='center';ctx.fillText('ASSET NEEDED',n.x+40,n.y+58);ctx.restore();
   }else{
-  const img=FACTORY_ATLASES[def[0]];const isEndpoint=n.type===MACHINE_TYPES.SPAWNER||n.type===MACHINE_TYPES.COLLECTOR;
+  const img=frame?.img;const isEndpoint=n.type===MACHINE_TYPES.SPAWNER||n.type===MACHINE_TYPES.COLLECTOR;
   const boxW=isEndpoint?92:82,boxH=isEndpoint?84:78,boxX=n.x+(80-boxW)/2,boxY=n.y-(isEndpoint?16:12);
   ctx.fillStyle='rgba(0,0,0,.33)';ctx.beginPath();ctx.ellipse(n.x+40,n.y+55,34,13,0,0,Math.PI*2);ctx.fill();
-  if(img&&img.complete&&img.naturalWidth){
-  const scale=Math.min(boxW/def[3],boxH/def[4]);const w=def[3]*scale,h=def[4]*scale;
+  if(img&&(img instanceof HTMLCanvasElement||img.complete&&img.naturalWidth)){
+  const scale=Math.min(boxW/frame.sw,boxH/frame.sh);const w=frame.sw*scale,h=frame.sh*scale;
   ctx.imageSmoothingEnabled=false;ctx.shadowBlur=powered?15:7;ctx.shadowColor=powered?'rgba(255,197,72,.55)':'rgba(0,0,0,.62)';
   let pressOffset=0;if([MACHINE_TYPES.SIDE_ADD,MACHINE_TYPES.SIDE_SUB,MACHINE_TYPES.SIDE_DOUBLER,MACHINE_TYPES.HYDRAULIC_PRESS].includes(n.type)&&this.inTransit.some(t=>t.tid===n.id&&t.progress>.72))pressOffset=3;
-  ctx.drawImage(img,def[1],def[2],def[3],def[4],boxX+(boxW-w)/2,boxY+(boxH-h)/2+pressOffset,w,h);ctx.shadowBlur=0;
+  ctx.drawImage(img,frame.sx,frame.sy,frame.sw,frame.sh,boxX+(boxW-w)/2,boxY+(boxH-h)/2+pressOffset,w,h);ctx.shadowBlur=0;
   }
   const isDyeVat=n.type===MACHINE_TYPES.DYE_VAT||n.type===MACHINE_TYPES.POWERED_DYE_VAT;
   const dyeKey=String(n.config?.color||'red').toLowerCase();
@@ -10329,6 +10385,8 @@
   }
 
   applyLevelToCreator(level, meta) {
+  this.creatorSelectedBlock=null;this.creatorSelectedScenery=null;this.creatorSelectedNode=null;this.creatorSelectedSceneryItem=null;this.creatorSelectedRoom=false;this.creatorMovingNode=null;this.creatorMovingScenery=null;this.creatorMovingRoom=false;this.creatorMoveOffset=null;this.wiring=null;this.dragging=null;
+  const inspector=document.getElementById('creator-inspector');if(inspector)inspector.style.display='none';
   this.creatorNodes = [];
   this.creatorConnections = [];
   let maxId = 0;
@@ -10591,11 +10649,11 @@
   html += '</div></div>';
 
   html += '<div id="creator-scenery-panel" style="display:none">';
-  html += '<h3 style="color:var(--brass);font-size:.8rem;margin-bottom:8px;">WORLD BACKDROP</h3><p style="font-size:.65rem;color:var(--text-dim);line-height:1.45;margin-bottom:10px;">Choose a world and floorplan, then drag a box directly over any atlas. The box snaps to the asset grid; release to pick that exact crop, then click the workspace to place it.</p>';
+  html += '<h3 style="color:var(--brass);font-size:.8rem;margin-bottom:8px;">WORLD BACKDROP</h3><p style="font-size:.65rem;color:var(--text-dim);line-height:1.45;margin-bottom:10px;">Choose a world and floorplan, then decorate from the isolated prop library. The raw atlas selector remains below for unusual multi-tile structures.</p>';
   html += '<label style="font-size:.62rem;color:var(--text-dim)">STORY WORLD</label><select id="creator-world-select" class="crt-input" style="width:100%;margin:4px 0 10px" onchange="game.setCreatorWorld(this.value)"><optgroup label="MAIN STORY">'+WORLD_ORDER.filter(k=>!WORLD_REGISTRY[k].bonus).map(k=>`<option value="${k}"${k===this.creatorWorld?' selected':''}>${String(WORLD_KEYS.indexOf(k)+1).padStart(2,'0')} · ${WORLD_REGISTRY[k].name}</option>`).join('')+'</optgroup><optgroup label="BONUS AFTERMATH">'+WORLD_ORDER.filter(k=>WORLD_REGISTRY[k].bonus).map(k=>`<option value="${k}">${WORLD_REGISTRY[k].name}</option>`).join('')+'</optgroup></select>';
   html += '<div id="creator-world-story" style="font-size:.64rem;color:var(--brass);margin-bottom:10px"></div><div id="creator-room-presets"></div>';
   html += '<button class="btn btn-gold" style="width:100%;margin:2px 0 6px" onclick="game.selectCreatorRoomTool()">SELECT / MOVE ROOM</button><button class="btn" style="width:100%;margin:0 0 14px" onclick="game.restoreCreatorDefaultWall()">RESTORE DEFAULT WALL PANELS</button><div style="font-size:.62rem;color:#8defff;line-height:1.45;margin:-5px 0 10px">The top buildings are individual scenery panels. Drag them directly, press Delete, or use their inspector.</div>';
-  html += '<div id="creator-atlas-browser"></div><div id="creator-curated-assets"></div>';
+  html += '<div id="creator-curated-assets"></div><div id="creator-atlas-browser"></div>';
   html += '</div>';
   
   // Production Log section
@@ -11373,8 +11431,24 @@
   const story=document.getElementById('creator-world-story');if(story)story.textContent=(world.bonus?'BONUS · ':'')+world.story+' · '+world.packs.reduce((n,p)=>n+p[2].length,0)+' atlas sheets';
   const presets=document.getElementById('creator-room-presets');if(presets)presets.innerHTML=worldRoomPresets(key).map(p=>`<button class="btn" style="width:100%;margin-bottom:6px;justify-content:flex-start" onclick="game.applyCreatorRoomPreset('${p.id}')">${p.name} · ${p.w/80}×${p.h/80} bays</button>`).join('');
   const sheets=worldSheets(key);if(!WORLD_SHEET_MAP[this.creatorAtlasSheet]||WORLD_SHEET_MAP[this.creatorAtlasSheet].world!==key)this.creatorAtlasSheet=sheets[0]?.id||null;
-  const browser=document.getElementById('creator-atlas-browser');if(browser){browser.innerHTML='<h3 style="color:var(--brass);font-size:.72rem;margin:12px 0 7px;border-bottom:1px solid rgba(205,175,120,.2);padding-bottom:4px">ALL WORLD ASSETS</h3><label style="font-size:.6rem;color:var(--text-dim)">ATLAS SHEET</label><select id="creator-atlas-sheet" class="crt-input" style="width:100%;margin:4px 0 8px" onchange="game.setCreatorAtlasSheet(this.value)">'+sheets.map(s=>`<option value="${s.id}"${s.id===this.creatorAtlasSheet?' selected':''}>${s.label}</option>`).join('')+'</select><div id="creator-atlas-selection" style="min-height:44px;padding:6px;border:1px solid rgba(205,175,120,.2);font-size:.6rem;color:var(--text-dim);margin-bottom:8px"><b style="color:var(--brass)">DRAG TO SELECT</b><br>The selection box snaps to whole atlas cells.</div><div id="creator-atlas-grid"></div>';this.renderCreatorAtlasGrid();}
-  const curated=document.getElementById('creator-curated-assets');if(curated)curated.innerHTML=key==='factory'?'<details style="margin-top:12px"><summary style="cursor:pointer;color:var(--brass);font-size:.7rem">CURATED FACTORY CROPS (67)</summary>'+FACTORY_SCENERY_DEFS.map(def=>`<button class="btn scenery-btn" data-scenery="${def.id}" style="margin-top:6px;width:100%;font-size:.64rem;justify-content:flex-start;gap:8px" onclick="game.selectCreatorScenery('${def.id}')"><span class="creator-scenery-sprite" style="${factorySceneryIconStyle(def.id,54,42)}"></span><span class="creator-block-name">${def.name}</span></button>`).join('')+'</details>':'';
+  const curated=document.getElementById('creator-curated-assets');if(curated){curated.innerHTML='<h3 style="color:var(--brass);font-size:.72rem;margin:12px 0 7px;border-bottom:1px solid rgba(205,175,120,.2);padding-bottom:4px">PRE-MADE ISOLATED PROPS</h3><div class="creator-prop-tools"><input id="creator-prop-search" class="crt-input" placeholder="Search props..." oninput="game.filterCreatorProps()"><select id="creator-prop-category" class="crt-input" onchange="game.filterCreatorProps()"><option value="">All types</option></select></div><div id="creator-prop-count" style="font-size:.56rem;color:var(--text-dim);margin-bottom:5px">Scanning supplied sheets...</div><div id="creator-prop-list" class="creator-prop-list"></div>'+(key==='factory'?'<details style="margin-top:12px"><summary style="cursor:pointer;color:var(--brass);font-size:.7rem">HAND-CURATED FACTORY SET ('+FACTORY_SCENERY_DEFS.length+')</summary>'+FACTORY_SCENERY_DEFS.map(def=>`<button class="btn scenery-btn" data-scenery="${def.id}" style="margin-top:6px;width:100%;font-size:.64rem;justify-content:flex-start;gap:8px" onclick="game.selectCreatorScenery('${def.id}')"><span class="creator-scenery-sprite" style="${factorySceneryIconStyle(def.id,54,42)}"></span><span class="creator-block-name">${def.name}</span></button>`).join('')+'</details>':'');this.renderCreatorPropLibrary();}
+  const browser=document.getElementById('creator-atlas-browser');if(browser){browser.innerHTML='<details style="margin-top:12px"><summary style="cursor:pointer;color:rgba(205,175,120,.72);font-size:.67rem">ADVANCED · RAW ATLAS CROP TOOL</summary><label style="display:block;font-size:.6rem;color:var(--text-dim);margin-top:8px">ATLAS SHEET</label><select id="creator-atlas-sheet" class="crt-input" style="width:100%;margin:4px 0 8px" onchange="game.setCreatorAtlasSheet(this.value)">'+sheets.map(s=>`<option value="${s.id}"${s.id===this.creatorAtlasSheet?' selected':''}>${s.label}</option>`).join('')+'</select><div id="creator-atlas-selection" style="min-height:44px;padding:6px;border:1px solid rgba(205,175,120,.2);font-size:.6rem;color:var(--text-dim);margin-bottom:8px"><b style="color:var(--brass)">DRAG TO SELECT</b><br>The selection box snaps to whole atlas cells.</div><div id="creator-atlas-grid"></div></details>';this.renderCreatorAtlasGrid();}
+  }
+
+  async renderCreatorPropLibrary() {
+  const worldKey=normalizeWorldKey(this.creatorWorld),host=document.getElementById('creator-prop-list'),count=document.getElementById('creator-prop-count');if(!host)return;const request=(this._creatorPropRequest||0)+1;this._creatorPropRequest=request;
+  try{
+  const detected=await worldPremadeProps(worldKey);if(request!==this._creatorPropRequest||normalizeWorldKey(this.creatorWorld)!==worldKey)return;
+  const factoryCurated=worldKey==='factory'?FACTORY_SCENERY_DEFS.map(def=>({type:def.id,name:def.name,category:def.category,sw:def.sw,sh:def.sh})):[],props=[...factoryCurated,...detected],search=(document.getElementById('creator-prop-search')?.value||'').trim().toLowerCase(),categorySelect=document.getElementById('creator-prop-category'),selectedCategory=categorySelect?.value||'',categories=[...new Set(props.map(p=>p.category))].sort();
+  if(categorySelect){categorySelect.innerHTML='<option value="">All types</option>'+categories.map(category=>`<option value="${category}"${category===selectedCategory?' selected':''}>${category}</option>`).join('');}
+  const filtered=props.filter(prop=>(!selectedCategory||prop.category===selectedCategory)&&(!search||(prop.name+' '+prop.category).toLowerCase().includes(search)));
+  if(count)count.textContent=`${filtered.length} shown · ${props.length} ready-to-place props from ${worldSheets(worldKey).length} sheets`;
+  host.innerHTML=filtered.map(prop=>`<button class="btn scenery-btn creator-prop-card" data-scenery="${prop.type}" onclick="game.selectCreatorScenery('${prop.type}')"><span class="creator-scenery-sprite" style="${factorySceneryIconStyle(prop.type,54,42)}"></span><span style="min-width:0"><span class="creator-block-name">${prop.name}</span><span class="prop-size">${prop.category} · ${prop.sw}×${prop.sh}px</span></span></button>`).join('')||'<div style="font-size:.62rem;color:var(--text-dim);padding:8px">No props match that filter.</div>';
+  }catch(error){if(count)count.textContent='Prop scan failed';host.innerHTML='<div style="font-size:.62rem;color:#ff8b7f;padding:8px">Could not read this atlas. The raw crop tool is still available.</div>';console.error(error);}
+  }
+
+  filterCreatorProps() {
+  this.renderCreatorPropLibrary();
   }
 
   setCreatorAtlasSheet(id) {
@@ -14285,6 +14359,9 @@
   const codecLevel={contract:{shape:'circle',color:'red'},nodes:[],world:'factory',scenery:[{id:'solid',type:solidSceneryType,x:40,y:40,rotation:1,scale:1,solid:true},{id:'decor',type:solidSceneryType,x:240,y:40,rotation:2,scale:1,solid:false}]};
   const decodedCollision=decodeSeedPayload(encodeSeedPayload(codecLevel));if(decodedCollision.scenery.length!==2||decodedCollision.scenery[0].solid!==true||decodedCollision.scenery[1].solid!==false)issues.push('scenery collision: compact save/load lost solidity');
   }
+  const propSheet=WORLD_ASSET_SHEETS[0],propCodecType=makeWorldPropType(propSheet.id,7,11,53,67),propCodecLevel={contract:{shape:'circle',color:'red'},nodes:[],world:'factory',scenery:[{id:'prop',type:propCodecType,x:120,y:160,rotation:3,scale:1.2,solid:false}]},decodedPropCodec=decodeSeedPayload(encodeSeedPayload(propCodecLevel)),decodedProp=parseWorldPropType(decodedPropCodec.scenery[0]?.type);
+  if(!decodedProp||decodedProp.sheet.id!==propSheet.id||decodedProp.x!==7||decodedProp.y!==11||decodedProp.w!==53||decodedProp.h!==67||decodedPropCodec.scenery[0].rotation!==3||decodedPropCodec.scenery[0].solid!==false)issues.push('isolated props: exact-pixel compact save/load contract failed');
+  const isolatedSpriteFrames=declaredTypes.filter(type=>factorySpriteFrame(type)).length;
 
   const spriteKeys = Object.keys(FACTORY_SPRITE_DEFS);
   spriteKeys.filter(type => !declaredTypes.includes(type)).forEach(type => warnings.push(`${type}: sprite exists without a declared module`));
@@ -14312,6 +14389,8 @@
   compatibleSocketPairs,
   paletteEntries: paletteTypes.length,
   sceneryCollisionContracts: 4,
+  isolatedPropCodecContracts: 1,
+  isolatedSpriteFrames,
   factoryRobotPersistenceContracts: 1,
   nativeMachineMechanicContracts: 7
   },
