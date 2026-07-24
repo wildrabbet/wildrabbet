@@ -1,0 +1,1806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!--
+  DIS — HOW TO SURVIVE IN HELL
+  A survival sim after "How to Survive in Hell" by u/Ratrotted (r/nosleep, 2017).
+  Full design spec: ./PLAN.md   Skies: procedural fallback (Brutal Skyboxes manifest in §9 of the plan).
+
+  You wake in a birthing sac. Claw out. Kill the first person you see.
+  Find a weapon, then clothes, then shelter. Boil the rain. Roast the meat.
+  Sleep somewhere hidden. The pillar of fire is the only way out.
+
+  Controls: WASD move · Shift sprint · Ctrl crouch · Space jump
+  LMB attack · Hold RMB block · Hold G charge throw · E interact · Q drop held
+  1-6 hands/inventory · C craft · Tab status · H handbook · N nest down (sleep) · F suppress memory
+  K give up (accept death) · Esc menu
+-->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DIS — How to Survive in Hell</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0708}
+body{font-family:'Courier New',ui-monospace,monospace;color:#cfc4b8;user-select:none;-webkit-user-select:none}
+canvas{position:fixed;inset:0;display:block}
+.ov{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:rgba(5,3,4,.92)}
+.hidden{display:none!important}
+h1{font-size:34px;letter-spacing:.35em;color:#b8352a;font-weight:400;text-shadow:0 0 30px rgba(160,30,20,.7)}
+h2{font-size:15px;letter-spacing:.5em;color:#7a6c62;font-weight:400;margin-top:6px}
+.note{max-width:560px;font-size:12px;line-height:1.7;color:#8d7f74;margin:22px 16px}
+.rec{font-size:12px;color:#6b5f57;letter-spacing:.15em;margin-top:10px}
+.btn{display:inline-block;margin:8px;padding:10px 26px;border:1px solid #6b352c;color:#d8c8bc;font-size:13px;letter-spacing:.25em;cursor:pointer;background:rgba(40,12,10,.35)}
+.btn:hover{background:#4a1610;color:#fff}
+.small{font-size:10px;color:#5c524b;margin-top:14px;line-height:1.8}
+a{color:#8d6b5a}
+#hud{position:fixed;inset:0;z-index:5;pointer-events:none}
+#cross{position:fixed;top:50%;left:50%;width:3px;height:3px;margin:-1px;background:#cdb;opacity:.7;border-radius:50%}
+#prompt{position:absolute;bottom:17%;width:100%;text-align:center;font-size:13px;color:#e8ddd2;text-shadow:0 1px 3px #000}
+#feed{position:absolute;left:14px;bottom:14px;font-size:11px;line-height:1.7;color:#9d8e82;text-shadow:0 1px 2px #000;max-width:44ch}
+#feed .bad{color:#c05a4a} #feed .good{color:#9fae7e}
+#day{position:absolute;top:12px;right:16px;font-size:11px;letter-spacing:.2em;color:#77675d;text-align:right;text-shadow:0 1px 2px #000}
+#conds{position:absolute;bottom:14px;right:16px;text-align:right;font-size:11px;line-height:1.8;text-shadow:0 1px 2px #000}
+#conds span{display:block}
+.c1{color:#9a8b7f}.c2{color:#c9a24a}.c3{color:#c05a3a}.c4{color:#e03a2a;animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.35}}
+#stam{position:absolute;bottom:8px;left:50%;width:120px;height:3px;margin-left:-60px;background:rgba(255,255,255,.08)}
+#stamF{height:100%;width:100%;background:#7d8a6a}
+#vig{position:fixed;inset:0;pointer-events:none;z-index:6;box-shadow:inset 0 0 120px rgba(0,0,0,.55);transition:box-shadow .3s}
+#panel{position:fixed;top:8%;left:50%;transform:translateX(-50%);z-index:11;background:rgba(10,6,6,.95);border:1px solid #3a2620;padding:18px 26px;font-size:12px;line-height:1.85;min-width:340px;max-width:560px;max-height:80%;overflow-y:auto}
+#panel h3{color:#b8352a;letter-spacing:.3em;font-size:13px;font-weight:400;margin-bottom:8px}
+#panel .opt{cursor:pointer;padding:1px 0}
+#panel .opt:hover{color:#fff}
+#panel .dim{color:#5c524b}
+#panel .key{color:#c9a24a}
+#sacov{background:radial-gradient(ellipse at 50% 55%, rgba(120,30,20,.55), rgba(25,4,4,.97) 75%)}
+#sacov .note{color:#caa}
+#air{width:220px;height:5px;background:rgba(255,255,255,.1);margin-top:18px}
+#airF{height:100%;width:100%;background:#7d9aaa}
+#deathq{max-width:600px;font-size:13px;line-height:1.9;color:#b3a598;margin:18px;font-style:italic}
+#deathq b{color:#c9a24a;font-style:normal}
+.dtitle{font-size:24px;letter-spacing:.45em;color:#8d1f16}
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="cross"></div>
+  <div id="prompt"></div>
+  <div id="feed"></div>
+  <div id="day"></div>
+  <div id="conds"></div>
+  <div id="stam"><div id="stamF"></div></div>
+</div>
+<div id="vig"></div>
+<div id="panel" class="hidden"></div>
+
+<div id="title" class="ov">
+  <h1>D I S</h1><h2>HOW TO SURVIVE IN HELL</h2>
+  <div class="note">There are no plants. There are no animals. There are no demons.<br>There is the rain, the city, and the others.<br><br>
+  <span style="color:#a33">18+ — extreme violence, cannibalism, body horror, despair.</span></div>
+  <div class="rec" id="titleRec"></div>
+  <div class="btn" id="btnStart">WAKE UP</div>
+  <div class="small">after "How to Survive in Hell" by u/Ratrotted (r/nosleep, 2017) · skies inspired by Brutal Skyboxes (Pizza Doggy)<br>
+  WASD+mouse · LMB attack · RMB block · G throw · E interact · C craft · N sleep · Tab status · H handbook<br>
+  <span id="btnGore" style="cursor:pointer;text-decoration:underline"></span> · <span id="btnReset" style="cursor:pointer;text-decoration:underline">erase eternity (reset world)</span></div>
+</div>
+
+<div id="sacov" class="ov hidden">
+  <div class="note" style="font-size:14px">Dark. Wet. Tight. You cannot breathe.<br><br><b style="color:#e8b">CLAW — mash LMB / SPACE</b></div>
+  <div id="air"><div id="airF"></div></div>
+</div>
+
+<div id="death" class="ov hidden">
+  <div class="dtitle" id="deathTitle">YOU DIED</div>
+  <div class="rec" id="deathCause"></div>
+  <div id="deathq"></div>
+  <div class="rec" id="deathRec"></div>
+  <div class="btn" id="btnRebirth">BACK TO THE SAC</div>
+</div>
+
+<div id="epi" class="ov hidden">
+  <div class="dtitle" style="color:#c9a24a" id="epiTitle">THE PILLAR</div>
+  <div id="epiText" class="note" style="font-size:13px;line-height:2"></div>
+  <div>
+    <div class="btn" id="btnStayOut">STAY OUT (for now)</div>
+    <div class="btn" id="btnReturn">THE EXORCIST FINDS YOU</div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+
+/* ============================================================
+   SECTION: CONFIG / TUNING  (see PLAN.md §12)
+   1 real second = 1 in-game minute. 1 day = 24 real minutes.
+============================================================ */
+const T = {
+  CHUNK: 40, VIEW: 3, CITY_R: 640,
+  thirstPerMin: 100/(36*60), hungerPerMin: 100/(96*60),
+  exhaustPerMin: 100/(20*60), malnutPerDay: 100/340,
+  chillWetPerSec: 100/(20*60)/1.0,        // naked in rain: ~20 min to max chill
+  walk: 4.2, run: 6.8, crouchMul: .45,
+  pillarFirstMin: 1440*1.6, pillarMeanGap: 1440*5, pillarBurn: 4.5*60, // seconds of real time for burn
+  npcActive: 18, npcRadius: 120,
+};
+const ZONES = {
+  farms:   {x:-380, z:-380, r:120},
+  boneyard:{x: 380, z: 380, r:110},
+  cocytus: {x: 520, z: 0,   r:140},
+  camps: [ {x:200, z:-200, name:"the Ash Court"}, {x:-220, z:240, name:"the Row"} ],
+  skinZ: 160, swampZ: 430, swampX: 320,
+};
+
+/* ============================================================
+   SECTION: RNG / UTIL
+============================================================ */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function hash2(x,y,s){let h=Math.imul(x,374761393)+Math.imul(y,668265263)+Math.imul(s,974634211);h=Math.imul(h^h>>>13,1274126177);return((h^h>>>16)>>>0)/4294967296}
+const clamp=(v,a,b)=>v<a?a:v>b?b:v, lerp=(a,b,t)=>a+(b-a)*t;
+const dist2=(ax,az,bx,bz)=>{const dx=ax-bx,dz=az-bz;return Math.sqrt(dx*dx+dz*dz)};
+function vnoise(x,z,s){const xi=Math.floor(x),zi=Math.floor(z),xf=x-xi,zf=z-zi;
+  const a=hash2(xi,zi,s),b=hash2(xi+1,zi,s),c=hash2(xi,zi+1,s),d=hash2(xi+1,zi+1,s);
+  const u=xf*xf*(3-2*xf),v=zf*zf*(3-2*zf);return lerp(lerp(a,b,u),lerp(c,d,u),v)}
+let seedCounter=1; function rnd(){return Math.random()}
+function pick(arr,r){return arr[Math.floor((r??Math.random())*arr.length)%arr.length]}
+
+/* ============================================================
+   SECTION: PERSISTENCE
+============================================================ */
+const SAVE_KEY="dis_save_v1";
+let S=null;
+function freshSave(){ return {
+  seed: (Math.random()*1e9)|0,
+  body: null,                 // rolled on first birth
+  records:{bestDays:0,deaths:0,escapes:0,kills:0},
+  handbook:{},                // pageKey -> true
+  life: 0, dayAtBirth:0, gameMin: 6*60,
+  corpses:[],                 // {x,z,items:[ids],mine:bool,life}
+  claims:[],                  // {x,z} building keys claimed
+  tribeRep:{},                // campName -> {member:bool,hostile:bool,killed:int}
+  legend:false, gore:true,
+};}
+function saveGame(){ try{ S.gameMin=world.gameMin; localStorage.setItem(SAVE_KEY,JSON.stringify(S)); }catch(e){} }
+function loadGame(){ try{ const d=localStorage.getItem(SAVE_KEY); if(d) return JSON.parse(d);}catch(e){} return null; }
+S = loadGame() || freshSave();
+
+/* ============================================================
+   SECTION: AUDIO (all synthesized — WebAudio)
+============================================================ */
+const AU = { ctx:null, master:null, rainGain:null, started:false };
+function auInit(){
+  if(AU.started) return; AU.started=true;
+  const ctx = AU.ctx = new (window.AudioContext||window.webkitAudioContext)();
+  AU.master = ctx.createGain(); AU.master.gain.value=.7; AU.master.connect(ctx.destination);
+  // rain: looped filtered noise
+  const len=ctx.sampleRate*2, buf=ctx.createBuffer(1,len,ctx.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+  const src=ctx.createBufferSource(); src.buffer=buf; src.loop=true;
+  const lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=900;
+  AU.rainLP=lp;
+  AU.rainGain=ctx.createGain(); AU.rainGain.gain.value=.18;
+  src.connect(lp); lp.connect(AU.rainGain); AU.rainGain.connect(AU.master); src.start();
+}
+function auBurst(freq,dur,vol,type="triangle",slide=0){
+  if(!AU.started) return; const c=AU.ctx,o=c.createOscillator(),g=c.createGain();
+  o.type=type;o.frequency.value=freq; if(slide)o.frequency.linearRampToValueAtTime(freq*slide,c.currentTime+dur);
+  g.gain.setValueAtTime(vol,c.currentTime); g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+dur);
+  o.connect(g);g.connect(AU.master);o.start();o.stop(c.currentTime+dur);
+}
+function auNoise(dur,vol,fc=400){
+  if(!AU.started) return; const c=AU.ctx,len=c.sampleRate*dur,b=c.createBuffer(1,len,c.sampleRate),dd=b.getChannelData(0);
+  for(let i=0;i<len;i++)dd[i]=(Math.random()*2-1)*(1-i/len);
+  const s=c.createBufferSource();s.buffer=b;const f=c.createBiquadFilter();f.type="lowpass";f.frequency.value=fc;
+  const g=c.createGain();g.gain.value=vol;s.connect(f);f.connect(g);g.connect(AU.master);s.start();
+}
+const sfx={
+  hit:()=>auNoise(.12,.5,700), swing:()=>auNoise(.08,.15,1800), bone:()=>{auNoise(.15,.6,500);auBurst(180,.15,.3,"square",.4)},
+  squelch:()=>auNoise(.3,.45,300), thunder:(v=.6)=>auNoise(2.2,v,120), eat:()=>auNoise(.2,.25,350),
+  drink:()=>auBurst(300,.25,.15,"sine",1.4), craft:()=>auBurst(520,.1,.2,"square"),
+  scream:()=>auBurst(700,.9,.12,"sawtooth",.5), roar:()=>{auNoise(1,.7,220);auBurst(90,1,.5,"sawtooth",.6)},
+  fire:()=>auNoise(.4,.2,500), heart:()=>auBurst(55,.18,.5,"sine",.8),
+};
+
+/* ============================================================
+   SECTION: RENDERER / SCENE / SKY / WEATHER
+============================================================ */
+const renderer=new THREE.WebGLRenderer({antialias:false});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+renderer.setSize(innerWidth,innerHeight);
+document.body.prepend(renderer.domElement);
+const scene=new THREE.Scene();
+const FOG_DIS=new THREE.Color(0x17100f), FOG_GEH=new THREE.Color(0x8d8d89), FOG_SWAMP=new THREE.Color(0x11130e);
+scene.fog=new THREE.FogExp2(FOG_DIS.getHex(),0.019);
+const camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,.1,900);
+addEventListener("resize",()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+
+const amb=new THREE.AmbientLight(0x6a5a52,1.35);scene.add(amb);
+const dirL=new THREE.DirectionalLight(0x7a655c,.8);dirL.position.set(.3,1,.2);scene.add(dirL);
+const playerLight=new THREE.PointLight(0xff8850,0,14);scene.add(playerLight); // torch/fire proximity
+
+/* Sky: procedural storm shader (Brutal Skyboxes manifest supported via SKY_MANIFEST — files optional) */
+const SKY_MANIFEST={dis_storm:[],gehenna_grey:[],pillar_event:[]}; // drop pack files in ./sky/ and list here
+const skyUni={ t:{value:0}, flash:{value:0}, mode:{value:0}, pillar:{value:0}, pillarDir:{value:new THREE.Vector3(1,0,0)} };
+const skyMat=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,uniforms:skyUni,
+vertexShader:`varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+fragmentShader:`
+varying vec3 vP;uniform float t,flash,mode,pillar;uniform vec3 pillarDir;
+float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+ return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}
+float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*n(p);p*=2.1;a*=.5;}return v;}
+void main(){
+ vec3 d=normalize(vP);
+ float y=max(d.y,0.);
+ if(mode>0.5){ // GEHENNA: flat grey, cold white sun
+   vec3 c=mix(vec3(.55,.55,.53),vec3(.72,.72,.70),y);
+   float sun=smoothstep(.9985,.9995,dot(d,normalize(vec3(.2,.35,.1))));
+   c+=sun*vec3(1.2);
+   gl_FragColor=vec4(c,1.);return;
+ }
+ vec2 uv=d.xz/(0.25+y)*.6;
+ float cl=fbm(uv*1.6+vec2(t*.014,t*.006));
+ float cl2=fbm(uv*3.4-vec2(t*.02,0.));
+ vec3 base=mix(vec3(.05,.028,.03),vec3(.16,.09,.08),cl);
+ base=mix(base,vec3(.30,.13,.09),pow(cl2,3.)*.9);        // bruised red boil
+ base=mix(vec3(.06,.045,.05),base,smoothstep(0.,.25,y)); // horizon murk
+ base+=flash*vec3(.85,.9,1.)*(.25+.75*cl);               // lightning wash
+ float pd=max(dot(normalize(vec3(d.x,0.,d.z)),pillarDir),0.);
+ base+=pillar*pow(pd,18.)*vec3(1.,.5,.15)*1.4;           // pillar glow on clouds
+ gl_FragColor=vec4(base,1.);
+}`});
+const sky=new THREE.Mesh(new THREE.SphereGeometry(800,24,16),skyMat);scene.add(sky);
+
+/* Rain */
+const RAIN_N=1600;
+const rainGeo=new THREE.BufferGeometry();
+const rainPos=new Float32Array(RAIN_N*3);
+for(let i=0;i<RAIN_N;i++){rainPos[i*3]=(Math.random()-.5)*70;rainPos[i*3+1]=Math.random()*30;rainPos[i*3+2]=(Math.random()-.5)*70}
+rainGeo.setAttribute("position",new THREE.BufferAttribute(rainPos,3));
+const rain=new THREE.Points(rainGeo,new THREE.PointsMaterial({color:0x8a90a0,size:.09,transparent:true,opacity:.55,fog:true}));
+scene.add(rain);
+
+const weather={intensity:.8,lightTimer:5,flash:0,thunderQ:[]};
+function weatherTick(dt,px,pz,inGehenna){
+  skyUni.t.value+=dt;
+  if(!inGehenna){
+    weather.intensity=.55+.45*vnoise(world.gameMin*.01,0,7);
+    weather.lightTimer-=dt;
+    if(weather.lightTimer<=0){
+      weather.flash=1; const d=4+Math.random()*20;
+      weather.thunderQ.push({t:d*.08,v:clamp(1.6/Math.sqrt(d),.15,.8)});
+      weather.lightTimer=3+Math.random()*14;
+    }
+  } else weather.intensity=0;
+  weather.flash=Math.max(0,weather.flash-dt*3.5);
+  skyUni.flash.value=weather.flash;
+  dirL.intensity=.55+weather.flash*2.2;
+  for(const th of weather.thunderQ){th.t-=dt;if(th.t<=0){sfx.thunder(th.v);th.done=1}}
+  weather.thunderQ=weather.thunderQ.filter(t=>!t.done);
+  // rain follows player
+  rain.visible=weather.intensity>0.01;
+  rain.position.set(px,0,pz);
+  const arr=rainGeo.attributes.position.array;
+  for(let i=0;i<RAIN_N;i++){
+    arr[i*3+1]-=dt*(22+8*(i%3));
+    if(arr[i*3+1]<0){arr[i*3]=(Math.random()-.5)*70;arr[i*3+1]=28+Math.random()*4;arr[i*3+2]=(Math.random()-.5)*70}
+  }
+  rainGeo.attributes.position.needsUpdate=true;
+  if(AU.started){AU.rainGain.gain.value=(player.sheltered?.05:.16)*weather.intensity+.02;
+    AU.rainLP.frequency.value=player.sheltered?420:900;}
+}
+
+/* ============================================================
+   SECTION: MATERIALS (procedural canvas textures)
+============================================================ */
+function makeTex(fn,sz=64){const c=document.createElement("canvas");c.width=c.height=sz;const g=c.getContext("2d");fn(g,sz);
+  const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;return t}
+const texGrime=makeTex((g,s)=>{g.fillStyle="#4a3d38";g.fillRect(0,0,s,s);
+  for(let i=0;i<400;i++){g.fillStyle=`rgba(${20+Math.random()*40|0},${15+Math.random()*30|0},${12+Math.random()*25|0},.5)`;
+  g.fillRect(Math.random()*s,Math.random()*s,2,2)}});
+const texMud=makeTex((g,s)=>{g.fillStyle="#241a15";g.fillRect(0,0,s,s);
+  for(let i=0;i<300;i++){g.fillStyle=`rgba(${30+Math.random()*30|0},${22+Math.random()*20|0},${16+Math.random()*14|0},.6)`;
+  g.fillRect(Math.random()*s,Math.random()*s,3,2)}});
+texMud.repeat.set(64,64);
+const M={
+  wall:new THREE.MeshLambertMaterial({map:texGrime}),
+  mud:new THREE.MeshLambertMaterial({map:texMud,color:0x9a8878}),
+  ash:new THREE.MeshLambertMaterial({color:0x8a8a86}),
+  sacM:new THREE.MeshLambertMaterial({color:0x9a7d3a}),
+  flesh:new THREE.MeshLambertMaterial({color:0x7d3a30}),
+  bone:new THREE.MeshLambertMaterial({color:0xcabfa8}),
+  wood:new THREE.MeshLambertMaterial({color:0x4a3826}),
+  metal:new THREE.MeshLambertMaterial({color:0x5a5f66}),
+  skin:new THREE.MeshLambertMaterial({color:0xb08a70}),
+  dark:new THREE.MeshLambertMaterial({color:0x1a1416}),
+  water:new THREE.MeshLambertMaterial({color:0x0a0d0a,transparent:true,opacity:.92}),
+  firecol:new THREE.MeshBasicMaterial({color:0xff7830}),
+  beam:new THREE.MeshBasicMaterial({color:0xffa040,transparent:true,opacity:.6,depthWrite:false}),
+  blood:new THREE.MeshBasicMaterial({color:0x5a0d08}),
+};
+
+/* ============================================================
+   SECTION: WORLD / CHUNK GENERATION
+============================================================ */
+const world={ gameMin:S.gameMin, chunks:new Map(), sacsHarvested:new Set(), props:[], npcs:[], corpses:[],
+  fires:[], builds:[], pillar:null, pillarNextAt:S.records.escapes||S.life>0? T.pillarFirstMin*.7 : T.pillarFirstMin,
+  legendTimer: 1440*2.2, screamT: 20 };
+world.pillarNextAt = world.gameMin + (S.life>0? 90+Math.random()*200 : T.pillarFirstMin/6); // minutes until first pillar (scaled for play)
+
+function zoneOf(x,z){
+  const r=Math.hypot(x,z);
+  if(r>T.CITY_R) return "gehenna";
+  if(dist2(x,z,ZONES.farms.x,ZONES.farms.z)<ZONES.farms.r) return "farms";
+  if(dist2(x,z,ZONES.boneyard.x,ZONES.boneyard.z)<ZONES.boneyard.r) return "boneyard";
+  if(dist2(x,z,ZONES.cocytus.x,ZONES.cocytus.z)<ZONES.cocytus.r) return "cocytus";
+  if(z>ZONES.swampZ && Math.abs(x)<ZONES.swampX) return "swamp";
+  if(Math.abs(z-ZONES.skinZ)<=10) return "skin";
+  return "dis";
+}
+function campAt(x,z){ for(const c of ZONES.camps) if(dist2(x,z,c.x,c.z)<26) return c; return null; }
+const eraColors=[0x6a6a6e,0x5a3f33,0x4a3b28,0x6a5741]; // modern, victorian, medieval, hovel
+function eraOf(cx,cz){ return Math.floor(vnoise(cx*.13,cz*.13,S.seed&1023)*4)%4; }
+
+const unitBox=new THREE.BoxGeometry(1,1,1);
+const unitSac=new THREE.SphereGeometry(.5,7,6);
+function buildChunk(cx,cz){
+  const key=cx+","+cz;
+  if(world.chunks.has(key)) return world.chunks.get(key);
+  const rng=mulberry32((hash2(cx,cz,S.seed)*1e9)|0);
+  const ox=cx*T.CHUNK, oz=cz*T.CHUNK;
+  const parts=[], aabbs=[], inter=[], sacPts=[];
+  const czone=zoneOf(ox+T.CHUNK/2,oz+T.CHUNK/2);
+  const era=eraOf(cx,cz), ecol=new THREE.Color(eraColors[era]);
+  const camp=campAt(ox+T.CHUNK/2,oz+T.CHUNK/2);
+  function part(x,y,z,sx,sy,sz,col,solid=true,roof=false){
+    parts.push({x,y,z,sx,sy,sz,col});
+    if(solid) aabbs.push({x0:x-sx/2,x1:x+sx/2,z0:z-sz/2,z1:z+sz/2,y0:y-sy/2,y1:y+sy/2,roof});
+  }
+  function pile(x,z,type){ inter.push({x,y:.4,z,type:"pile",pile:type,left:2+((rng()*3)|0)}); 
+    const c=type==="timber"?0x4a3826:type==="scrap"?0x5a5f66:type==="bone"?0xcabfa8:0x555050;
+    for(let i=0;i<3;i++) part(x+rng()*1.2-.6,.2+i*.14,z+rng()*1.2-.6,.9,.28,.6,new THREE.Color(c),false);
+  }
+  function building(px,pz){
+    const w=9+rng()*5, d=9+rng()*5, h=3.4+rng()*2, th=.4;
+    const col=ecol.clone().multiplyScalar(.8+rng()*.4);
+    const doorSide=(rng()*4)|0, ruinSide=rng()<.3?((rng()*4)|0):-1;
+    const sides=[[0,-d/2,w,th],[0,d/2,w,th],[-w/2,0,th,d],[w/2,0,th,d]];
+    for(let s=0;s<4;s++){
+      const [sx,sz,ww,dd]=sides[s];
+      let hh=h; if(s===ruinSide&&s!==doorSide) hh=h*.45;
+      if(s===doorSide){ // wall with 1.5m door gap in middle
+        if(ww>dd){ const seg=(ww-1.5)/2;
+          part(px+sx-seg/2-0.75,hh/2,pz+sz,seg,hh,dd,col); part(px+sx+seg/2+0.75,hh/2,pz+sz,seg,hh,dd,col);
+          part(px+sx,h-0.5,pz+sz,1.6,Math.max(.2,h-2.2),dd,col); // lintel
+        } else { const seg=(dd-1.5)/2;
+          part(px+sx,hh/2,pz+sz-seg/2-0.75,ww,hh,seg,col); part(px+sx,hh/2,pz+sz+seg/2+0.75,ww,hh,seg,col);
+          part(px+sx,h-0.5,pz+sz,ww,Math.max(.2,h-2.2),1.6,col);
+        }
+      } else part(px+sx,hh/2,pz+sz,ww,hh,dd,col);
+    }
+    if(rng()>.35) part(px,h+.12,pz,w+.6,.25,d+.6,col.clone().multiplyScalar(.7),true,true); // roof
+    // interior contents
+    const ir=rng();
+    if(ir<.4) pile(px+rng()*2-1,pz+rng()*2-1,pick(["timber","scrap","bone","rock"],rng()));
+    else if(ir<.46) inter.push({x:px,y:.3,z:pz,type:"memory"});
+    // birthing sacs on outer walls
+    if(rng()<.6){ const n=1+(rng()<.3?1:0);
+      for(let i=0;i<n;i++){ const s=(rng()*4)|0,[sx,sz]=sides[s];
+        const wx=px+sx*1.06+(s>1?0:(rng()-.5)*w*.6), wz=pz+sz*1.06+(s>1?(rng()-.5)*d*.6:0);
+        const sy=1+rng()*1.6;
+        sacPts.push({x:wx,y:sy,z:wz}); inter.push({x:wx,y:sy,z:wz,type:"sac",used:false});
+      }}
+  }
+  /* ---- base layout ---- */
+  if(czone==="gehenna"){ /* empty ash */ }
+  else if(camp){ // tribe camp: cleared, fire + huts
+    part(camp.x,1.1,camp.z,1,2.2,1,new THREE.Color(0x3a2a20)); // totem
+    for(let i=0;i<3;i++){ const a=i*2.1+.6, hx=camp.x+Math.cos(a)*8, hz=camp.z+Math.sin(a)*8;
+      part(hx,1.4,hz,5,2.8,5,new THREE.Color(0x4a3b28)); aabbs.pop(); // hut shell as visual
+      part(hx,1.4,hz-2.6,5,2.8,.4,new THREE.Color(0x4a3b28)); part(hx,1.4,hz+2.6,5,2.8,.4,new THREE.Color(0x4a3b28));
+      part(hx-2.6,1.4,hz,.4,2.8,5,new THREE.Color(0x4a3b28));
+      part(hx,2.9,hz,5.4,.25,5.4,new THREE.Color(0x352a1e),true,true);
+      parts.pop(); parts.push({x:hx,y:2.9,z:hz,sx:5.4,sy:.25,sz:5.4,col:new THREE.Color(0x352a1e)});
+    }
+    inter.push({x:camp.x,y:.3,z:camp.z+3,type:"campfire",camp:camp.name,lit:true});
+    inter.push({x:camp.x+3,y:1,z:camp.z,type:"chief",camp:camp.name});
+    inter.push({x:camp.x-3,y:1,z:camp.z,type:"surgeon",camp:camp.name});
+  }
+  else if(czone==="dis"||czone==="skin"){
+    for(let pxi=0;pxi<2;pxi++) for(let pzi=0;pzi<2;pzi++){
+      const px=ox+10+pxi*20, pz=oz+10+pzi*20;
+      if(czone==="skin"&&Math.abs(pz-ZONES.skinZ)<11) continue;     // keep the street clear
+      if(Math.abs(px)<14&&Math.abs(pz)<14) continue;                 // origin plaza
+      const pb=rng();
+      if(pb<.5) building(px,pz);
+      else if(pb<.72){ for(let i=0;i<4;i++) part(px+rng()*6-3,.5+rng()*.5,pz+rng()*6-3,2+rng()*2,1+rng(),2+rng()*2,new THREE.Color(0x4a4340)); pile(px,pz,"rock"); }
+      else if(pb<.8) pile(px+rng()*4-2,pz+rng()*4-2,pick(["timber","scrap","bone"],rng()));
+    }
+    if(rng()<.5){ const lx=ox+4+rng()*32; part(lx,2.2,oz+2,.22,4.4,.22,new THREE.Color(0x333)); }
+    if(czone==="skin"){ // skin street dressing: lamps + hanging skins + bait
+      for(let i=0;i<3;i++){ const lx=ox+6+i*14;
+        part(lx,2.4,ZONES.skinZ-8,.25,4.8,.25,new THREE.Color(0x2a2a2a));
+        part(lx,3.2,ZONES.skinZ-7.4,.7,1.3,.1,new THREE.Color(0x8a5545),false); // flayed hide
+        part(lx,2.4,ZONES.skinZ+8,.25,4.8,.25,new THREE.Color(0x2a2a2a));
+        part(lx,3.1,ZONES.skinZ+7.4,.7,1.4,.1,new THREE.Color(0x96604c),false);
+      }
+      if(rng()<.4) inter.push({x:ox+20,y:.3,z:ZONES.skinZ+(rng()*8-4),type:"bait",taken:false});
+      if(rng()<.25) inter.push({x:ox+10,y:.3,z:ZONES.skinZ-3,type:"memory",skin:true});
+    }
+  }
+  else if(czone==="farms"){
+    const F=ZONES.farms, dC=dist2(ox+20,oz+20,F.x,F.z);
+    // perimeter wall
+    for(let a=0;a<64;a++){ const ang=a/64*Math.PI*2, wx=F.x+Math.cos(ang)*F.r, wz=F.z+Math.sin(ang)*F.r;
+      if(wx>=ox&&wx<ox+T.CHUNK&&wz>=oz&&wz<oz+T.CHUNK){
+        if(Math.abs(ang-Math.PI/4)<.12) continue; // NE gate
+        part(wx,2.2,wz,6,4.4,1.2,new THREE.Color(0x4c4440));
+      }}
+    if(dC<F.r*.8){ // interior: vats, racks, pens
+      if(rng()<.5){ const vx=ox+10+rng()*20, vz=oz+10+rng()*20;
+        part(vx,1.6,vz,3.2,3.2,3.2,new THREE.Color(0x3f4a44)); inter.push({x:vx,y:1,z:vz+2,type:"vat"}); }
+      if(rng()<.4){ const px2=ox+8+rng()*24, pz2=oz+8+rng()*24;
+        for(let i=0;i<4;i++){part(px2-3+i*2,1,pz2-3,.2,2,.2,new THREE.Color(0x333));part(px2-3+i*2,1,pz2+3,.2,2,.2,new THREE.Color(0x333));}
+        inter.push({x:px2,y:.3,z:pz2,type:"pen"}); }
+      for(let i=0;i<2;i++){ const sx=ox+6+rng()*28, sz2=oz+6+rng()*28, sy=1+rng();
+        sacPts.push({x:sx,y:sy,z:sz2}); inter.push({x:sx,y:sy,z:sz2,type:"sac",used:false}); }
+    }
+  }
+  else if(czone==="boneyard"){
+    const B=ZONES.boneyard, dC=dist2(ox+20,oz+20,B.x,B.z);
+    if(dC<30){ // cathedral ruin
+      const col=new THREE.Color(0x55504a);
+      part(B.x,5,B.z-12,24,10,1.2,col); part(B.x,5,B.z+12,24,10,1.2,col);
+      part(B.x-12,5,B.z,1.2,10,10,col); part(B.x+12,5,B.z+6,1.2,10,12,col);
+      part(B.x,9,B.z-11,3,8,3,col); // broken spire
+      inter.push({x:B.x,y:.3,z:B.z,type:"altar"});
+    } else if(dC<B.r){
+      for(let i=0;i<3;i++){ const cxp=ox+6+rng()*28, czp=oz+6+rng()*28;
+        part(cxp,1.5,czp,.25,3,.25,new THREE.Color(0x8a8478)); part(cxp,2.2,czp,1.4,.22,.22,new THREE.Color(0x8a8478)); }
+      if(rng()<.5) pile(ox+10+rng()*20,oz+10+rng()*20,"bone");
+    }
+  }
+  else if(czone==="cocytus"){
+    const C=ZONES.cocytus, dC=dist2(ox+20,oz+20,C.x,C.z);
+    if(Math.abs(dC-C.r)<24){ for(let i=0;i<4;i++) part(ox+5+rng()*30,2+rng()*2,oz+5+rng()*30,4+rng()*4,4+rng()*4,3,new THREE.Color(0x3f4448)); }
+    else { if(rng()<.55){ const bx2=ox+8+rng()*24, bz2=oz+8+rng()*24;
+        part(bx2,.9,bz2,2.2,1.8,2.2,new THREE.Color(0x5a4a3a)); aabbs[aabbs.length-1].ore=true;
+        inter.push({x:bx2,y:.9,z:bz2,type:"ore",left:2}); }
+      if(rng()<.4) part(ox+10+rng()*20,.06,oz+10+rng()*20,5,.12,5,new THREE.Color(0xcfe0e8),false); // ice sheet
+    }
+  }
+  else if(czone==="swamp"){
+    part(ox+20,-.25,oz+20,T.CHUNK,.5,T.CHUNK,new THREE.Color(0x0a0d0a),false); // black water
+    for(let i=0;i<5;i++){ const dx2=ox+4+rng()*32, dz2=oz+4+rng()*32;
+      part(dx2,.35,dz2,2.6+rng()*2,.5,1.2,new THREE.Color(0x3a2f22)); } // walkable debris
+    if(rng()<.3) part(ox+16,1.6,oz+16,5,3.2,5,new THREE.Color(0x2f2a24)); // drowned ruin
+  }
+  /* ---- bake instanced meshes ---- */
+  const group=new THREE.Group();
+  if(parts.length){
+    const im=new THREE.InstancedMesh(unitBox,new THREE.MeshLambertMaterial({color:0xffffff}),parts.length);
+    const m4=new THREE.Matrix4();
+    parts.forEach((p,i)=>{ m4.makeScale(p.sx,p.sy,p.sz); m4.setPosition(p.x,p.y,p.z); im.setMatrixAt(i,m4);
+      im.setColorAt(i,p.col||new THREE.Color(0x555)); });
+    im.instanceMatrix.needsUpdate=true; if(im.instanceColor) im.instanceColor.needsUpdate=true;
+    group.add(im);
+  }
+  if(sacPts.length){
+    const sm=new THREE.InstancedMesh(unitSac,M.sacM,sacPts.length);
+    const m4=new THREE.Matrix4();
+    sacPts.forEach((p,i)=>{ m4.makeScale(.9,1.2,.7); m4.setPosition(p.x,p.y,p.z); sm.setMatrixAt(i,m4); });
+    sm.instanceMatrix.needsUpdate=true; group.add(sm);
+  }
+  scene.add(group);
+  const rec={key,cx,cz,group,aabbs,inter,zone:czone};
+  world.chunks.set(key,rec);
+  return rec;
+}
+function chunkAt(x,z){ return world.chunks.get(Math.floor(x/T.CHUNK)+","+Math.floor(z/T.CHUNK)); }
+function ensureChunks(px,pz){
+  const ccx=Math.floor(px/T.CHUNK), ccz=Math.floor(pz/T.CHUNK);
+  for(let dx=-T.VIEW;dx<=T.VIEW;dx++)for(let dz=-T.VIEW;dz<=T.VIEW;dz++) buildChunk(ccx+dx,ccz+dz);
+  // unload far
+  for(const [key,rec] of world.chunks){
+    if(Math.abs(rec.cx-ccx)>T.VIEW+1||Math.abs(rec.cz-ccz)>T.VIEW+1){
+      scene.remove(rec.group); rec.group.traverse(o=>{if(o.geometry&&o.geometry!==unitBox&&o.geometry!==unitSac)o.geometry.dispose()});
+      world.chunks.delete(key);
+    }}
+}
+function nearbyAABBs(x,z){
+  const out=[], ccx=Math.floor(x/T.CHUNK), ccz=Math.floor(z/T.CHUNK);
+  for(let dx=-1;dx<=1;dx++)for(let dz=-1;dz<=1;dz++){ const c=world.chunks.get((ccx+dx)+","+(ccz+dz)); if(c) out.push(...c.aabbs); }
+  return out;
+}
+function collideMove(px,py,pz,vx,vz,r){
+  let nx=px+vx, nz=pz+vz;
+  const boxes=nearbyAABBs(px,pz);
+  for(const b of boxes){
+    if(py+1.6<b.y0||py+.3>b.y1) continue;
+    if(b.y1<=py+.55) continue; // steppable
+    // circle vs box, axis separated
+    const cx=clamp(nx,b.x0,b.x1), cz2=clamp(pz,b.z0,b.z1);
+    if((nx-cx)*(nx-cx)+(pz-cz2)*(pz-cz2)<r*r) nx=px;
+    const cx2=clamp(px,b.x0,b.x1), cz3=clamp(nz,b.z0,b.z1);
+    if((px-cx2)*(px-cx2)+(nz-cz3)*(nz-cz3)<r*r) nz=pz;
+  }
+  return [nx,nz];
+}
+function floorHeight(x,z,py){
+  let h=0; const boxes=nearbyAABBs(x,z);
+  for(const b of boxes){ if(x>b.x0-.2&&x<b.x1+.2&&z>b.z0-.2&&z<b.z1+.2&&b.y1<=py+.55&&b.y1>h) h=b.y1; }
+  return h;
+}
+function underRoof(x,z,py){
+  const boxes=nearbyAABBs(x,z);
+  for(const b of boxes){ if(b.y0>py+1&&x>b.x0&&x<b.x1&&z>b.z0&&z<b.z1) return true; }
+  return false;
+}
+function losClear(ax,az,bx,bz){
+  const d=dist2(ax,az,bx,bz), steps=Math.min(14,Math.ceil(d));
+  const boxes=nearbyAABBs((ax+bx)/2,(az+bz)/2);
+  for(let i=1;i<steps;i++){ const t=i/steps, x=lerp(ax,bx,t), z=lerp(az,bz,t);
+    for(const b of boxes){ if(b.y1>1.2&&b.y0<1.6&&x>b.x0&&x<b.x1&&z>b.z0&&z<b.z1) return false; } }
+  return true;
+}
+/* ground + water planes follow player */
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(760,760),M.mud);
+ground.rotation.x=-Math.PI/2; ground.position.y=-.02; scene.add(ground);
+
+/* ============================================================
+   SECTION: ITEMS / INVENTORY / CRAFT / PROPS
+============================================================ */
+const ITEMS={
+  rock:{n:"rock",w:1.5,dmg:15,geo:[.3,.22,.3],col:0x555050},
+  plank:{n:"plank",w:2,dmg:13,geo:[.12,.9,.12],col:0x4a3826},
+  shiv:{n:"bone shiv",w:.5,dmg:22,sharp:1,geo:[.06,.35,.06],col:0xcabfa8},
+  club:{n:"club",w:2.5,dmg:32,geo:[.1,.7,.1],col:0x3a2c1c},
+  axe:{n:"axe",w:3,dmg:44,sharp:1,geo:[.14,.6,.14],col:0x5a5f66},
+  spear:{n:"spear",w:2.5,dmg:36,sharp:1,geo:[.07,1.4,.07],col:0x4a3826},
+  iron:{n:"iron blade",w:2.5,dmg:60,sharp:1,geo:[.1,.6,.05],col:0x8a8f96},
+  bowl:{n:"bowl (empty)",w:1,geo:[.3,.12,.3],col:0x5a5f66},
+  bowlD:{n:"bowl (foul rain)",w:2,geo:[.3,.12,.3],col:0x3a4048},
+  bowlC:{n:"bowl (boiled water)",w:2,drink:45,geo:[.3,.12,.3],col:0x6a7f8a},
+  fleshR:{n:"flesh, raw",w:1,food:26,raw:true,geo:[.25,.15,.35],col:0x7d3a30},
+  fleshC:{n:"flesh, roasted",w:1,food:38,geo:[.25,.15,.35],col:0x5a3020},
+  sacflesh:{n:"pale sac-flesh",w:1,food:50,geo:[.28,.18,.28],col:0x9a8d5a},
+  scrap:{n:"scrap metal",w:2,mat:true,geo:[.3,.1,.4],col:0x5a5f66},
+  timber:{n:"timber",w:2,mat:true,geo:[.15,.8,.15],col:0x4a3826},
+  bone:{n:"bones",w:1,mat:true,geo:[.1,.5,.1],col:0xcabfa8},
+  skin:{n:"cured skin",w:.8,mat:true,geo:[.4,.05,.4],col:0x96604c},
+  oreI:{n:"iron ore",w:3,mat:true,geo:[.3,.25,.3],col:0x5a4a3a},
+  bandage:{n:"skin bandage",w:.3,geo:[.2,.06,.2],col:0xb08a70},
+  splint:{n:"splint",w:.6,geo:[.08,.5,.08],col:0x8a7458},
+};
+const CLOTH={none:{n:"naked",warm:0,arm:0},rags:{n:"skin rags",warm:.45,arm:2},leather:{n:"stitched leathers",warm:.75,arm:5},bonearm:{n:"bone-plated leathers",warm:.8,arm:10}};
+const RECIPES=[
+  {id:"shiv",req:{bone:1},out:"shiv"},
+  {id:"club",req:{timber:1},out:"club"},
+  {id:"spear",req:{timber:2,bone:1},out:"spear"},
+  {id:"axe",req:{timber:1,scrap:1,skin:1},out:"axe"},
+  {id:"bowl",req:{scrap:1},out:"bowl"},
+  {id:"bandage",req:{skin:1},out:"bandage"},
+  {id:"splint",req:{timber:1,skin:1},out:"splint"},
+  {id:"rags",req:{skin:2},cloth:"rags",label:"skin rags (wear)"},
+  {id:"leather",req:{skin:4},cloth:"leather",label:"stitched leathers (wear)"},
+  {id:"bonearm",req:{skin:2,bone:4},cloth:"bonearm",label:"bone plating (wear)",needCloth:"leather"},
+  {id:"iron",req:{oreI:2,timber:1},out:"iron",needFire:true,label:"iron blade (smelt at fire)"},
+  {id:"firepit",req:{timber:2,scrap:1},place:"fire",label:"fire pit (place)"},
+  {id:"catcher",req:{scrap:2},place:"catcher",label:"rain catcher (place)"},
+  {id:"barricade",req:{timber:2},place:"barricade",label:"barricade (place)"},
+];
+function invCount(id){ let n=0; for(const it of player.inv) if(it.id===id) n+=it.qty; return n; }
+function invTake(id,qty){ for(const it of player.inv){ if(it.id===id){ const k=Math.min(it.qty,qty); it.qty-=k; qty-=k; } }
+  player.inv=player.inv.filter(i=>i.qty>0); if(player.hand>=player.inv.length)player.hand=Math.max(0,player.inv.length-1); syncHand(); }
+function invWeight(){ let w=0; for(const it of player.inv) w+=(ITEMS[it.id].w||1)*it.qty; return w; }
+function invAdd(id,qty=1){
+  if(invWeight()+ITEMS[id].w*qty>player.maxW){ log("Too heavy to carry.","bad"); return false; }
+  if(ITEMS[id].mat||ITEMS[id].food||id==="bandage"){ for(const it of player.inv) if(it.id===id){ it.qty+=qty; return true; } }
+  player.inv.push({id,qty}); syncHand(); return true;
+}
+function heldItem(){ return player.inv[player.hand]||null; }
+/* physics props (dropped / thrown things) */
+function propMesh(id){ const g=ITEMS[id].geo, m=new THREE.Mesh(new THREE.BoxGeometry(g[0],g[1],g[2]),
+  new THREE.MeshLambertMaterial({color:ITEMS[id].col})); return m; }
+function spawnProp(id,x,y,z,vx=0,vy=0,vz=0,thrown=false){
+  const mesh=propMesh(id); mesh.position.set(x,y,z); scene.add(mesh);
+  const p={id,mesh,x,y,z,vx,vy,vz,resting:false,thrown,live:thrown};
+  world.props.push(p); return p;
+}
+function propsTick(dt){
+  for(const p of world.props){
+    if(p.resting) continue;
+    p.vy-=22*dt;
+    let nx=p.x+p.vx*dt, nz=p.z+p.vz*dt, ny=p.y+p.vy*dt;
+    const boxes=nearbyAABBs(p.x,p.z);
+    for(const b of boxes){
+      if(nx>b.x0-.1&&nx<b.x1+.1&&nz>b.z0-.1&&nz<b.z1+.1&&ny>b.y0&&ny<b.y1){
+        if(p.y>=b.y1-.05){ ny=b.y1+.05; p.vy=0; p.vx*=.4; p.vz*=.4; }
+        else { p.vx*=-.25; p.vz*=-.25; nx=p.x; nz=p.z; p.live=false; }
+      }}
+    const g=floorHeight(nx,nz,p.y)+ (zoneOf(nx,nz)==="swamp"?-.3:0);
+    if(ny<=g+.08){ ny=g+.08; p.vy=0; p.vx*=.5; p.vz*=.5;
+      if(Math.abs(p.vx)+Math.abs(p.vz)<.4){ p.resting=true; p.live=false; } }
+    // thrown prop hits
+    if(p.live){
+      const spd=Math.hypot(p.vx,p.vy,p.vz);
+      for(const n of world.npcs){
+        if(n.dead||n===p.thrownBy) continue;
+        if(dist2(nx,nz,n.x,n.z)<.7&&Math.abs(ny-(n.y+1.1))<1.2){
+          const dmg=(ITEMS[p.id].dmg||8)*clamp(spd/14,.3,1.4)*(ITEMS[p.id].sharp?1.25:1);
+          npcDamage(n,dmg,"thrown "+ITEMS[p.id].n,p.thrownBy==="player");
+          p.vx*=-.2;p.vz*=-.2;p.live=false; sfx.hit();
+          break;
+        }}
+      if(p.thrownBy!=="player"&&p.live&&dist2(nx,nz,player.x,player.z)<.7&&Math.abs(ny-(player.y+1.2))<1.2){
+        playerDamage((ITEMS[p.id].dmg||8)*clamp(spd/14,.3,1.2),"a thrown "+ITEMS[p.id].n); p.live=false; p.vx*=-.2;
+      }
+      noiseEvent(nx,nz,8);
+    }
+    p.x=nx;p.y=ny;p.z=nz; p.mesh.position.set(nx,ny,nz);
+    p.mesh.rotation.x+=p.resting?0:dt*4; p.mesh.rotation.z+=p.resting?0:dt*3;
+  }
+  if(world.props.length>90){ const p=world.props.shift(); scene.remove(p.mesh); }
+}
+/* corpses */
+function spawnCorpse(x,z,items,mine=false,name=null){
+  const g=new THREE.Group();
+  const b=new THREE.Mesh(new THREE.BoxGeometry(.55,.3,1.6),M.flesh); b.position.y=.18; g.add(b);
+  const h=new THREE.Mesh(new THREE.BoxGeometry(.3,.25,.3),M.skin); h.position.set(0,.18,.95); g.add(h);
+  g.position.set(x,floorHeight(x,z,1),z); g.rotation.y=Math.random()*6.3; scene.add(g);
+  const c={x,z,items:items||[],flesh:2+((Math.random()*3)|0),bone:2,skinN:1,mesh:g,mine,name,age:0};
+  world.corpses.push(c);
+  if(world.corpses.length>36){ const old=world.corpses.shift(); scene.remove(old.mesh); }
+  return c;
+}
+/* fires & placed builds */
+function spawnFire(x,z,lit=false,fuel=8){
+  const g=new THREE.Group();
+  const ring=new THREE.Mesh(new THREE.BoxGeometry(1,.18,1),M.dark); g.add(ring);
+  const fl=new THREE.Mesh(new THREE.ConeGeometry(.3,.7,6),M.firecol); fl.position.y=.5; fl.visible=lit; g.add(fl);
+  const li=new THREE.PointLight(0xff7830,lit?1.6:0,11); li.position.y=1; g.add(li);
+  g.position.set(x,floorHeight(x,z,1),z); scene.add(g);
+  const f={x,z,lit,fuel,mesh:g,flame:fl,light:li};
+  world.fires.push(f); return f;
+}
+function firesTick(dt){
+  for(const f of world.fires){
+    if(!f.lit) continue;
+    f.fuel-=dt/60;
+    const roof=underRoof(f.x,f.z,f.mesh.position.y);
+    if(!roof&&weather.intensity>.2&&zoneOf(f.x,f.z)!=="gehenna"){ f.fuel-=dt/8; } // rain drowns it fast
+    f.flame.scale.setScalar(.7+Math.sin(world.gameMin*9+f.x)*.2);
+    f.light.intensity=1.3+Math.sin(world.gameMin*11)*.3;
+    if(f.fuel<=0){ f.lit=false; f.flame.visible=false; f.light.intensity=0; log("A fire dies.","bad"); }
+  }
+}
+function nearFire(x,z,r=2.6){ for(const f of world.fires) if(f.lit&&dist2(x,z,f.x,f.z)<r) return f; return null; }
+function spawnBuild(kind,x,z){
+  let mesh;
+  if(kind==="barricade"){ mesh=new THREE.Mesh(new THREE.BoxGeometry(1.7,1.9,.3),M.wood); mesh.position.set(x,.95,z); }
+  else if(kind==="catcher"){ mesh=new THREE.Mesh(new THREE.BoxGeometry(.9,.5,.9),M.metal); mesh.position.set(x,.3,z); }
+  scene.add(mesh);
+  const b={kind,x,z,mesh,water:0,aabb:kind==="barricade"?{x0:x-.85,x1:x+.85,z0:z-.15,z1:z+.15,y0:0,y1:1.9}:null};
+  if(b.aabb){ const c=chunkAt(x,z); if(c) c.aabbs.push(b.aabb); }
+  world.builds.push(b); return b;
+}
+
+/* ============================================================
+   SECTION: PLAYER — body, meters, injuries, death & rebirth
+============================================================ */
+function rollBody(first=false){
+  let str=.6+Math.random()*.8; if(first) str=Math.max(str,.95);
+  return { str:+str.toFixed(2), size:.9+Math.random()*.25, age:pick(["war-young","worn","old"]) };
+}
+if(!S.body) S.body=rollBody(true);
+const player={
+  x:0,y:0,z:0,vy:0,yaw:0,pitch:0, hp:100,stam:100,
+  thirst:20,hunger:25,wet:0,chill:0,exhaust:10,malnut:0,composure:100,
+  bleeding:0, legInj:0, armInj:0,
+  dis:{gutrot:0,pneumonia:0,gest:0},
+  cloth:"none", inv:[], hand:0, body:S.body, maxW:0,
+  alive:false, downed:false, sheltered:false, phase:"title",
+  vomitToday:0, lastDay:0, bornMin:0, kills:0, crouch:false, blocking:false,
+  throwCharge:0, atkCd:0, memoryLock:0, suppressHeld:false, enslaved:null, tribe:null,
+  gehennaDeep:0, sleepUntil:0, noise:0,
+};
+player.maxW=14+player.body.str*10;
+function log(msg,cls){ const f=document.getElementById("feed");
+  const d=document.createElement("div"); if(cls)d.className=cls; d.textContent=msg; f.appendChild(d);
+  while(f.children.length>7) f.removeChild(f.firstChild); setTimeout(()=>{d.style.opacity=.35},6000); }
+function setPrompt(t){ document.getElementById("prompt").innerHTML=t||""; }
+function noiseEvent(x,z,r){
+  for(const n of world.npcs){ if(n.dead) continue;
+    if(dist2(x,z,n.x,n.z)<r*(n.arch==="hound"?1.6:1)) n.invest={x,z,t:20}; }
+}
+function playerDamage(dmg,src,sharp=false){
+  if(!player.alive||player.phase!=="alive") return;
+  const arm=CLOTH[player.cloth].arm;
+  if(player.blocking&&player.stam>5){ dmg*=.35; player.stam-=8; sfx.hit(); }
+  dmg=Math.max(1,dmg-arm*.8);
+  player.hp-=dmg; player.wetFlash=1;
+  if(sharp&&Math.random()<.5) player.bleeding=Math.min(3,player.bleeding+1);
+  if(dmg>18&&Math.random()<.3){ if(Math.random()<.5){player.legInj=Math.min(2,player.legInj+1);log("Something in your leg gives way.","bad");sfx.bone();}
+    else {player.armInj=Math.min(2,player.armInj+1);log("Your arm cracks.","bad");sfx.bone();} }
+  document.getElementById("vig").style.boxShadow=`inset 0 0 160px rgba(140,10,5,${clamp(.4+ (100-player.hp)/130,.3,.95)})`;
+  sfx.hit();
+  if(player.hp<=0) die(src);
+  else if(player.hp<16&&!player.downed){ player.downed=true; log("You go down.","bad"); }
+}
+const HANDBOOK={
+  sac:["Birth","Most of us just wake up in a birthing sac a few minutes after death. Claw your way out and get ready to fight. Not everybody has the strength — you get the body you had just before you died. Tough shit."],
+  firstblood:["Fresh Meat","Chances are good that the first person who sees you will be hungry. There are no plants or animals in Hell. Aim to kill the first person you see."],
+  rain:["Shelter","It never stops raining in Hell and pneumonia is a shitty way to die. Pick a building, kill any squatters you find and move in."],
+  water:["Water","Hell's rain is teeming with disease. It has to be boiled before it's safe. A fire, and something to make a bowl with — that's a necessity."],
+  food:["Hunger","Cannibalism is your only option if you don't fancy starving to death and having to start over."],
+  malnut:["The Diet","Human flesh and boiled rainwater doesn't make for a balanced diet. Sooner or later even the strongest resident dies of malnutrition. Nobody stays on top of the food chain for long. My record is a year."],
+  sacflesh:["The Sac-Flesh","Eat some of their flesh and over the next few days you'll grow a new birthing sac inside you. It's a small mercy that you won't live long enough to see it break through your skin."],
+  sleep:["Sleep","Sleep in Hell is both vital and dangerous. Somewhere sheltered, hidden, with an escape route — and even then, never more than a few hours at a time."],
+  skin:["Skin Street","Some people are fucked up even by Hell's standards. They leave their ornaments out as bait. Forget clothing — grab a weapon, stay out of the shadows, keep checking behind you, and get out."],
+  farms:["Perdition Farms","The billboards promise free food and safety to anybody stupid enough to believe them. The tribes there won't kill you. The bad news is they're big fans of taking people alive."],
+  boneyard:["The Boneyard","The people there decided Hell just isn't hellish enough for their liking. Stay away. The damned can't offer you salvation. The damned only offer pain."],
+  hounds:["Hellhounds","Some lose their minds after centuries and become little more than beasts. They keep the cunning to hunt as a pack — and human teeth are perfectly capable of ripping flesh from the bone."],
+  surgeon:["The Surgeons","A tribal surgeon could save your life — without anaesthetic. Freelancers in the beaked masks? For each one trying to do a tough job, there are a dozen Mengeles. Not worth the risk."],
+  tribes:["Tribes","Safety in numbers is as good as it gets down here. Remember: you're only part of the tribe for as long as you're a resident. Get yourself killed and it's back to being fresh meat."],
+  gehenna:["Gehenna","Sometimes the damned lose the will to survive and set off walking into the grey. I made the walk myself once. The further you go, the hollower you become. When I turned around, Dis was only a few steps away."],
+  cocytus:["Cocytus","They thought if they dug far enough they'd tunnel out of Hell. They didn't find a way out and they didn't find magma. The deeper you go, the colder it gets."],
+  swamp:["Phlegethon","The swamp's water will kill you no matter what you do with it. And when the lightning finds the gas — you won't outrun the fire. I guarantee it."],
+  witch:["The Pale Witch","She was born here. She doesn't notice pain, or cold, or your club. Don't look at her eyes. I ran from a woman with a broken leg and I'm not ashamed of it."],
+  slaughter:["The Slaughter Man","Naked, unarmed and brand new to Hell, he tore a slaver tribe apart with his bare hands. When you hear the word, leave the district."],
+  pillar:["The Pillar","When the living reach for the dead, we see it as a pillar of fire from the clouds. Thousands swarm to it, kicking, biting, clawing. Only one gets out. Contacting the dead always ends in a bloodbath."],
+  escape:["Out","Forget redemption. Forget God. The only way out of Hell is by riding a pillar of fire and taking over a living body. Focus on that."],
+  final:["Eternity","No dragons to slay, no morals to learn. No grand revelation, no purpose, no hope. There's only eternity among our own kind. When you get back — you owe me one."],
+};
+function unlockPage(k){ if(!HANDBOOK[k]||S.handbook[k]) return; S.handbook[k]=true; log("Handbook page earned: "+HANDBOOK[k][0],"good"); saveGame(); }
+function die(cause,pageKey){
+  if(!player.alive) return;
+  player.alive=false; player.phase="dead";
+  const days=Math.max(0,Math.floor((world.gameMin-player.bornMin)/1440*10)/10);
+  S.records.deaths++; if(days>S.records.bestDays) S.records.bestDays=days;
+  // your corpse keeps your things
+  const ids=[]; for(const it of player.inv) for(let i=0;i<it.qty;i++) ids.push(it.id);
+  spawnCorpse(player.x,player.z,ids,true,"your last body");
+  S.corpses.push({x:player.x,z:player.z,items:ids,mine:true});
+  if(S.corpses.length>10)S.corpses.shift();
+  player.inv=[]; player.hand=0; player.cloth="none"; player.tribe=null; player.enslaved=null;
+  if(pageKey) unlockPage(pageKey);
+  else if(/pneumonia/.test(cause)) unlockPage("rain");
+  else if(/starv/.test(cause)) unlockPage("food");
+  else if(/stomach/.test(cause)) unlockPage("sacflesh");
+  else if(/malnutrition/.test(cause)) unlockPage("malnut");
+  else unlockPage("firstblood");
+  saveGame();
+  document.getElementById("deathCause").textContent=cause+" — you lasted "+days+" days.";
+  const pg=pageKey&&HANDBOOK[pageKey]?HANDBOOK[pageKey]:null;
+  const last=Object.keys(S.handbook).slice(-1)[0];
+  const shown=pg||(last?HANDBOOK[last]:HANDBOOK.sac);
+  document.getElementById("deathq").innerHTML="<b>"+shown[0]+"</b><br>"+shown[1];
+  document.getElementById("deathRec").textContent=`best: ${S.records.bestDays} days · deaths: ${S.records.deaths} · escapes: ${S.records.escapes}`;
+  document.getElementById("death").classList.remove("hidden");
+  document.exitPointerLock&&document.exitPointerLock();
+}
+/* --- the sac sequence --- */
+const sacState={active:false,air:100,tear:0};
+function startBirth(){
+  S.life++; saveGame();
+  // pick a rebirth street spot
+  let bx=0,bz=0;
+  for(let i=0;i<40;i++){ const a=Math.random()*6.28, r=40+Math.random()*300;
+    bx=Math.cos(a)*r; bz=Math.sin(a)*r;
+    const zn=zoneOf(bx,bz); if(zn==="dis"||zn==="skin") break; }
+  player.x=bx; player.z=bz; player.y=2.2; player.vy=0;
+  ensureChunks(bx,bz);
+  player.hp=100*(0.85+player.body.str*.15); player.stam=100;
+  player.thirst=20;player.hunger=25;player.wet=0;player.chill=0;player.exhaust=10;
+  player.malnut=Math.min(player.malnut,0); player.composure=100; player.bleeding=0;
+  player.legInj=0;player.armInj=0;player.dis={gutrot:0,pneumonia:0,gest:0};
+  player.downed=false; player.vomitToday=0; player.bornMin=world.gameMin; player.kills=0;
+  sacState.active=true; sacState.air=100; sacState.tear=0;
+  player.phase="sac";
+  document.getElementById("death").classList.add("hidden");
+  document.getElementById("title").classList.add("hidden");
+  document.getElementById("sacov").classList.remove("hidden");
+  unlockPage("sac");
+}
+function sacClaw(){
+  if(!sacState.active) return;
+  sacState.tear+=7+player.body.str*8; sfx.squelch();
+  if(sacState.tear>=100){
+    sacState.active=false;
+    document.getElementById("sacov").classList.add("hidden");
+    player.phase="alive"; player.alive=true;
+    log("With a wet ripping sound, you are dumped onto the street.","bad");
+    noiseEvent(player.x,player.z,26); // dinner bell
+    if(Math.random()<.35){ player.legInj=1; log("You land badly. Your ankle twists.","bad"); }
+    sfx.squelch(); sfx.scream();
+    renderer.domElement.requestPointerLock();
+  }
+}
+function sacTick(dt){
+  if(!sacState.active) return;
+  sacState.air-=dt*(100/16);
+  sacState.tear=Math.max(0,sacState.tear-dt*4);
+  document.getElementById("airF").style.width=clamp(sacState.air,0,100)+"%";
+  if(sacState.air<=0){
+    sacState.active=false;
+    document.getElementById("sacov").classList.add("hidden");
+    player.alive=true; // so die() runs
+    die("Drowned in the birthing sac","sac");
+  }
+}
+/* --- meters --- */
+function metersTick(dt){
+  if(player.phase!=="alive") return;
+  const mins=dt; // 1 sec = 1 min
+  const day=Math.floor(world.gameMin/1440);
+  if(day!==player.lastDay){ player.lastDay=day; player.vomitToday=0; }
+  player.thirst+=T.thirstPerMin*mins; player.hunger+=T.hungerPerMin*mins;
+  player.exhaust+=T.exhaustPerMin*mins*(player.sleeping?0:1);
+  player.malnut+=T.malnutPerDay/1440*mins;
+  const zn=zoneOf(player.x,player.z);
+  player.sheltered=underRoof(player.x,player.z,player.y)||zn==="gehenna";
+  const fire=nearFire(player.x,player.z,3);
+  if(zn!=="gehenna"&&!player.sheltered&&weather.intensity>.1) player.wet=Math.min(100,player.wet+dt*2.2);
+  else player.wet=Math.max(0,player.wet-dt*(fire?6:0.8));
+  const warm=CLOTH[player.cloth].warm+(fire?1:0);
+  const coldMul = zn==="cocytus"? (1.6+2.4*(1-dist2(player.x,player.z,ZONES.cocytus.x,ZONES.cocytus.z)/ZONES.cocytus.r)) : 1;
+  if((player.wet>45||zn==="cocytus")&&warm<1) player.chill=Math.min(100,player.chill+dt*T.chillWetPerSec*100*(1-warm)*coldMul);
+  else player.chill=Math.max(0,player.chill-dt*(fire?3:.4));
+  if(player.chill>=100&&player.dis.pneumonia<=0){ player.dis.pneumonia=1; log("The cold settles into your lungs.","bad"); }
+  /* diseases */
+  if(player.dis.pneumonia>0){ player.dis.pneumonia+=mins;
+    player.hp-=dt*.045; if(Math.random()<dt/34){ log("You cough — loud.","bad"); noiseEvent(player.x,player.z,22); sfx.hit(); }
+    if(fire&&player.chill<20&&player.wet<20&&Math.random()<dt/120){ player.dis.pneumonia=0; log("Your chest finally loosens.","good"); }
+    if(player.dis.pneumonia>2880) die("Pneumonia","rain"); }
+  if(player.dis.gutrot>0){ player.dis.gutrot-=mins;
+    if(Math.random()<dt/50){ log("Your guts revolt. You vomit.","bad"); player.thirst+=8; player.hunger+=5; sfx.squelch(); noiseEvent(player.x,player.z,10); } }
+  if(player.dis.gest>0){ player.dis.gest+=mins;
+    if(player.dis.gest>1400&&player.dis.gest<1410) log("Something shifts in your stomach.","bad");
+    if(player.dis.gest>2000&&Math.random()<dt/40) sfx.squelch();
+    if(player.dis.gest>2160) die("Your stomach bursts","sacflesh"); }
+  if(player.bleeding>0){ player.hp-=dt*.06*player.bleeding; if(Math.random()<dt/60){player.bleeding--;} }
+  if(player.thirst>=100){ player.hp-=dt*.35; }
+  if(player.hunger>=100){ player.hp-=dt*.12; }
+  if(player.exhaust>=100&&Math.random()<dt/8){ log("You black out on your feet.","bad"); player.exhaust=88; playerDamage(4,"collapse"); }
+  if(player.malnut>=100) die("Malnutrition — even the strongest die of it","malnut");
+  if(player.hp<=0&&player.alive){ die(player.thirst>=100?"Died of thirst":"Bled out"); return; }
+  if(player.hp<40&&Math.random()<dt/3) sfx.heart();
+  player.hp=Math.min(player.hp+ (player.hunger<50&&player.thirst<50? dt*.03:0), 100*(0.85+player.body.str*.15));
+  if(player.downed&&player.hp>24) player.downed=false;
+  if(player.memoryLock>0) player.memoryLock-=dt;
+  /* gehenna */
+  if(zn==="gehenna"){ gehennaTick(dt); } else if(player.gehennaDeep>0){ player.gehennaDeep=0; skyUni.mode.value=0; scene.fog.color.copy(FOG_DIS); scene.fog.density=.028; ground.material=M.mud; }
+}
+function gehennaTick(dt){
+  const r=Math.hypot(player.x,player.z);
+  skyUni.mode.value=1; scene.fog.color.copy(FOG_GEH); scene.fog.density=.006; ground.material=M.ash;
+  unlockPage("gehenna");
+  player.gehennaDeep=Math.max(player.gehennaDeep,r-T.CITY_R);
+  player.thirst=Math.max(0,player.thirst-dt); player.hunger=Math.max(0,player.hunger-dt); player.exhaust=Math.max(0,player.exhaust-dt);
+  player.hollow=(player.hollow||0)+dt*(r-T.CITY_R)/900;
+  if(player.hollow>4&&Math.random()<dt/6) log("You feel hollower.","bad");
+  // turning back: facing the city while deep
+  const facing=Math.atan2(-player.x,-player.z), diff=Math.abs(((player.yaw-facing+Math.PI*3)%(Math.PI*2))-Math.PI);
+  if(r>T.CITY_R+120&&diff<.6){
+    // Dis was only a few steps away
+    const a=Math.atan2(player.z,player.x);
+    player.x=Math.cos(a)*(T.CITY_R-8); player.z=Math.sin(a)*(T.CITY_R-8);
+    log("You turn around. Dis is only a few steps away.","bad");
+    if(player.hollow>25){ die("Your body finally falls apart","gehenna"); }
+    player.hollow=0;
+  }
+  if(player.hollow>60) hollowEnd();
+}
+function hollowEnd(){
+  player.alive=false; player.phase="epilogue";
+  document.getElementById("epiTitle").textContent="THE GREY";
+  document.getElementById("epiText").innerHTML=
+   "You keep walking. The urge to eat goes first, then thirst, then the ache of your feet, then their feeling, then the memory of feet.<br><br>"+
+   "Your skin peels away like wet paper and you do not care. You are an outline. Then a thought. Then a place where a thought was.<br><br><i>Some part of you still wanted to live. Most of you didn't.</i>";
+  document.getElementById("btnStayOut").classList.add("hidden");
+  document.getElementById("btnReturn").textContent="BACK TO THE SAC";
+  document.getElementById("epi").classList.remove("hidden");
+  document.exitPointerLock&&document.exitPointerLock();
+  S.records.deaths++; unlockPage("gehenna"); saveGame();
+}
+
+/* ============================================================
+   SECTION: INPUT / MOVEMENT / COMBAT / INTERACTION
+============================================================ */
+const keys={};
+let menuOpen=null, interTarget=null;
+addEventListener("keydown",e=>{
+  if(e.code==="Tab"){ e.preventDefault(); toggleStatus(); return; }
+  keys[e.code]=true;
+  if(menuOpen&&e.code.startsWith("Digit")){ const i=+e.code.slice(5)-1; if(menuOpen[i]){menuOpen[i].fn();} return; }
+  if(player.phase!=="alive") return;
+  if(e.code.startsWith("Digit")&&!menuOpen){ const i=+e.code.slice(5)-1; if(i<player.inv.length){player.hand=i;syncHand();} }
+  if(e.code==="KeyE") doInteract();
+  if(e.code==="KeyC") openCraft();
+  if(e.code==="KeyH") openHandbook();
+  if(e.code==="KeyN") trySleep();
+  if(e.code==="KeyQ") dropHeld();
+  if(e.code==="KeyX") useHeld();
+  if(e.code==="KeyR") drinkRain();
+  if(e.code==="KeyK"){ if(confirmGiveUp) { die("You open your own throat. Better than the alternative.", player.enslaved?"farms":undefined); confirmGiveUp=false; }
+    else { confirmGiveUp=true; log("Press K again to give up this body.","bad"); setTimeout(()=>confirmGiveUp=false,3000);} }
+  if(e.code==="Escape") closeMenu();
+});
+let confirmGiveUp=false;
+addEventListener("keyup",e=>{ keys[e.code]=false; });
+document.addEventListener("mousemove",e=>{
+  if(document.pointerLockElement!==renderer.domElement) return;
+  const m=player.memoryLock>0?.35:1;
+  player.yaw-=e.movementX*.0023*m; player.pitch-=e.movementY*.0023*m;
+  player.pitch=clamp(player.pitch,-1.45,1.45);
+});
+addEventListener("mousedown",e=>{
+  if(player.phase==="sac"){ sacClaw(); return; }
+  if(player.phase!=="alive") return;
+  if(document.pointerLockElement!==renderer.domElement){ renderer.domElement.requestPointerLock(); return; }
+  if(e.button===0) doAttack();
+  if(e.button===2) player.blocking=true;
+});
+addEventListener("mouseup",e=>{ if(e.button===2) player.blocking=false; });
+addEventListener("contextmenu",e=>e.preventDefault());
+addEventListener("wheel",e=>{ if(player.inv.length){ player.hand=(player.hand+(e.deltaY>0?1:-1)+player.inv.length)%player.inv.length; syncHand(); }});
+addEventListener("keypress",e=>{ if(e.code==="Space"&&player.phase==="sac") sacClaw(); });
+
+/* viewmodel */
+const vm=new THREE.Group(); camera.add(vm); scene.add(camera);
+const vmArm=new THREE.Mesh(new THREE.BoxGeometry(.1,.1,.5),M.skin); vmArm.position.set(.32,-.32,-.5); vm.add(vmArm);
+let vmItem=null;
+function syncHand(){
+  if(vmItem){vm.remove(vmItem);vmItem=null;}
+  const it=heldItem();
+  if(it){ vmItem=propMesh(it.id); vmItem.position.set(.34,-.26,-.72); vmItem.rotation.set(.4,0,.3); vm.add(vmItem); }
+}
+function doAttack(){
+  if(player.atkCd>0||player.stam<6||menuOpen) return;
+  const it=heldItem(), w=it?ITEMS[it.id]:null;
+  const dmgBase=(w&&w.dmg)?w.dmg:9;
+  const armMul=player.armInj>0?(player.armInj>1?.4:.7):1;
+  player.atkCd=.55+(w?.15:0); player.stam-=7; sfx.swing();
+  noiseEvent(player.x,player.z,10);
+  const fx=-Math.sin(player.yaw), fz=-Math.cos(player.yaw);
+  let hit=null,hd=2.4;
+  for(const n of world.npcs){ if(n.dead)continue;
+    const d=dist2(player.x,player.z,n.x,n.z);
+    if(d<hd){ const dot=((n.x-player.x)*fx+(n.z-player.z)*fz)/Math.max(d,.01); if(dot>.55){hit=n;hd=d;} } }
+  if(hit){
+    let dmg=dmgBase*player.body.str*armMul*(.85+Math.random()*.3);
+    const aimHigh=player.pitch>-.05;
+    if(aimHigh&&Math.random()<.3){ dmg*=1.9; }
+    if(hit.downed) dmg*=2.5;
+    npcDamage(hit,dmg,w?w.n:"fists",true,w&&w.sharp);
+  } else {
+    // hit a sac? props? environment thunk
+    for(const c of world.corpses){ if(dist2(player.x,player.z,c.x,c.z)<2){ sfx.squelch(); break; } }
+  }
+}
+function dropHeld(){
+  const it=heldItem(); if(!it) return;
+  it.qty--; if(it.qty<=0){player.inv.splice(player.hand,1);player.hand=Math.max(0,player.hand-1);}
+  const fx=-Math.sin(player.yaw), fz=-Math.cos(player.yaw);
+  spawnProp(it.id,player.x+fx*.8,player.y+1.1,player.z+fz*.8,fx*1.5,.5,fz*1.5);
+  syncHand();
+}
+function throwHeld(charge){
+  const it=heldItem(); if(!it) return;
+  it.qty--; if(it.qty<=0){player.inv.splice(player.hand,1);player.hand=Math.max(0,player.hand-1);}
+  const p=15+charge*16*player.body.str;
+  const fx=-Math.sin(player.yaw)*Math.cos(player.pitch), fy=Math.sin(player.pitch), fz=-Math.cos(player.yaw)*Math.cos(player.pitch);
+  const pr=spawnProp(it.id,player.x+fx*.6,player.y+1.45,player.z+fz*.6,fx*p,fy*p+2,fz*p,true);
+  pr.thrownBy="player"; sfx.swing(); syncHand(); noiseEvent(player.x,player.z,6);
+}
+function useHeld(){
+  const it=heldItem(); if(!it) return; const d=ITEMS[it.id];
+  if(d.food){ player.hunger=Math.max(0,player.hunger-d.food); sfx.eat();
+    if(d.raw&&Math.random()<.45){ player.dis.gutrot=200; log("The raw meat sits wrong.","bad"); }
+    if(it.id==="sacflesh"&&player.dis.gest<=0){ player.dis.gest=1; log("It tastes pale and sweet and wrong.","bad"); }
+    invTake(it.id,1);
+  } else if(d.drink){ player.thirst=Math.max(0,player.thirst-d.drink); sfx.drink(); invTake(it.id,1); invAdd("bowl"); }
+  else if(it.id==="bowlD"){ log("It reeks. Boil it first — or drink and gamble. (use again to gamble)");
+    if(player.gambleD){ player.thirst=Math.max(0,player.thirst-40); if(Math.random()<.55){player.dis.gutrot=260;log("You lose the gamble.","bad");}
+      invTake("bowlD",1); invAdd("bowl"); player.gambleD=false; sfx.drink(); } else player.gambleD=true;
+  }
+  else if(it.id==="bandage"){ if(player.bleeding>0){player.bleeding=0;log("You bind the wounds.","good");invTake("bandage",1);player.composure=Math.max(0,player.composure-3);} else log("No open wounds."); }
+  else if(it.id==="splint"){ if(player.legInj>0||player.armInj>0){ player.legInj=0;player.armInj=0; log("You set the bone. It costs you a scream.","bad");
+    noiseEvent(player.x,player.z,20); player.composure=Math.max(0,player.composure-8); invTake("splint",1); sfx.bone(); } else log("Nothing to splint."); }
+}
+function drinkRain(){
+  if(player.sheltered||weather.intensity<.1||zoneOf(player.x,player.z)==="gehenna"){ log("No rain reaches you here."); return; }
+  player.thirst=Math.max(0,player.thirst-25); player.wet=Math.min(100,player.wet+10); sfx.drink();
+  if(Math.random()<.4){ player.dis.gutrot=240; log("The rain tastes of rot. That was a mistake.","bad"); }
+  unlockPage("water");
+}
+
+/* menus */
+function showMenu(title,opts){
+  menuOpen=opts;
+  const p=document.getElementById("panel");
+  p.innerHTML="<h3>"+title+"</h3>"+opts.map((o,i)=>`<div class="opt ${o.dim?'dim':''}"><span class="key">${i+1}</span> ${o.txt}</div>`).join("")
+   +`<div class="opt dim" style="margin-top:8px">Esc — close</div>`;
+  [...p.querySelectorAll(".opt")].forEach((el,i)=>{ if(opts[i]) el.onclick=()=>opts[i].fn(); });
+  p.classList.remove("hidden");
+}
+function closeMenu(){ menuOpen=null; document.getElementById("panel").classList.add("hidden"); }
+function openCraft(){
+  const opts=[];
+  for(const r of RECIPES){
+    const have=Object.entries(r.req).every(([k,v])=>invCount(k)>=v);
+    const fireOk=!r.needFire||nearFire(player.x,player.z,3);
+    const clothOk=!r.needCloth||player.cloth===r.needCloth;
+    const label=(r.label||ITEMS[r.out].n)+"  ["+Object.entries(r.req).map(([k,v])=>v+" "+ITEMS[k].n).join(", ")+"]";
+    if(have&&fireOk&&clothOk) opts.push({txt:label,fn:()=>{
+      Object.entries(r.req).forEach(([k,v])=>invTake(k,v));
+      if(r.out) invAdd(r.out);
+      if(r.cloth){ player.cloth=r.cloth; log("You dress yourself in the dead.","good"); }
+      if(r.place==="fire"){ const fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw); spawnFire(player.x+fx*1.6,player.z+fz*1.6,false,0); log("Fire pit built. Add timber, then strike it."); }
+      if(r.place==="catcher"){ const fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw); spawnBuild("catcher",player.x+fx*1.6,player.z+fz*1.6); }
+      if(r.place==="barricade"){ const fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw); spawnBuild("barricade",player.x+fx*1.4,player.z+fz*1.4); }
+      sfx.craft(); closeMenu();
+    }});
+    else opts.push({txt:label+(fireOk?"":" — needs fire")+(clothOk?"":" — needs leathers"),dim:true,fn:()=>{}});
+  }
+  showMenu("CRAFT — from what the dead left",opts);
+}
+function openHandbook(){
+  const keysH=Object.keys(S.handbook);
+  const opts=keysH.length?keysH.map(k=>({txt:HANDBOOK[k][0],fn:()=>{ showMenu(HANDBOOK[k][0],[{txt:HANDBOOK[k][1],fn:()=>{}},{txt:"back",fn:openHandbook}]); }}))
+    :[{txt:"(no pages yet — die more)",dim:true,fn:()=>{}}];
+  showMenu("HANDBOOK TO HELL — "+keysH.length+"/"+Object.keys(HANDBOOK).length+" pages",opts);
+}
+/* interact scan */
+function nearestInteract(){
+  let best=null,bd=2.6;
+  const ccx=Math.floor(player.x/T.CHUNK), ccz=Math.floor(player.z/T.CHUNK);
+  for(let dx=-1;dx<=1;dx++)for(let dz=-1;dz<=1;dz++){
+    const c=world.chunks.get((ccx+dx)+","+(ccz+dz)); if(!c) continue;
+    for(const it of c.inter){ if(it.gone) continue; const d=dist2(player.x,player.z,it.x,it.z); if(d<bd){best={kind:"inter",o:it};bd=d;} }
+  }
+  for(const c of world.corpses){ const d=dist2(player.x,player.z,c.x,c.z); if(d<bd&&!c.gone){best={kind:"corpse",o:c};bd=d;} }
+  for(const f of world.fires){ const d=dist2(player.x,player.z,f.x,f.z); if(d<bd){best={kind:"fire",o:f};bd=d;} }
+  for(const b of world.builds){ if(b.kind!=="catcher")continue; const d=dist2(player.x,player.z,b.x,b.z); if(d<bd){best={kind:"catcher",o:b};bd=d;} }
+  for(const p of world.props){ if(!p.resting)continue; const d=dist2(player.x,player.z,p.x,p.z); if(d<bd){best={kind:"prop",o:p};bd=d;} }
+  return best;
+}
+function interactPrompt(t){
+  if(!t) return "";
+  const o=t.o;
+  switch(t.kind){
+    case "prop": return "E — take "+ITEMS[o.id].n;
+    case "corpse": return "E — the body"+(o.name?" ("+o.name+")":"");
+    case "fire": return "E — the fire";
+    case "catcher": return o.water>0?"E — collect rainwater":"rain catcher (empty)";
+    case "inter":
+      if(o.type==="pile") return "E — scavenge "+o.pile;
+      if(o.type==="sac") return "E — a birthing sac";
+      if(o.type==="ore") return "E — iron ore (needs axe)";
+      if(o.type==="bait") return "E — someone left clothes and a club…";
+      if(o.type==="chief") return "E — the chief of "+o.camp;
+      if(o.type==="surgeon") return "E — the tribe's surgeon";
+      if(o.type==="campfire") return "E — the camp fire";
+      if(o.type==="vat") return "E — an industrial vat";
+      if(o.type==="altar") return "E — the altar";
+      if(o.type==="pen") return "a slave pen";
+  }
+  return "";
+}
+
+/* ============================================================
+   SECTION: INTERACTION HANDLERS / SLEEP / MEMORY
+============================================================ */
+function doInteract(){
+  if(menuOpen){ closeMenu(); return; }
+  const t=interTarget; if(!t) return;
+  const o=t.o;
+  if(t.kind==="prop"){ if(invAdd(o.id)){ scene.remove(o.mesh); world.props.splice(world.props.indexOf(o),1); sfx.craft(); } return; }
+  if(t.kind==="catcher"){ if(o.water>=1&&invCount("bowl")>0){ invTake("bowl",1); invAdd("bowlD"); o.water=0; log("Foul rainwater collected."); } return; }
+  if(t.kind==="fire"||(t.kind==="inter"&&o.type==="campfire")){
+    const f=t.kind==="fire"?o:{lit:true,fuel:99,camp:o.camp};
+    const opts=[];
+    if(t.kind==="fire") opts.push({txt:"feed the fire (1 timber)",dim:invCount("timber")<1,fn:()=>{ if(invCount("timber")<1)return; invTake("timber",1); f.fuel+=5; log("The fire takes the wood."); closeMenu(); }});
+    if(t.kind==="fire"&&!f.lit) opts.push({txt:"strike sparks"+(underRoof(f.x,f.z,player.y)?"":" (the rain will fight you)"),dim:f.fuel<=0,fn:()=>{
+      if(f.fuel<=0){return;} const ok=underRoof(f.x,f.z,player.y)?.9:.3;
+      if(Math.random()<ok){ f.lit=true; f.flame.visible=true; f.light.intensity=1.6; log("Flame. Warmth. A beacon.","good"); sfx.fire(); }
+      else log("The damp wins this one.","bad"); closeMenu(); }});
+    if(f.lit){
+      opts.push({txt:"roast raw flesh ("+invCount("fleshR")+")",dim:invCount("fleshR")<1,fn:()=>{ const n=invCount("fleshR"); if(!n)return; invTake("fleshR",n); invAdd("fleshC",n); log("Meat roasts over the flame."); sfx.eat(); closeMenu(); }});
+      opts.push({txt:"boil foul water ("+invCount("bowlD")+")",dim:invCount("bowlD")<1,fn:()=>{ const n=invCount("bowlD"); if(!n)return; invTake("bowlD",n); invAdd("bowlC",n); unlockPage("water"); log("The water boils clean — as clean as it gets."); closeMenu(); }});
+      opts.push({txt:"warm yourself",fn:()=>{ log("You stop shivering, for now.","good"); closeMenu(); }});
+    }
+    showMenu(f.camp?("CAMP FIRE — "+f.camp):"THE FIRE",opts); return;
+  }
+  if(t.kind==="corpse"){
+    const o2=o, sharp=player.inv.some(i=>ITEMS[i.id].sharp);
+    const opts=[
+      {txt:"take the flesh"+(sharp?"":" (no blade — scraps only)"),dim:o2.flesh<=0,fn:()=>{
+        const n=sharp?o2.flesh:1; o2.flesh=0; invAdd("fleshR",n); unlockPage("food"); sfx.squelch();
+        player.composure=Math.max(0,player.composure-2); log("You take what you need. Everyone does."); closeMenu(); }},
+      {txt:"take the bones",dim:o2.bone<=0,fn:()=>{ invAdd("bone",o2.bone); o2.bone=0; closeMenu(); }},
+      {txt:"take the skin"+(sharp?"":" (needs a blade)"),dim:o2.skinN<=0||!sharp,fn:()=>{ if(!sharp)return; invAdd("skin",2); o2.skinN=0; sfx.squelch(); closeMenu(); }},
+    ];
+    if(o2.items.length) opts.push({txt:"their belongings ("+o2.items.length+")",fn:()=>{ for(const id of o2.items) invAdd(id); o2.items=[]; closeMenu(); }});
+    showMenu(o2.mine?"YOUR LAST BODY":"A BODY",opts); return;
+  }
+  if(t.kind!=="inter") return;
+  if(o.type==="pile"){ const give=o.pile==="rock"?"rock":o.pile==="timber"?"timber":o.pile==="scrap"?"scrap":"bone";
+    if(invAdd(give,1)){ o.left--; if(o.left<=0)o.gone=true; sfx.craft(); } return; }
+  if(o.type==="sac"){
+    showMenu("A BIRTHING SAC — it pulses",[
+      {txt:"drink the fluid (desperate)",fn:()=>{ player.vomitToday++; player.thirst=Math.max(0,player.thirst-20); sfx.drink();
+        if(player.vomitToday>2){ log("Too much. You empty your stomach from every available orifice.","bad"); player.thirst+=25;player.hunger+=15; player.dis.gutrot=120; sfx.squelch(); }
+        closeMenu(); }},
+      {txt:"carve the pale flesh",fn:()=>{ invAdd("sacflesh",2); o.used=true; log("It comes away like wet dough.","bad"); sfx.squelch(); closeMenu(); }},
+      {txt:"leave it",fn:closeMenu},
+    ]); return; }
+  if(o.type==="ore"){ const hasAxe=player.inv.some(i=>i.id==="axe"||i.id==="iron");
+    if(!hasAxe){ log("You need an axe to crack the vein."); return; }
+    invAdd("oreI",1); o.left--; if(o.left<=0)o.gone=true; unlockPage("cocytus"); sfx.bone(); return; }
+  if(o.type==="bait"){ if(o.taken)return; o.taken=true;
+    invAdd("club"); invAdd("skin",2); log("Free clothes. Free club. Free.","bad");
+    unlockPage("skin"); skinAmbush(); return; }
+  if(o.type==="chief"){ tribeMenu(o.camp); return; }
+  if(o.type==="surgeon"){ surgeonMenu(o.camp); return; }
+  if(o.type==="vat"){ if(player.enslaved){ enslavedWork(); return; }
+    unlockPage("farms"); player.composure=Math.max(0,player.composure-4);
+    log("The vat is full of broth. You recognise some of the ingredients.","bad"); return; }
+  if(o.type==="altar"){ unlockPage("boneyard"); player.composure=Math.max(0,player.composure-6);
+    log("Redemption, the carvings promise. The stains say otherwise.","bad"); return; }
+}
+function tribeMenu(camp){
+  const rep=S.tribeRep[camp]||(S.tribeRep[camp]={member:false,hostile:false,killed:0,nextTrib:0});
+  if(rep.hostile){ log(camp+" remembers what you did. Run.","bad"); return; }
+  const day=Math.floor(world.gameMin/1440);
+  const opts=[];
+  if(player.tribe===camp){
+    opts.push({txt:"tribute: 2 roasted flesh (due day "+rep.nextTrib+")",dim:invCount("fleshC")<2,fn:()=>{
+      if(invCount("fleshC")<2)return; invTake("fleshC",2); rep.nextTrib=day+2; log("The chief nods. You remain a resident.","good"); saveGame(); closeMenu(); }});
+    opts.push({txt:"(you are a member — camp fire sleep is safe)",dim:true,fn:()=>{}});
+  } else if(rep.member){
+    opts.push({txt:"return to the tribe (you died — prove yourself again)",fn:()=>{ startInitiation(camp); closeMenu(); }});
+  } else {
+    opts.push({txt:"ask to join — an initiation, then",fn:()=>{ startInitiation(camp); closeMenu(); }});
+  }
+  showMenu("THE CHIEF — "+camp,opts);
+}
+function startInitiation(camp){
+  log("Two of theirs step forward. First blood to yield.","bad");
+  unlockPage("tribes");
+  player.initiation={camp,left:2};
+  const c=ZONES.camps.find(c=>c.name===camp);
+  for(let i=0;i<2;i++){ const n=spawnNPC(c.x+3+i*2,c.z+5,"tribal"); n.hostile=true; n.yieldAt=30; n.initFor=camp; n.tribe=camp; }
+}
+function surgeonMenu(camp){
+  if(player.tribe!==camp){ log("The surgeon looks through you. Members only."); return; }
+  const cost=invCount("fleshC")>=2;
+  showMenu("THE SURGEON — flint, hair-thread, no anaesthetic",[
+    {txt:"treat everything (2 roasted flesh)",dim:!cost,fn:()=>{
+      if(!cost)return; invTake("fleshC",2);
+      player.bleeding=0;player.legInj=0;player.armInj=0;player.dis.pneumonia=0;player.dis.gutrot=0;
+      player.hp=Math.min(100,player.hp+25);
+      player.composure=Math.max(0,player.composure-8);
+      log("It works. You scream the whole time.","bad"); noiseEvent(player.x,player.z,18); sfx.bone(); unlockPage("surgeon"); closeMenu(); }},
+    {txt:"leave",fn:closeMenu},
+  ]);
+}
+/* sleep */
+let sleepState=null;
+function trySleep(){
+  if(player.exhaust<25){ log("You're not tired enough to risk it."); return; }
+  const roofed=underRoof(player.x,player.z,player.y);
+  const camp=ZONES.camps.find(c=>dist2(player.x,player.z,c.x,c.z)<14);
+  const safe=camp&&player.tribe===camp.name;
+  let risk=.3; if(roofed)risk-=.12;
+  const walls=nearbyAABBs(player.x,player.z).filter(b=>b.y1>2&&dist2(player.x,player.z,(b.x0+b.x1)/2,(b.z0+b.z1)/2)<7).length;
+  if(walls>=3)risk-=.08;
+  if(world.builds.some(b=>b.kind==="barricade"&&dist2(player.x,player.z,b.x,b.z)<8))risk-=.06;
+  if(safe)risk=.02;
+  sleepState={risk:Math.max(.02,risk),chunks:0,t:0};
+  player.phase="sleep";
+  log(safe?"You sleep by the tribe's fire, watched over.":"You nest down in the "+(roofed?"dark":"open")+".");
+  unlockPage("sleep");
+}
+function sleepTick(dt){
+  if(!sleepState) return;
+  sleepState.t+=dt;
+  world.gameMin+=dt*40; // time races
+  player.exhaust=Math.max(0,player.exhaust-dt*9);
+  player.hp=Math.min(100,player.hp+dt*.8);
+  if(sleepState.t>3){ sleepState.t=0; sleepState.chunks++;
+    if(Math.random()<sleepState.risk){
+      // something found you
+      if(Math.random()<.55&&player.inv.length){
+        const n=1+(Math.random()*2|0);
+        for(let i=0;i<n&&player.inv.length;i++){ const idx=(Math.random()*player.inv.length)|0; const it=player.inv[idx];
+          it.qty--; if(it.qty<=0)player.inv.splice(idx,1); }
+        player.hand=0; syncHand(); wake("You wake to fading footsteps. Your things are lighter.","bad");
+      } else {
+        playerDamage(24,"an attacker in the dark",true);
+        const n=spawnNPC(player.x+2,player.z+2,"resident"); n.hostile=true;
+        wake("You wake to a boot coming down.","bad");
+      }
+      return;
+    }
+    if(player.exhaust<8){ wake("You wake on your own. That's rare here.","good"); return; }
+  }
+}
+function wake(msg,cls){ sleepState=null; if(player.alive)player.phase="alive"; log(msg,cls); }
+/* memory events */
+let memState=null;
+function memoryTick(dt){
+  if(memState){
+    memState.t+=dt;
+    if(memState.t<2&&keys.KeyF&&!memState.resolved){ memState.resolved=true;
+      player.composure=Math.max(0,player.composure-6);
+      log("You push it back down. It costs you.","bad"); memState=null; return; }
+    if(memState.t>=2&&!memState.resolved){ memState.resolved=true;
+      player.memoryLock=6; noiseEvent(player.x,player.z,16);
+      log(memState.skin?"The hides hang like wreaths. Like Christmas. Like your kids on Christmas morning.":"A rain-warped photograph. A family. Yours had faces like that.","bad");
+      document.getElementById("vig").style.boxShadow="inset 0 0 260px rgba(20,10,40,.9)";
+    }
+    if(memState.t>8) memState=null;
+    return;
+  }
+  const ccx=Math.floor(player.x/T.CHUNK), ccz=Math.floor(player.z/T.CHUNK);
+  const c=world.chunks.get(ccx+","+ccz); if(!c) return;
+  for(const it of c.inter){ if(it.type==="memory"&&!it.done&&dist2(player.x,player.z,it.x,it.z)<3){
+    it.done=true; memState={t:0,skin:!!it.skin,resolved:false};
+    log("Something catches your eye. (F — push the feeling down)","bad"); break; } }
+}
+
+/* ============================================================
+   SECTION: NPCs — the damned
+============================================================ */
+const ARCH={
+  fresh:  {hp:60, str:.8, spd:3.6, weapon:null,  cloth:"none",    col:0xb08a70},
+  scav:   {hp:75, str:.9, spd:3.9, weapon:"rock",cloth:"rags",    col:0x8a7458},
+  resident:{hp:95,str:1.1,spd:4.1, weapon:"club",cloth:"leather", col:0x6a5344},
+  tribal: {hp:105,str:1.15,spd:4.2,weapon:"axe", cloth:"bonearm", col:0x5a4a38},
+  slaver: {hp:100,str:1.1,spd:4.4, weapon:"club",cloth:"leather", col:0x4c4436},
+  stalker:{hp:85, str:1.2,spd:4.6, weapon:"shiv",cloth:"rags",    col:0x33282a},
+  zealot: {hp:90, str:1.0,spd:3.8, weapon:"club",cloth:"rags",    col:0x777068},
+  hound:  {hp:55, str:.95,spd:5.6, weapon:null,  cloth:"none",    col:0x9a8878},
+  plague: {hp:80, str:.9, spd:3.4, weapon:"shiv",cloth:"leather", col:0x1a1416},
+  witch:  {hp:1e9,str:1.0,spd:1.5, weapon:null,  cloth:"none",    col:0xe8ded8},
+  slaughter:{hp:6000,str:2.6,spd:4.6,weapon:null,cloth:"none",   col:0xa07860},
+};
+function spawnNPC(x,z,arch){
+  const a=ARCH[arch];
+  const g=new THREE.Group();
+  const bodyM=new THREE.Mesh(new THREE.CapsuleGeometry(.32,.95,3,6),new THREE.MeshLambertMaterial({color:a.col}));
+  bodyM.position.y=1.0; g.add(bodyM);
+  const headCol=arch==="zealot"?0xdddDD0:arch==="plague"?0x111:arch==="witch"?0xf0e8e2:0xb08a70;
+  const head=new THREE.Mesh(new THREE.BoxGeometry(.3,.32,arch==="plague"?.55:.3),new THREE.MeshLambertMaterial({color:headCol}));
+  head.position.y=1.85; g.add(head);
+  if(arch==="slaughter"){ g.scale.setScalar(1.45); }
+  if(arch==="hound"){ bodyM.rotation.x=Math.PI/2.3; bodyM.position.y=.6; head.position.set(0,.75,-.5); }
+  let wm=null; if(a.weapon){ wm=propMesh(a.weapon); wm.position.set(.45,1.1,0); wm.rotation.z=.5; g.add(wm); }
+  g.position.set(x,0,z); scene.add(g);
+  const n={x,z,y:0,arch,hp:a.hp,maxhp:a.hp,str:a.str,spd:a.spd,weapon:a.weapon,cloth:a.cloth,
+    mesh:g, headM:head, state:"wander", tgt:null, wp:null, hostile:false, downed:false, dead:false,
+    atkCd:0, thinkT:Math.random()*.6, invest:null, yieldAt:0, tribe:null, fear:0, satisfied:false,
+    packMates:null, isBait:false, home:{x,z}, name:null };
+  world.npcs.push(n); return n;
+}
+function npcPower(n){ return n.str*40+(n.weapon?ITEMS[n.weapon].dmg:0)+CLOTH[n.cloth].arm*3+n.hp*.3; }
+function playerPower(){ const it=heldItem();
+  return player.body.str*40+((it&&ITEMS[it.id].dmg)||0)+CLOTH[player.cloth].arm*3+player.hp*.3+(player.downed?-40:0); }
+function npcDamage(n,dmg,src,byPlayer=false,sharp=false){
+  if(n.dead) return;
+  if(n.arch==="witch"){ sfx.hit(); return; } // she doesn't notice
+  dmg=Math.max(1,dmg-CLOTH[n.cloth].arm*.7);
+  n.hp-=dmg; sfx.hit();
+  if(n.arch!=="slaughter"){ n.fear+=dmg*.4; if(byPlayer&&!n.yieldAt) n.hostile=true; n.tgt="player"; }
+  if(n.yieldAt&&n.hp<=n.yieldAt){ n.hostile=false; n.state="yield";
+    if(n.initFor){ const camp=n.initFor; n.initFor=null;
+      if(!world.npcs.some(m=>m.initFor===camp&&!m.dead)){
+        player.tribe=camp; const rep=S.tribeRep[camp]; rep.member=true; rep.nextTrib=Math.floor(world.gameMin/1440)+2;
+        log("They pull you up. You're one of theirs — while you live.","good"); unlockPage("tribes"); saveGame(); } }
+    return; }
+  if(n.hp<=18&&!n.downed&&n.arch!=="slaughter"){ n.downed=true; n.state="down"; }
+  if(n.hp<=0) npcDie(n,byPlayer);
+}
+function npcDie(n,byPlayer){
+  n.dead=true; scene.remove(n.mesh);
+  const items=[]; if(n.weapon)items.push(n.weapon);
+  if(n.cloth==="leather"||n.cloth==="bonearm"){items.push("skin","skin");}
+  if(Math.random()<.3)items.push("bone");
+  spawnCorpse(n.x,n.z,items,false,n.name);
+  if(byPlayer){ player.kills++; S.records.kills++;
+    if(player.kills===1) unlockPage("firstblood");
+    if(n.tribe){ const rep=S.tribeRep[n.tribe]||(S.tribeRep[n.tribe]={member:false,hostile:false,killed:0});
+      rep.killed++; if(rep.killed>1||!n.initFor){rep.hostile=true; if(player.tribe===n.tribe){player.tribe=null; log(n.tribe+" will not forget this.","bad");}} }
+    player.composure=Math.max(0,player.composure-1);
+  }
+  if(n.arch==="slaughter"){ log("You have done the impossible. Hell will tell stories about YOU now.","good"); S.legend=true; saveGame(); }
+  world.npcs.splice(world.npcs.indexOf(n),1);
+}
+function npcAttack(n,dt){
+  n.atkCd-=dt; if(n.atkCd>0) return;
+  n.atkCd=.9+Math.random()*.5;
+  const w=n.weapon?ITEMS[n.weapon]:null;
+  let dmg=(w?w.dmg:10)*n.str*(.8+Math.random()*.4);
+  if(n.arch==="slaughter") dmg=55+Math.random()*30;
+  if(n.arch==="stalker"){ const behind=Math.abs(((Math.atan2(player.x-n.x,player.z-n.z)-player.yaw+Math.PI*3)%(Math.PI*2))-Math.PI)<1.1; if(behind)dmg*=2.2; }
+  if(player.downed){ // executions: stomps, eyes, limbs
+    dmg*=1.6;
+    if(n.arch==="slaver"&&zoneOf(player.x,player.z)!=="gehenna"){ enslavePlayer(); return; }
+    if(Math.random()<.4){ player.legInj=2; }
+  }
+  if(n.arch==="witch"){ // she breaks, she doesn't kill
+    player.legInj=2; playerDamage(18,"the Pale Witch, calmly",false); sfx.bone();
+    n.satisfied=true; n.state="leave"; log('"Hmmm?" She loses interest. She keeps the use of your leg.',"bad"); return;
+  }
+  playerDamage(dmg,n.arch==="hound"?"teeth and fingernails":(w?("a "+w.n):"fists"),w&&w.sharp||n.arch==="hound");
+}
+function npcTick(dt){
+  const pp=playerPower();
+  for(const n of world.npcs){
+    if(n.dead) continue;
+    n.thinkT-=dt;
+    const d=dist2(n.x,n.z,player.x,player.z);
+    /* think */
+    if(n.thinkT<=0){
+      n.thinkT=.45+Math.random()*.3;
+      const seen=d<26&&losClear(n.x,n.z,player.x,player.z);
+      if(world.pillar&&world.pillar.active&&dist2(n.x,n.z,world.pillar.x,world.pillar.z)<800){ n.state="converge"; n.hostile=true; }
+      else if(n.state==="yield"||n.state==="leave"||n.state==="down"){ /* keep */ }
+      else if(n.arch==="witch"){ n.state=n.satisfied?"leave":(d<30?"hunt":"wander"); }
+      else if(n.arch==="slaughter"){ n.state=d<3?"hunt":"march"; }
+      else if(n.arch==="stalker"){ n.state=seen||d<30?"stalk":"wander"; }
+      else if(n.arch==="hound"){ n.state=n.isBait?(d<14?"lure":"wander"):(n.packTriggered?"hunt":"wait"); }
+      else if(n.arch==="slaver"&&seen&&d<24){ n.state="hunt"; n.hostile=true; }
+      else if(n.arch==="zealot"&&seen&&d<20){ n.state="hunt"; n.hostile=true; }
+      else if(n.hostile&&seen){ n.state=(npcPower(n)<pp*.6&&n.fear>20)?"flee":"hunt"; }
+      else if(seen){
+        const ratio=npcPower(n)/Math.max(pp,1);
+        const playerFight=world.npcs.some(m=>m!==n&&!m.dead&&m.hostile&&dist2(m.x,m.z,player.x,player.z)<6);
+        if(playerFight&&ratio>1&&d<14){ n.hostile=true; n.state="hunt"; } // kill both while they're distracted
+        else if(ratio>1.35&&(player.cloth!=="none"||player.inv.length>1||player.downed)){ n.hostile=true; n.state="hunt";
+          if(d<14&&Math.random()<.3) log("Someone has noticed what you're carrying.","bad"); }
+        else if(ratio<.65){ n.state="flee"; }
+        else if(n.state==="wander"&&Math.random()<.2) n.state="scavenge";
+      }
+      else if(n.invest){ n.state="invest"; }
+      else if(Math.random()<.15) n.state=Math.random()<.5?"wander":"scavenge";
+    }
+    /* act */
+    let sx=0,sz=0,spd=n.spd;
+    const toP=Math.atan2(player.x-n.x,player.z-n.z);
+    if(n.state==="hunt"||n.state==="converge"&&d<20){
+      if(d>1.6){ sx=Math.sin(toP); sz=Math.cos(toP); } else npcAttack(n,dt);
+      if(n.state==="converge"&&world.pillar) { } }
+    else if(n.state==="converge"){ const a=Math.atan2(world.pillar.x-n.x,world.pillar.z-n.z); sx=Math.sin(a);sz=Math.cos(a); spd*=1.2; }
+    else if(n.state==="flee"){ sx=-Math.sin(toP); sz=-Math.cos(toP); spd*=1.1; }
+    else if(n.state==="stalk"){
+      const facingMe=Math.abs(((toP-player.yaw+Math.PI*4)%(Math.PI*2))-Math.PI)>2.2;
+      if(facingMe&&d<24){ sx=0;sz=0; } // freeze when watched
+      else if(d>1.5){ sx=Math.sin(toP);sz=Math.cos(toP); spd*=.8; } else npcAttack(n,dt);
+    }
+    else if(n.state==="lure"){
+      if(d<9){ sx=-Math.sin(toP);sz=-Math.cos(toP); spd*=.86; // stays just ahead, limping
+        if(d<3.2&&keys.ShiftLeft){ // the stop-trick
+          n.isBait=false; log("She stops dead. You trip over her.","bad");
+          playerDamage(6,"the fall"); player.memoryLock=1.2; sfx.bone();
+          for(const m of world.npcs) if(m.packMates===n.packMates) {m.packTriggered=true;m.hostile=true;}
+          const howl=()=>sfx.roar(); howl(); unlockPage("hounds");
+        }
+        if(n.packMates&&d<12){ let close=0; for(const m of world.npcs) if(m.packMates===n.packMates&&dist2(m.x,m.z,player.x,player.z)<16) close++;
+          if(close>=3){ for(const m of world.npcs) if(m.packMates===n.packMates){m.packTriggered=true;m.hostile=true;} sfx.roar(); unlockPage("hounds"); } }
+      }
+    }
+    else if(n.state==="march"){ if(!n.wp||dist2(n.x,n.z,n.wp.x,n.wp.z)<3){ const a=Math.random()*6.3; n.wp={x:n.x+Math.sin(a)*80,z:n.z+Math.cos(a)*80}; if(Math.random()<.5){sfx.roar(); if(d<50)log('"VALHALLA!"',"bad");} }
+      const a=Math.atan2(n.wp.x-n.x,n.wp.z-n.z); sx=Math.sin(a);sz=Math.cos(a); spd*=.7; if(d<2.2)npcAttack(n,dt); }
+    else if(n.state==="invest"&&n.invest){ const a=Math.atan2(n.invest.x-n.x,n.invest.z-n.z); sx=Math.sin(a);sz=Math.cos(a); spd*=.8;
+      n.invest.t-=dt; if(n.invest.t<=0||dist2(n.x,n.z,n.invest.x,n.invest.z)<2) n.invest=null; }
+    else if(n.state==="scavenge"){
+      let tc=null,td=25; for(const c of world.corpses){ const dd=dist2(n.x,n.z,c.x,c.z); if(dd<td&&c.flesh>0){tc=c;td=dd;} }
+      if(tc){ if(td>1.4){ const a=Math.atan2(tc.x-n.x,tc.z-n.z); sx=Math.sin(a);sz=Math.cos(a); spd*=.7; }
+        else if(Math.random()<dt*.5){ tc.flesh--; sfx.squelch(); } }
+      else n.state="wander";
+    }
+    else if(n.state==="wander"||n.state==="wait"){
+      if(!n.wp||dist2(n.x,n.z,n.wp.x,n.wp.z)<2){ const a=Math.random()*6.3, r2=6+Math.random()*20;
+        n.wp={x:n.home.x+Math.sin(a)*r2,z:n.home.z+Math.cos(a)*r2}; }
+      const a=Math.atan2(n.wp.x-n.x,n.wp.z-n.z); sx=Math.sin(a)*.99;sz=Math.cos(a); spd*=.45;
+      if(n.state==="wait"){sx=0;sz=0;}
+    }
+    else if(n.state==="leave"){ const a=Math.atan2(n.x-player.x,n.z-player.z); sx=Math.sin(a);sz=Math.cos(a); spd*=.6;
+      if(d>60){ n.dead=true; scene.remove(n.mesh); world.npcs.splice(world.npcs.indexOf(n),1); continue; } }
+    else if(n.state==="down"){ sx=0;sz=0; if(n.hp>0)n.hp+=dt*.5; if(n.hp>26){n.downed=false;n.state=n.hostile?"flee":"wander";n.fear=60;} }
+    if(n.downed){sx=0;sz=0;}
+    /* witch gaze */
+    if(n.arch==="witch"&&!n.satisfied&&d<25&&losClear(n.x,n.z,player.x,player.z)){
+      const lookingAt=Math.abs(((Math.atan2(n.x-player.x,n.z-player.z)-player.yaw+Math.PI*4)%(Math.PI*2))-Math.PI)>2.6;
+      if(lookingAt){ player.gaze=Math.min(1,(player.gaze||0)+dt*2); if(player.gaze>=.6){ player.memoryLock=Math.max(player.memoryLock,.3); if(!n.gazeLogged){n.gazeLogged=true; log("You look into her eyes and you cannot fucking move.","bad"); unlockPage("witch");} } }
+      else { player.gaze=Math.max(0,(player.gaze||0)-dt*3); n.gazeLogged=false; }
+    }
+    if(sx||sz){
+      const [nx,nz]=collideMove(n.x,n.y,n.z,sx*spd*dt,sz*spd*dt,.38);
+      const zn=zoneOf(nx,nz);
+      if(zn!=="gehenna"&&!(zn==="swamp"&&n.arch!=="hound")){ n.x=nx; n.z=nz; }
+      n.mesh.rotation.y=Math.atan2(sx,sz);
+    }
+    n.y=floorHeight(n.x,n.z,n.y+.5);
+    n.mesh.position.set(n.x,n.y+(n.downed?-.6:0),n.z);
+    if(n.downed) n.mesh.rotation.x=1.4; else n.mesh.rotation.x=0;
+  }
+}
+/* population manager */
+let popT=0;
+function populationTick(dt){
+  popT-=dt; if(popT>0) return; popT=2.5;
+  const zn=zoneOf(player.x,player.z);
+  const near=world.npcs.filter(n=>dist2(n.x,n.z,player.x,player.z)<T.npcRadius);
+  // despawn far
+  for(const n of [...world.npcs]) if(dist2(n.x,n.z,player.x,player.z)>170&&!n.name){
+    n.dead=true; scene.remove(n.mesh); world.npcs.splice(world.npcs.indexOf(n),1); }
+  const want=zn==="gehenna"?0:zn==="swamp"?3:T.npcActive;
+  if(near.length>=want) return;
+  const a=Math.random()*6.3, r=45+Math.random()*50;
+  const x=player.x+Math.sin(a)*r, z=player.z+Math.cos(a)*r;
+  const zz=zoneOf(x,z);
+  if(zz==="gehenna") return;
+  let arch="resident";
+  const roll=Math.random();
+  if(zz==="skin") arch="stalker";
+  else if(zz==="farms") arch="slaver";
+  else if(zz==="boneyard") arch="zealot";
+  else if(zz==="cocytus") arch=roll<.6?"resident":"scav";
+  else arch=roll<.34?"resident":roll<.62?"scav":roll<.86?"fresh":"plague"===undefined?"scav":(roll<.92?"plague":"fresh");
+  if(zz==="dis"&&Math.random()<.06){ spawnHoundPack(x,z); return; }
+  const n=spawnNPC(x,z,arch);
+  if(arch==="slaver"||arch==="zealot"){ for(let i=1;i<3;i++) spawnNPC(x+i*1.5,z+i,arch); }
+  // fresh meat birth theatre
+  if(arch==="fresh"&&dist2(x,z,player.x,player.z)<60){ sfx.squelch(); if(Math.random()<.4) log("Somewhere close, a wet ripping sound. Fresh meat.","bad"); }
+}
+function spawnHoundPack(x,z){
+  const id={};
+  const bait=spawnNPC(x,z,"hound"); bait.isBait=true; bait.state="lure"; bait.packMates=id;
+  for(let i=0;i<4;i++){ const h=spawnNPC(x+Math.sin(i*1.6)*14,z+Math.cos(i*1.6)*14,"hound"); h.packMates=id; h.state="wait"; }
+}
+function skinAmbush(){
+  for(let i=0;i<2;i++){
+    const behind=player.yaw+Math.PI+(Math.random()-.5);
+    const n=spawnNPC(player.x+Math.sin(behind)*14,player.z+Math.cos(behind)*14,"stalker");
+    n.hostile=true; n.state="stalk";
+  }
+}
+/* plague doctor interaction (freelancers aren't worth the risk) */
+const _doInteract=doInteract;
+doInteract=function(){
+  const pd=world.npcs.find(n=>n.arch==="plague"&&!n.dead&&!n.hostile&&dist2(n.x,n.z,player.x,player.z)<2.6);
+  if(pd&&!menuOpen){
+    showMenu("A BEAKED MASK, A COAT OF BLACKENED SKIN",[
+      {txt:"submit to treatment (3 raw flesh)",dim:invCount("fleshR")<3,fn:()=>{
+        if(invCount("fleshR")<3)return; invTake("fleshR",3); unlockPage("surgeon");
+        const roll=Math.random();
+        if(roll<.5){ player.bleeding=0;player.legInj=0;player.armInj=0;player.dis.pneumonia=0;
+          log("Rough hands, real skill. He sends you on your way.","good"); }
+        else if(roll<.75){ const steal=Math.min(player.inv.length,2);
+          for(let i=0;i<steal;i++)player.inv.pop(); syncHand();
+          log("You wake mid-street. He took his fee — and everything else.","bad"); }
+        else { playerDamage(35,"a freelance surgeon's curiosity",true); pd.hostile=true;
+          log("He wasn't a surgeon. He just liked the outfit.","bad"); }
+        closeMenu(); }},
+      {txt:"back away slowly",fn:closeMenu},
+    ]); return;
+  }
+  _doInteract();
+};
+
+/* ============================================================
+   SECTION: EVENTS — the pillar, the farms, legends, wildfire
+============================================================ */
+function spawnPillar(){
+  let x=0,z=0;
+  for(let i=0;i<30;i++){ const a=Math.random()*6.3, r=120+Math.random()*260;
+    x=Math.cos(a)*r; z=Math.sin(a)*r; if(zoneOf(x,z)==="dis") break; }
+  const g=new THREE.Group();
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(2.2,3.2,300,10,1,true),M.beam); beam.position.y=150; g.add(beam);
+  const glow=new THREE.PointLight(0xff9040,3,120); glow.position.y=8; g.add(glow);
+  g.position.set(x,0,z); scene.add(g);
+  world.pillar={x,z,active:true,t:T.pillarBurn,mesh:g,beam,seen:false,crowded:false};
+  log("The clouds tear open. A pillar of fire, far off.","bad"); sfx.roar();
+}
+function pillarTick(dt){
+  if(!world.pillar){
+    if(world.gameMin>world.pillarNextAt&&player.phase==="alive") spawnPillar();
+    skyUni.pillar.value=Math.max(0,skyUni.pillar.value-dt);
+    return;
+  }
+  const P=world.pillar;
+  P.t-=dt;
+  const d=dist2(player.x,player.z,P.x,P.z);
+  skyUni.pillar.value=clamp(1.2-d/700,0,1);
+  const dir=new THREE.Vector3(P.x-player.x,0,P.z-player.z).normalize();
+  skyUni.pillarDir.value.copy(dir);
+  P.beam.rotation.y+=dt*.5;
+  P.beam.material.opacity=.45+Math.sin(world.gameMin*8)*.15;
+  if(!P.seen&&d<500){ P.seen=true; unlockPage("pillar"); log("Every soul in the district is already running toward it.","bad"); }
+  if(!P.crowded&&d<120){ P.crowded=true;
+    for(let i=0;i<14;i++){ const a=Math.random()*6.3, r=4+Math.random()*14;
+      const n=spawnNPC(P.x+Math.cos(a)*r,P.z+Math.sin(a)*r,pick(["resident","scav","fresh","tribal"]));
+      n.hostile=true; n.state="converge"; }
+  }
+  // the stampede brawls with itself
+  if(Math.random()<dt*3){
+    const near=world.npcs.filter(n=>!n.dead&&dist2(n.x,n.z,P.x,P.z)<12);
+    if(near.length>1){ const a=pick(near); npcDamage(a,8+Math.random()*14,"the crowd"); if(Math.random()<.2)sfx.scream(); }
+  }
+  if(Math.random()<dt*1.5&&d<80) sfx.roar();
+  if(d<3&&player.phase==="alive"&&!player.downed){ escapeHell(); return; }
+  if(P.t<=0){
+    scene.remove(P.mesh); world.pillar=null;
+    world.pillarNextAt=world.gameMin+T.pillarMeanGap/8*(0.6+Math.random());
+    for(const n of world.npcs){ if(n.state==="converge"){n.state="wander";n.hostile=false;n.home={x:n.x,z:n.z};} }
+    if(d<200) log("The pillar gutters out. Somebody — one single somebody — got to leave.","bad");
+  }
+}
+function escapeHell(){
+  player.phase="epilogue"; player.alive=false;
+  S.records.escapes++; unlockPage("escape"); unlockPage("final");
+  const days=Math.max(0,Math.floor((world.gameMin-player.bornMin)/1440*10)/10);
+  if(days>S.records.bestDays)S.records.bestDays=days;
+  if(world.pillar){ scene.remove(world.pillar.mesh); world.pillar=null; world.pillarNextAt=world.gameMin+T.pillarMeanGap/8; }
+  saveGame();
+  document.getElementById("epiTitle").textContent="THE PILLAR TAKES YOU";
+  document.getElementById("epiText").innerHTML=
+   "Heat with no pain. The city drops away like a stone down a well — the streets, the sacs, the small wet sounds of the others.<br><br>"+
+   "You open somebody else's eyes. Fluorescent light. A ceiling fan. A body that is not yours, and is now yours.<br><br>"+
+   "<i>Demons aren't real. What the living call possession is just one of us, testing out a new body.</i><br><br>"+
+   "You lasted "+days+" days this time. You got out. You know exactly how much that is worth — and exactly how long it lasts.<br><br><b style='color:#c9a24a'>You owe me one.</b>";
+  document.getElementById("btnStayOut").classList.remove("hidden");
+  document.getElementById("btnReturn").textContent="THE EXORCIST FINDS YOU (return)";
+  document.getElementById("epi").classList.remove("hidden");
+  document.exitPointerLock&&document.exitPointerLock();
+}
+/* --- enslavement (Perdition Farms) --- */
+function enslavePlayer(){
+  if(player.enslaved) return;
+  player.enslaved={works:0};
+  unlockPage("farms");
+  const F=ZONES.farms;
+  // your things are taken
+  for(const it of [...player.inv]) for(let i=0;i<it.qty;i++) spawnProp(it.id,F.x+8+Math.random()*2,1,F.z+8+Math.random()*2);
+  player.inv=[]; player.hand=0; player.cloth="none"; syncHand();
+  player.x=F.x; player.z=F.z; player.hp=Math.max(player.hp,30); player.downed=false;
+  for(let i=0;i<3;i++){ const g2=spawnNPC(F.x+Math.cos(i*2.1)*6,F.z+Math.sin(i*2.1)*6,"slaver"); g2.home={x:F.x,z:F.z}; g2.guard=true; }
+  log("They take you alive. The Farms always take you alive.","bad");
+  log("Work the vats (E) — or K, and the narrator would call that the smart choice.","bad");
+}
+function enslavedWork(){
+  const e=player.enslaved; if(!e) return;
+  e.works++;
+  sfx.squelch(); player.exhaust+=8;
+  const roll=Math.random();
+  if(roll<.3){ player.dis.gutrot=200; log("They make you taste the batch. Your guts object.","bad"); }
+  else if(roll<.38){ if(player.dis.gest<=0)player.dis.gest=1; log("They make you taste the batch. Something in it was pale.","bad"); }
+  else { player.hunger=Math.max(0,player.hunger-20); log("You grind the sacs into the vat. You keep a little for yourself."); }
+  if(e.works>=3){
+    showMenu("THE CORPSE PIT — they think you're spent",[
+      {txt:"lie still among the dead (feign death)",fn:()=>{
+        if(Math.random()<.65){ player.enslaved=null;
+          const F=ZONES.farms; const a=Math.PI/4; player.x=F.x+Math.cos(a)*(F.r+6); player.z=F.z+Math.sin(a)*(F.r+6);
+          log("They dump you outside the wall. You keep not breathing until the cart leaves.","good"); }
+        else { playerDamage(30,"a pitchfork checking the pile",true); e.works=2; log("A guard prods the pile. You flinch.","bad"); }
+        closeMenu(); }},
+      {txt:"make a run for it",fn:()=>{ for(const n of world.npcs) if(n.guard){n.hostile=true;n.tgt="player";} closeMenu(); }},
+    ]);
+  }
+}
+/* --- legends scheduler --- */
+function legendsTick(dt){
+  if(world.gameMin-player.bornMin<200) return;
+  world.legendTimer-=dt;
+  if(world.legendTimer>0) return;
+  world.legendTimer=200+Math.random()*300;
+  if(world.npcs.some(n=>n.arch==="witch"||n.arch==="slaughter")) return;
+  if(zoneOf(player.x,player.z)!=="dis") return;
+  const a=Math.random()*6.3;
+  if(Math.random()<.5){
+    spawnNPC(player.x+Math.sin(a)*70,player.z+Math.cos(a)*70,"slaughter");
+    log("Far off, through the rain, a single word: \"VALHALLA!\"","bad"); sfx.roar(); unlockPage("slaughter");
+  } else {
+    const w=spawnNPC(player.x+Math.sin(a)*45,player.z+Math.cos(a)*45,"witch");
+    w.name="the Pale Witch";
+    if(Math.random()<.6) log("The street has gone very quiet.","bad");
+  }
+}
+/* --- swamp wildfire --- */
+const wild={t:150,burn:0,warn:0};
+function wildfireTick(dt){
+  const inSwamp=zoneOf(player.x,player.z)==="swamp";
+  if(inSwamp) unlockPage("swamp");
+  if(wild.burn>0){
+    wild.burn-=dt;
+    scene.fog.color.setHex(0x552200);
+    skyUni.flash.value=Math.max(skyUni.flash.value,.5);
+    if(inSwamp&&floorHeight(player.x,player.z,player.y)<=.05){ playerDamage(dt*14,"the wildfire — you can't outrun it"); }
+    if(wild.burn<=0) log("The fire passes, hissing into the black water.","bad");
+    return;
+  }
+  if(wild.warn>0){
+    wild.warn-=dt;
+    if(Math.random()<dt*2) log("The water shivers. Gas. Get off the surface.","bad");
+    if(wild.warn<=0){ wild.burn=10; sfx.thunder(.9); sfx.roar(); if(inSwamp) log("The lightning finds the gas. PHLEGETHON IGNITES.","bad"); }
+    return;
+  }
+  if(inSwamp){ wild.t-=dt; if(wild.t<=0){ wild.t=140+Math.random()*160; wild.warn=8; } }
+}
+/* ambient dread */
+let ambT=18;
+function ambientTick(dt){
+  ambT-=dt; if(ambT>0) return; ambT=14+Math.random()*26;
+  if(zoneOf(player.x,player.z)==="gehenna") return;
+  sfx.scream();
+  if(Math.random()<.25) log(pick([
+    "Somewhere, a scream stops mid-note.",
+    "Two voices argue over something wet.",
+    "A church bell — no. Something hitting metal.",
+    "Someone nearby is crying, and stops themselves.",
+    "The rain, the rain, the rain.",
+  ]),"");
+}
+
+/* ============================================================
+   SECTION: PLAYER TICK / HUD / MAIN LOOP / INIT
+============================================================ */
+let statusOpen=false;
+function toggleStatus(){
+  if(statusOpen){ closeMenu(); statusOpen=false; return; }
+  statusOpen=true;
+  const b=player.body;
+  const lines=[
+    `body: ${b.age} · strength ${b.str} · carrying ${invWeight().toFixed(1)}/${player.maxW.toFixed(0)}kg`,
+    `hp ${player.hp|0} · stamina ${player.stam|0} · composure ${player.composure|0}`,
+    `thirst ${player.thirst|0} · hunger ${player.hunger|0} · exhaustion ${player.exhaust|0}`,
+    `wet ${player.wet|0} · chill ${player.chill|0} · malnutrition ${player.malnut|0}/100`,
+    `wearing: ${CLOTH[player.cloth].n}${player.tribe?" · tribe: "+player.tribe:""}`,
+    `injuries: ${player.legInj?"leg("+player.legInj+") ":""}${player.armInj?"arm("+player.armInj+") ":""}${player.bleeding?"bleeding ":""}${player.dis.pneumonia>0?"pneumonia ":""}${player.dis.gutrot>0?"gut-rot ":""}${player.dis.gest>0?"…something growing ":""}` || "none",
+    `— inventory —`,
+    ...(player.inv.length?player.inv.map((it,i)=>`${i===player.hand?"» ":"  "}${ITEMS[it.id].n} ×${it.qty}`):["  empty hands"]),
+  ];
+  showMenu("YOUR BODY — the one you died in",lines.map(t=>({txt:t,dim:true,fn:()=>{}})));
+  menuOpen=null; // display only; keep number keys for hands
+}
+function condHTML(){
+  const c=[];
+  const add=(txt,lvl)=>c.push(`<span class="c${lvl}">${txt}</span>`);
+  const it=heldItem(); add(it?("in hand: "+ITEMS[it.id].n):"empty hands",1);
+  if(player.thirst>85)add("THIRST",4);else if(player.thirst>60)add("thirsty",2);
+  if(player.hunger>85)add("STARVING",4);else if(player.hunger>60)add("hungry",2);
+  if(player.wet>60)add("soaked",2);
+  if(player.chill>70)add("FREEZING",4);else if(player.chill>35)add("cold",3);
+  if(player.exhaust>80)add("EXHAUSTED",3);else if(player.exhaust>55)add("tired",2);
+  if(player.bleeding)add("bleeding",3);
+  if(player.legInj)add(player.legInj>1?"leg broken":"limping",3);
+  if(player.armInj)add(player.armInj>1?"arm broken":"arm hurt",3);
+  if(player.dis.pneumonia>0)add("pneumonia",4);
+  if(player.dis.gutrot>0)add("gut-rot",3);
+  if(player.dis.gest>800)add("something is growing",4);
+  if(player.malnut>60)add("malnourished",3);
+  if(player.composure<25)add("breaking down",3);
+  if(player.downed)add("DOWN — crawl",4);
+  if(player.enslaved)add("ENSLAVED",4);
+  return c.join("");
+}
+function hudTick(){
+  const day=Math.floor((world.gameMin-player.bornMin)/1440)+1;
+  const zn=zoneOf(player.x,player.z);
+  const znName={dis:"Dis",skin:"Skin Street",farms:"Perdition Farms",boneyard:"the Boneyard",swamp:"Phlegethon",cocytus:"Cocytus",gehenna:"Gehenna"}[zn];
+  document.getElementById("day").innerHTML=`day ${day} · life ${S.life}<br>${znName}`;
+  document.getElementById("conds").innerHTML=condHTML();
+  document.getElementById("stamF").style.width=clamp(player.stam,0,100)+"%";
+  interTarget=nearestInteract();
+  let p=interactPrompt(interTarget);
+  if(player.throwCharge>0) p="throw: "+"▮".repeat(1+Math.min(5,player.throwCharge*5|0));
+  if(memState&&!memState.resolved&&memState.t<2) p="F — push it down";
+  setPrompt(p);
+  if(player.hp>30&&!player.memoryLock)
+    document.getElementById("vig").style.boxShadow=`inset 0 0 ${120+player.chill}px rgba(${player.chill>50?"40,60,90":"0,0,0"},.${55+((100-player.hp)/3|0)})`;
+}
+function playerTick(dt){
+  const held=heldItem();
+  if(keys.KeyG&&held){ player.throwCharge=Math.min(1.2,player.throwCharge+dt); }
+  else if(player.throwCharge>0){ throwHeld(player.throwCharge); player.throwCharge=0; }
+  player.atkCd-=dt;
+  if(vmItem){ vmItem.rotation.x=.4+(player.atkCd>0?Math.sin(player.atkCd*12)*1.2:0); }
+  let ix=0,iz=0;
+  if(keys.KeyW)iz-=1; if(keys.KeyS)iz+=1; if(keys.KeyA)ix-=1; if(keys.KeyD)ix+=1;
+  const mag=Math.hypot(ix,iz)||1; ix/=mag; iz/=mag;
+  const sprint=keys.ShiftLeft&&player.stam>2&&!player.downed&&!player.crouch;
+  player.crouch=!!keys.ControlLeft;
+  let spd=sprint?T.run:T.walk;
+  spd*=player.crouch?T.crouchMul:1;
+  spd*=player.downed?.28:1;
+  spd*=player.legInj>1?.45:player.legInj>0?.75:1;
+  spd*=1-(invWeight()/player.maxW)*.3;
+  spd*=player.memoryLock>0?.45:1;
+  spd*=(.8+player.body.str*.2);
+  const zn=zoneOf(player.x,player.z);
+  if(zn==="swamp"&&floorHeight(player.x,player.z,player.y)<=.05){
+    spd*=.5; player.hp-=dt*1.6;
+    if(Math.random()<dt*.5) log("The black water burns your skin.","bad");
+    const tx=Math.floor(player.x/4),tz=Math.floor(player.z/4);
+    if(hash2(tx,tz,S.seed)<.10){ player.hp-=dt*12; spd*=.4; if(Math.random()<dt)log("There is no bottom here. It pulls.","bad"); }
+    if(player.hp<=0){ die("Phlegethon swallowed you","swamp"); return; }
+  }
+  if(sprint&&(ix||iz)){ player.stam-=dt*9;
+    if(zn!=="gehenna"&&Math.random()<dt*.1){ player.memoryLock=Math.max(player.memoryLock,.5); log("Your feet slide in the mud.",""); } }
+  else player.stam=Math.min(100,player.stam+dt*(player.exhaust>70?3:6.5));
+  const cs=Math.cos(player.yaw),sn=Math.sin(player.yaw);
+  const wx=(ix*cs - iz*sn)*spd*dt, wz=(iz*cs + ix*sn)*spd*dt;
+  const [nx,nz]=collideMove(player.x,player.y,player.z,wx,wz,.35);
+  player.x=nx; player.z=nz;
+  const g=floorHeight(player.x,player.z,player.y);
+  if(keys.Space&&player.y<=g+.02&&!player.downed){ player.vy=6.4; keys.Space=false; }
+  player.vy-=20*dt; player.y+=player.vy*dt;
+  if(player.y<=g){ if(player.vy<-9){ playerDamage((-player.vy-8)*4,"the fall"); if(Math.random()<.4)player.legInj=Math.min(2,player.legInj+1); }
+    player.y=g; player.vy=0; }
+  const eye=player.crouch||player.downed?0.9:1.62;
+  camera.position.set(player.x,player.y+eye+Math.sin(world.gameMin*7)*.015*(spd>5?2:1),player.z);
+  camera.rotation.order="YXZ";
+  camera.rotation.y=player.yaw;
+  camera.rotation.x=player.pitch+(player.memoryLock>0?Math.sin(world.gameMin*20)*.02:0);
+  sky.position.copy(camera.position);
+  ground.position.set(player.x,ground.position.y,player.z);
+  const f=nearFire(player.x,player.z,6);
+  playerLight.position.set(player.x,player.y+1.5,player.z);
+  playerLight.intensity=f?1:0;
+}
+const clock=new THREE.Clock();
+let saveT=0;
+function loop(){
+  requestAnimationFrame(loop);
+  const dt=Math.min(clock.getDelta(),.05);
+  const zn=player.phase==="alive"?zoneOf(player.x,player.z):"dis";
+  if(player.phase==="alive"||player.phase==="sleep") world.gameMin+=dt;
+  weatherTick(dt,player.x,player.z,zn==="gehenna");
+  if(player.phase==="sac"){ sacTick(dt); }
+  else if(player.phase==="sleep"){ sleepTick(dt); firesTick(dt); }
+  else if(player.phase==="alive"){
+    ensureChunks(player.x,player.z);
+    playerTick(dt); metersTick(dt); memoryTick(dt);
+    npcTick(dt); populationTick(dt); propsTick(dt); firesTick(dt);
+    pillarTick(dt); legendsTick(dt); wildfireTick(dt); ambientTick(dt);
+    for(const b of world.builds) if(b.kind==="catcher"&&weather.intensity>.2&&!underRoof(b.x,b.z,1)) b.water=Math.min(1,b.water+dt/45);
+    hudTick();
+    saveT+=dt; if(saveT>12){ saveT=0; saveGame(); }
+  }
+  else {
+    const t=world.gameMin*.05+clock.elapsedTime*.02;
+    camera.position.set(Math.sin(t)*30,14,Math.cos(t)*30);
+    camera.lookAt(0,2,0);
+    sky.position.copy(camera.position);
+  }
+  renderer.render(scene,camera);
+}
+function refreshTitleRec(){
+  document.getElementById("titleRec").textContent=
+   `best: ${S.records.bestDays} days · deaths: ${S.records.deaths} · escapes: ${S.records.escapes} · pages: ${Object.keys(S.handbook).length}/${Object.keys(HANDBOOK).length}`+(S.legend?" · LEGEND":"");
+  document.getElementById("btnGore").textContent="gore: "+(S.gore?"full":"reduced");
+}
+document.getElementById("btnStart").onclick=()=>{ auInit(); startBirth(); };
+document.getElementById("btnRebirth").onclick=()=>{ startBirth(); };
+document.getElementById("btnStayOut").onclick=()=>{
+  document.getElementById("epi").classList.add("hidden");
+  document.getElementById("title").classList.remove("hidden");
+  player.phase="title"; refreshTitleRec();
+};
+document.getElementById("btnReturn").onclick=()=>{
+  document.getElementById("epi").classList.add("hidden");
+  document.getElementById("btnStayOut").classList.remove("hidden");
+  startBirth();
+};
+document.getElementById("btnGore").onclick=()=>{ S.gore=!S.gore; saveGame(); refreshTitleRec(); };
+document.getElementById("btnReset").onclick=()=>{ if(confirm("Erase eternity? Records, handbook, world — everything.")){ localStorage.removeItem(SAVE_KEY); location.reload(); } };
+ensureChunks(0,0);
+for(const c of S.corpses) spawnCorpse(c.x,c.z,c.items,c.mine,"your last body");
+refreshTitleRec();
+loop();
+</script>
+</body>
+</html>
