@@ -928,20 +928,28 @@ addEventListener("keydown",e=>{
 });
 let confirmGiveUp=false;
 addEventListener("keyup",e=>{ keys[e.code]=false; });
+/* Pointer lock is unavailable in some embeds — fall back to drag-to-look there. */
+let plBlocked=false, dragLook=false, lastMX=0, lastMY=0;
+document.addEventListener("pointerlockerror",()=>{ plBlocked=true; log("Mouse capture blocked — hold the mouse and drag to look.","bad"); });
+function locked(){ return document.pointerLockElement===renderer.domElement; }
 document.addEventListener("mousemove",e=>{
-  if(document.pointerLockElement!==renderer.domElement) return;
+  let dx,dy;
+  if(locked()){ dx=e.movementX; dy=e.movementY; }
+  else if(plBlocked&&dragLook){ dx=e.clientX-lastMX; dy=e.clientY-lastMY; lastMX=e.clientX; lastMY=e.clientY; }
+  else return;
   const m=player.memoryLock>0?.35:1;
-  player.yaw-=e.movementX*.0023*m; player.pitch-=e.movementY*.0023*m;
+  player.yaw-=dx*.0023*m; player.pitch-=dy*.0023*m;
   player.pitch=clamp(player.pitch,-1.45,1.45);
 });
 addEventListener("mousedown",e=>{
   if(player.phase==="sac"){ sacClaw(); return; }
   if(player.phase!=="alive") return;
-  if(document.pointerLockElement!==renderer.domElement){ renderer.domElement.requestPointerLock(); return; }
+  if(!locked()&&!plBlocked){ renderer.domElement.requestPointerLock(); return; }
+  if(plBlocked){ dragLook=true; lastMX=e.clientX; lastMY=e.clientY; }
   if(e.button===0) doAttack();
   if(e.button===2) player.blocking=true;
 });
-addEventListener("mouseup",e=>{ if(e.button===2) player.blocking=false; });
+addEventListener("mouseup",e=>{ if(e.button===2) player.blocking=false; dragLook=false; });
 addEventListener("contextmenu",e=>e.preventDefault());
 addEventListener("wheel",e=>{ if(player.inv.length){ player.hand=(player.hand+(e.deltaY>0?1:-1)+player.inv.length)%player.inv.length; syncHand(); }});
 addEventListener("keypress",e=>{ if(e.code==="Space"&&player.phase==="sac") sacClaw(); });
