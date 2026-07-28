@@ -36,7 +36,7 @@
           <h1 class="brand">Rabbit Kit</h1>
           <p class="lede">Capture, create, search, and move work between your PCs. Save Cloud notes and links, send complete folders at LAN speed, and keep every optional tool out of the way until you need it.</p>
           <div class="ctaRow">
-            <span class="btn primary" aria-disabled="true">Installer update in progress</span>
+            <a class="btn primary" href="./download/RabbitKit-Setup.exe">Download</a>
             <a class="btn ghost" href="#features">See features</a>
           </div>
           <p class="releaseMeta">Latest: <strong id="releaseVersion">checking...</strong> <span aria-hidden="true">&middot;</span> Windows 10/11</p>
@@ -143,15 +143,15 @@
 
     <section class="strip">
       <div class="stripInner">
-        <h2>Install it your way</h2>
-        <p>Use the standard installer for the quickest setup, or download the ZIP package when you want the files directly.</p>
+        <h2>A normal Windows install</h2>
+        <p>One installer puts Rabbit Kit in Program Files, adds the shortcuts, and includes everything the app needs.</p>
       </div>
     </section>
 
     <section id="get" class="get">
       <h2>Get Rabbit Kit</h2>
-      <p>Windows app. Download size: <span id="releaseSize">about 1 MB</span>.</p>
-      <span class="btn primary" aria-disabled="true">Installer update in progress</span>
+      <p>Windows app. Download size: <span id="releaseSize">about 22 MB</span>.</p>
+      <a class="btn primary" href="./download/RabbitKit-Setup.exe">Download</a>
       <ol class="steps">
         <li>Open <code>RabbitKit-Setup.exe</code></li>
         <li>Click Install and accept the Windows prompt</li>
@@ -173,7 +173,7 @@
         var version = document.getElementById("releaseVersion");
         var size = document.getElementById("releaseSize");
         if (version) version.textContent = "v" + (release.display_version || release.version);
-        if (size && release.portable_size) size.textContent = (release.portable_size / 1048576).toFixed(1) + " MB";
+        if (size && release.size) size.textContent = (release.size / 1048576).toFixed(1) + " MB";
       })
       .catch(function () {
         var version = document.getElementById("releaseVersion");
