@@ -159,6 +159,13 @@ code {
   margin-top: 1.6rem;
   animation: rise 0.7s 0.16s ease both;
 }
+.releaseMeta {
+  margin: 0.9rem 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  animation: rise 0.7s 0.22s ease both;
+}
+.releaseMeta strong { color: var(--ink); }
 
 .btn {
   display: inline-flex;
@@ -235,6 +242,13 @@ code {
   border-block: 1px solid var(--line);
   background: linear-gradient(90deg, rgba(57,209,184,0.06), transparent 40%, rgba(88,120,255,0.05));
 }
+.cloudStrip {
+  margin-top: 0;
+  background:
+    radial-gradient(700px 220px at 50% 0%, rgba(57,209,184,0.14), transparent 70%),
+    linear-gradient(90deg, rgba(57,209,184,0.06), transparent 45%, rgba(88,120,255,0.05));
+}
+.cloudStrip .eyebrow { margin-bottom: 0.5rem; }
 .stripInner {
   max-width: 720px;
   margin: 0 auto;

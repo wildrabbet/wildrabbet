@@ -32,14 +32,23 @@
         <img src="./shots/rk-script.png" alt="Rabbit Kit Rabbit Script tab" width="1280" height="720" />
         <div class="heroScrim"></div>
         <div class="heroCopy">
-          <p class="eyebrow">Local Windows toolbox</p>
+          <p class="eyebrow">Lightweight Windows workspace</p>
           <h1 class="brand">Rabbit Kit</h1>
-          <p class="lede">Convert media, build sprite sheets, record macros, bind virtual sticks, and automate with Rabbit Script. Runs on your PC. Nothing leaves the machine unless you turn Online on.</p>
+          <p class="lede">Capture, create, search, and move work between your PCs. Save Cloud notes and links, send complete folders at LAN speed, and keep every optional tool out of the way until you need it.</p>
           <div class="ctaRow">
             <a class="btn primary" href="./download/RabbitKit-Setup.exe" download>Download</a>
             <a class="btn ghost" href="#features">See features</a>
           </div>
+          <p class="releaseMeta">Latest: <strong id="releaseVersion">checking...</strong> <span aria-hidden="true">&middot;</span> verified automatic updates</p>
         </div>
+      </div>
+    </section>
+
+    <section class="strip cloudStrip">
+      <div class="stripInner">
+        <p class="eyebrow">New in Rabbit Kit</p>
+        <h2>Your own device Cloud</h2>
+        <p>Save a link or note on one laptop and see it on every paired Rabbit Kit within seconds. Queue individual files or complete folders to another PC on the same Wi-Fi, with folder structure and SHA-256 verification preserved.</p>
       </div>
     </section>
 
@@ -127,21 +136,21 @@
 
     <section class="strip">
       <div class="stripInner">
-        <h2>Send files to your other PC</h2>
-        <p>The DMs tab pairs your machines with a 6-digit code, then streams files straight from one to the other over your own network. No size limit, no cloud, no upload wait — just the speed of your network, and a checksum on arrival.</p>
+        <h2>Fast, direct device transfer</h2>
+        <p>Pair your machines once, then send files and complete folders straight over your network. There is no upload wait or artificial size cap, and every file is checked on arrival.</p>
       </div>
     </section>
 
     <section class="strip">
       <div class="stripInner">
-        <h2>Local first</h2>
-        <p>The UI binds to 127.0.0.1 only. Settings and macros stay in a local data folder. Your DMs account never leaves the PC, and the transfer port only listens while you are signed in.</p>
+        <h2>Quietly stays current</h2>
+        <p>Rabbit Kit checks this release feed in the background. When a newer build exists, it downloads the installer from rabbet.lol, verifies its exact size and SHA-256 checksum, updates silently, and restarts into the correct version.</p>
       </div>
     </section>
 
     <section id="get" class="get">
       <h2>Get Rabbit Kit</h2>
-      <p>Windows app. The installer is about 700 KB. It sets up Python, ffmpeg, WebView2 if needed, then opens Rabbit Kit in its own window.</p>
+      <p>Windows app. Installer size: <span id="releaseSize">about 1 MB</span>. It sets up Python, ffmpeg, WebView2 if needed, then opens Rabbit Kit in its own window.</p>
       <a class="btn primary" href="./download/RabbitKit-Setup.exe" download>Download installer</a>
       <ol class="steps">
         <li>Run <code>RabbitKit-Setup.exe</code></li>
@@ -157,5 +166,19 @@
     <span class="dot">·</span>
     <span>Rabbit Kit</span>
   </footer>
+  <script>
+    fetch("./update.json", {cache: "no-store"})
+      .then(function (response) { return response.ok ? response.json() : Promise.reject(); })
+      .then(function (release) {
+        var version = document.getElementById("releaseVersion");
+        var size = document.getElementById("releaseSize");
+        if (version) version.textContent = "v" + release.version;
+        if (size && release.size) size.textContent = (release.size / 1048576).toFixed(1) + " MB";
+      })
+      .catch(function () {
+        var version = document.getElementById("releaseVersion");
+        if (version) version.textContent = "current release";
+      });
+  </script>
 </body>
 </html>
