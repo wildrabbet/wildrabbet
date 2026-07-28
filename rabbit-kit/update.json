@@ -1,12 +1,12 @@
 {
-    "version":  "2026.7.28.4",
-    "display_version":  "2026.7.28.4",
+    "version":  "2026.7.29.1",
+    "display_version":  "2026.7.29.1",
     "paused":  false,
     "url":  "https://www.rabbet.lol/rabbit-kit/download/RabbitKit-Setup.exe",
-    "sha256":  "2292056c4b354d3d583ec060c98db2c9e830bc3f3e005351f326796b849fa3d4",
-    "size":  12800,
-    "portable_url":  "https://www.rabbet.lol/rabbit-kit/download/RabbitKit-2026.7.28.4.zip",
-    "portable_sha256":  "be75fcdb4f6f5edb5a27dee2f4935b0ee9c4afb0eca24a3760bedd20ea11ab1b",
-    "portable_size":  1080602,
-    "published":  "2026-07-28T14:28:13.0965499Z"
+    "sha256":  "67e8c7e3ea0cb121477a8adc8915163b11f6d05a484a6caf6d7148eb7e87e6ac",
+    "size":  123904,
+    "portable_url":  "https://www.rabbet.lol/rabbit-kit/download/RabbitKit-2026.7.29.1.zip",
+    "portable_sha256":  "0b3309af42388cbb37b0ca0e822b56700bf7824010de7b0e6b0b9b7521b8e3a3",
+    "portable_size":  33223702,
+    "published":  "2026-07-28T14:52:49.8340204Z"
 }
