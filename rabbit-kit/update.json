@@ -1,7 +1,13 @@
 {
-    "version":  "2026.7.28.4",
-    "url":  "https://www.rabbet.lol/rabbit-kit/download/RabbitKit-Setup.exe",
-    "sha256":  "949329de6eaf443d827c85667d3d509e9d41a74738492e85944d42b63cac8b79",
-    "size":  1110528,
-    "published":  "2026-07-28T13:42:50.6391347Z"
+  "version": "0.0.0",
+  "display_version": "2026.7.28.4",
+  "paused": true,
+  "reason": "The unsigned self-extracting EXE was withdrawn after a Defender Wacatac ML detection.",
+  "url": "",
+  "sha256": "",
+  "size": 0,
+  "portable_url": "https://www.rabbet.lol/rabbit-kit/download/RabbitKit-2026.7.28.4-Safe.zip",
+  "portable_sha256": "b098c94925380e290f23981d899a5094cafe1388fb40c883ff3dacb291f6eb6f",
+  "portable_size": 1080810,
+  "published": "2026-07-28T14:00:00Z"
 }
