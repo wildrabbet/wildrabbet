@@ -1,13 +1,12 @@
 {
-  "version": "0.0.0",
+  "version": "2026.7.28.4",
   "display_version": "2026.7.28.4",
-  "paused": true,
-  "reason": "The unsigned self-extracting EXE was withdrawn after a Defender Wacatac ML detection.",
-  "url": "",
-  "sha256": "",
-  "size": 0,
-  "portable_url": "https://www.rabbet.lol/rabbit-kit/download/RabbitKit-2026.7.28.4-Safe.zip",
-  "portable_sha256": "b098c94925380e290f23981d899a5094cafe1388fb40c883ff3dacb291f6eb6f",
-  "portable_size": 1080810,
+  "paused": false,
+  "url": "https://www.rabbet.lol/rabbit-kit/download/RabbitKit-Setup.exe",
+  "sha256": "027022a0340405ed308ddf21f24ceeb2c33fd7bf3ba3cbf95d39b10e818e1a66",
+  "size": 10240,
+  "portable_url": "https://www.rabbet.lol/rabbit-kit/download/RabbitKit-2026.7.28.4.zip",
+  "portable_sha256": "3559856f7ec1750b5140ef9efe6eae7367c5cb0e18b6ea87fd3f7b2ee7d41be0",
+  "portable_size": 1080503,
   "published": "2026-07-28T14:00:00Z"
 }
