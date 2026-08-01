@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0a0b10">
+  <meta name="description" content="Rabbit Remote for Android — low-latency PC streaming and complete touch, keyboard, and gamepad control.">
+  <title>Rabbit Remote · wildrabbet</title>
+  <style>
+    :root{--bg:#090a0f;--panel:#13151e;--line:#292d3b;--ink:#f4f4f8;--mut:#a3a8ba;
+      --violet:#a497ff;--mint:#58dec2;--shadow:0 24px 80px #0009}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);
+      font:15px/1.6 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+    a{color:inherit}.top{height:68px;max-width:1160px;margin:auto;padding:0 24px;display:flex;align-items:center;
+      justify-content:space-between}.logo{text-decoration:none;font-weight:800;letter-spacing:-.02em}.logo span{color:var(--violet)}
+    .top nav{display:flex;align-items:center;gap:22px}.top nav a{color:var(--mut);text-decoration:none;font-size:13px}
+    .top nav a:hover{color:var(--ink)}
+    main{overflow:hidden}.hero{min-height:680px;display:grid;place-items:center;padding:70px 24px 92px;position:relative;
+      background:radial-gradient(circle at 72% 16%,#322b5a 0,transparent 35%),
+      radial-gradient(circle at 20% 70%,#12372f 0,transparent 30%)}
+    .hero:before{content:"";position:absolute;inset:0;opacity:.12;background-image:
+      linear-gradient(#fff1 1px,transparent 1px),linear-gradient(90deg,#fff1 1px,transparent 1px);background-size:54px 54px}
+    .heroInner{position:relative;width:min(980px,100%);display:grid;grid-template-columns:1.12fr .88fr;gap:60px;align-items:center}
+    .eyebrow{margin:0 0 14px;color:var(--mint);font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+    h1{font-size:clamp(46px,8vw,82px);line-height:.98;letter-spacing:-.065em;margin:0 0 24px}
+    .lede{font-size:clamp(17px,2vw,21px);line-height:1.55;color:#c8cad5;max-width:630px;margin:0 0 30px}
+    .actions{display:flex;gap:11px;align-items:center;flex-wrap:wrap}.button{display:inline-flex;align-items:center;justify-content:center;
+      min-height:50px;padding:0 21px;border-radius:12px;text-decoration:none;border:1px solid var(--line);font-weight:800}
+    .button.primary{background:var(--violet);border-color:var(--violet);color:#15121f;box-shadow:0 12px 38px #7768df48}
+    .button.secondary{background:#181a24}.meta{color:var(--mut);font-size:12px;margin-top:14px}
+    .phone{width:min(330px,82vw);aspect-ratio:9/18.5;margin:auto;border:1px solid #ffffff30;border-radius:38px;
+      background:#06070a;padding:11px;box-shadow:var(--shadow),0 0 0 7px #181a22;transform:rotate(2deg)}
+    .screen{height:100%;border-radius:29px;overflow:hidden;border:1px solid #252837;background:
+      radial-gradient(circle at 60% 20%,#362f62 0,transparent 34%),#0d0f16;display:flex;flex-direction:column}
+    .screenTop{padding:18px 16px 11px;border-bottom:1px solid #ffffff12;display:flex;align-items:center;gap:9px}
+    .rabbit{width:29px;height:29px;border-radius:9px;background:var(--violet);display:grid;place-items:center;color:#171320;font-weight:950}
+    .pcFrame{margin:18px 13px 10px;aspect-ratio:16/9;border:1px solid #4c5062;border-radius:8px;background:
+      linear-gradient(145deg,#262c43,#11131c 65%);position:relative;overflow:hidden}
+    .pcFrame:after{content:"LIVE · 60 FPS";position:absolute;right:7px;bottom:6px;background:#0b0c12d9;border:1px solid #ffffff18;
+      border-radius:99px;padding:2px 7px;color:var(--mint);font-size:8px;font-weight:800}
+    .phoneTools{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;padding:4px 13px}.phoneTools i{height:42px;border-radius:10px;
+      background:#1b1e2a;border:1px solid #303445}.sticks{flex:1;position:relative}.sticks:before,.sticks:after{content:"";
+      position:absolute;width:86px;height:86px;border-radius:50%;border:2px solid #ffffff35;background:#161823b8;bottom:17px}
+    .sticks:before{left:19px}.sticks:after{right:19px}
+    .section{padding:96px 24px}.wrap{width:min(1050px,100%);margin:auto}.sectionHead{max-width:700px;margin-bottom:42px}
+    h2{font-size:clamp(31px,5vw,50px);line-height:1.08;letter-spacing:-.045em;margin:0 0 15px}.sectionHead p{color:var(--mut);font-size:17px}
+    .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card{padding:24px;border:1px solid var(--line);
+      border-radius:17px;background:linear-gradient(145deg,#171923,#11131a)}.card b{font-size:17px}.card p{color:var(--mut);margin:8px 0 0}
+    .card .num{display:block;color:var(--violet);font:800 12px/1 ui-monospace,monospace;margin-bottom:18px}
+    .setup{background:#11131a;border-block:1px solid var(--line)}.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;
+      counter-reset:step}.step{position:relative;padding-left:54px}.step:before{counter-increment:step;content:counter(step);position:absolute;left:0;
+      top:0;width:36px;height:36px;border-radius:11px;background:#292541;color:var(--violet);display:grid;place-items:center;font-weight:900}
+    .step b{display:block;margin-bottom:5px}.step span{color:var(--mut)}
+    .trust{margin-top:40px;padding:18px 20px;border:1px solid #3c403e;border-radius:14px;background:#171a1b;color:#b9bdbd;font-size:13px}
+    .download{padding:100px 24px;text-align:center;background:radial-gradient(circle at 50% 40%,#2b2750 0,transparent 46%)}
+    .download p{color:var(--mut);margin:0 0 25px}.download .button{min-width:190px}.hash{font:11px/1.6 ui-monospace,monospace;color:#777d91;
+      margin-top:18px;word-break:break-all}.foot{max-width:1050px;margin:auto;padding:30px 24px 42px;display:flex;justify-content:space-between;
+      color:#7f8496;font-size:12px;border-top:1px solid #1e212c}.foot a{text-decoration:none}
+    @media(max-width:800px){.hero{padding-top:42px}.heroInner{grid-template-columns:1fr;text-align:center}.lede{margin-inline:auto}
+      .actions{justify-content:center}.phone{width:250px}.cards,.steps{grid-template-columns:1fr}.top nav a:not(.keep){display:none}.section{padding:72px 20px}}
+  </style>
+</head>
+<body>
+  <header class="top">
+    <a class="logo" href="../">wild<span>rabbet</span></a>
+    <nav><a href="#features">Features</a><a href="#setup">Setup</a><a class="keep" href="../rabbit-kit/">Rabbit Kit for PC</a></nav>
+  </header>
+  <main>
+    <section class="hero">
+      <div class="heroInner">
+        <div>
+          <p class="eyebrow">Rabbit Kit for Android</p>
+          <h1>Your PC.<br>In your hands.</h1>
+          <p class="lede">Stream and control your PC from your phone over Wi-Fi or a direct USB link. Pick the resolution, frame rate, bandwidth, touch behaviour, and gamepad layout you want.</p>
+          <div class="actions">
+            <a class="button primary" href="./download/RabbitKit-Remote.apk" download>Download</a>
+            <a class="button secondary" href="#setup">How to connect</a>
+          </div>
+          <div class="meta"><span id="version">Rabbit Remote</span> · Android 8.0 or newer · <span id="size">tiny download</span></div>
+        </div>
+        <div class="phone" aria-hidden="true"><div class="screen">
+          <div class="screenTop"><span class="rabbit">R</span><div><b>Rabbit Remote</b><div style="font-size:9px;color:#8f95aa">Full control · USB</div></div></div>
+          <div class="pcFrame"></div><div class="phoneTools"><i></i><i></i><i></i><i></i></div><div class="sticks"></div>
+        </div></div>
+      </div>
+    </section>
+
+    <section id="features" class="section"><div class="wrap">
+      <div class="sectionHead"><p class="eyebrow">Built for speed</p><h2>A remote desktop without the heavy interface.</h2><p>The companion stays small. Your PC does the capture and encoding; the phone focuses on decoding, display, and controls.</p></div>
+      <div class="cards">
+        <article class="card"><span class="num">01</span><b>Adjustable picture</b><p>Adaptive, 1080p, native-resolution, and game presets. Choose 30, 45, or 60 fps and set H.264 bandwidth yourself.</p></article>
+        <article class="card"><span class="num">02</span><b>Wi-Fi or USB</b><p>Use your private local network for convenience, or route the stream through a cable for a steadier low-latency connection.</p></article>
+        <article class="card"><span class="num">03</span><b>Complete PC control</b><p>Direct touch, trackpad mode, left/right/middle click, drag, two-finger scroll, phone keyboard, modifiers, and clipboard transfer.</p></article>
+        <article class="card"><span class="num">04</span><b>Custom gamepad</b><p>Use a virtual Xbox controller with remappable buttons, adjustable sticks, deadzones, sensitivity, opacity, scale, and haptics.</p></article>
+        <article class="card"><span class="num">05</span><b>Launch your games</b><p>Browse installed Steam games and Rabbit Kit shortcuts from the phone, launch one, and move straight into fullscreen control.</p></article>
+        <article class="card"><span class="num">06</span><b>Phone to PC too</b><p>Rabbit Kit can mirror and control a connected Android phone in a resizable window or fullscreen, including phone audio.</p></article>
+      </div>
+    </div></section>
+
+    <section id="setup" class="section setup"><div class="wrap">
+      <div class="sectionHead"><p class="eyebrow">Three steps</p><h2>Connect without an account.</h2></div>
+      <div class="steps">
+        <div class="step"><b>Download and open</b><span>Tap Download above, open the file, and approve Android's normal install screen.</span></div>
+        <div class="step"><b>Enable Phone Remote</b><span>On the PC, open Rabbit Kit → Cloud → Control this PC from your phone.</span></div>
+        <div class="step"><b>Pair once</b><span>Choose the PC in Rabbit Remote and enter the six-digit code shown by Rabbit Kit.</span></div>
+      </div>
+      <div class="trust"><b>Private-network design.</b> The remote picture, input, and clipboard stay between your paired devices on the same trusted Wi-Fi or USB cable. The LAN connection is not internet-encrypted, so do not forward its ports or use it on an untrusted public network. The app contacts rabbet.lol only to check whether an update is available.</div>
+    </div></section>
+
+    <section class="download">
+      <p class="eyebrow">Rabbit Remote</p><h2>Ready when your PC is.</h2>
+      <p>No account. No autoplay feed. Just your screen and your controls.</p>
+      <a class="button primary" href="./download/RabbitKit-Remote.apk" download>Download</a>
+      <div class="hash" id="hash"></div>
+    </section>
+  </main>
+  <footer class="foot"><a href="../">← wildrabbet</a><span><a href="../rabbit-kit/">Rabbit Kit for PC</a></span></footer>
+  <script>
+    fetch('./update.json',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error();return r.json()}).then(function(x){
+      document.getElementById('version').textContent='Version '+x.version;
+      document.getElementById('size').textContent=(x.size/1024).toFixed(0)+' KB';
+      document.getElementById('hash').textContent='SHA-256 '+x.sha256;
+    }).catch(function(){});
+  </script>
+</body>
+</html>
