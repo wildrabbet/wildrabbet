@@ -111,15 +111,6 @@
           <div class="cardDesc">Succubus queen. An unhinged protagonist. Explore the realm.</div>
         </a>
 
-        <a class="card c1 soon" aria-disabled="true">
-          <div class="cardTop">
-            <div class="emoji">🍽️</div>
-            <div class="tag">soon</div>
-          </div>
-          <div class="cardTitle">Jim Eats the Neighbours</div>
-          <div class="cardDesc">Jim is out and tonight he wants to eat the neighbours. Convince them to let him in!</div>
-        </a>
-
         <a class="card c2" href="./games/mc/mc9.html">
           <div class="cardTop">
             <div class="emoji">🧱</div>
@@ -138,15 +129,6 @@
           <div class="cardDesc">Build the line. Make the part. Find out what the factory is hiding.</div>
         </a>
 
-        <a class="card c4 soon" aria-disabled="true">
-          <div class="cardTop">
-            <div class="emoji">🛒</div>
-            <div class="tag">soon</div>
-          </div>
-          <div class="cardTitle">Infinite Retail</div>
-          <div class="cardDesc">Explore a never ending Supermarket! But be careful when the lights go out.</div>
-        </a>
-
         <a class="card c5" href="./games/datura-protocol/">
           <div class="cardTop">
             <div class="emoji">☠️</div>
@@ -154,15 +136,6 @@
           </div>
           <div class="cardTitle">Datura Protocol</div>
           <div class="cardDesc">Oh God, do NOT play this</div>
-        </a>
-
-        <a class="card c6 soon" aria-disabled="true">
-          <div class="cardTop">
-            <div class="emoji">🧩</div>
-            <div class="tag">soon</div>
-          </div>
-          <div class="cardTitle">CodeCrackers</div>
-          <div class="cardDesc">Create your own Crosswords and Code Crackers!</div>
         </a>
 
         <a class="card c7" href="./games/true/true.html">
@@ -199,14 +172,6 @@
           </div>
           <div class="cardTitle">Rabbit Kit</div>
           <div class="cardDesc">Windows toolbox app. Convert, sprites, macros, keybinds, Rabbit Script.</div>
-        </a>
-        <a class="card c8" href="https://rabbetmodels.b-cdn.net/discover/" rel="nofollow" aria-label="Rabbet Archive, owner only">
-          <div class="cardTop">
-            <div class="emoji">◫</div>
-            <div class="tag">owner only</div>
-          </div>
-          <div class="cardTitle">Rabbet Archive</div>
-          <div class="cardDesc">Private 3D model catalogue for the site owner.</div>
         </a>
       </div>
     </section>
@@ -279,7 +244,7 @@
     // Surprise me -> picks a random tile in Stuff
     (function () {
       const btn = document.getElementById('surpriseBtn');
-      const cards = Array.from(document.querySelectorAll('#grid .card:not(.soon)'));
+      const cards = Array.from(document.querySelectorAll('#grid .card'));
       btn.addEventListener('click', () => {
         const pick = cards[Math.floor(Math.random() * cards.length)];
         if (!pick) return;
