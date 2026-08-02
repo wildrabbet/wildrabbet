@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0a0b10">
-  <meta name="description" content="Rabbit Remote for Android — low-latency PC streaming and complete touch, keyboard, and gamepad control.">
-  <title>Rabbit Remote · wildrabbet</title>
+  <meta name="description" content="Rabbit Kit for Android — useful local phone tools with optional linked-PC control, files, games, and streaming.">
+  <title>Rabbit Kit for Android · wildrabbet</title>
   <style>
     :root{--bg:#090a0f;--panel:#13151e;--line:#292d3b;--ink:#f4f4f8;--mut:#a3a8ba;
       --violet:#a497ff;--mint:#58dec2;--shadow:0 24px 80px #0009}
@@ -42,6 +42,8 @@
       background:#1b1e2a;border:1px solid #303445}.sticks{flex:1;position:relative}.sticks:before,.sticks:after{content:"";
       position:absolute;width:86px;height:86px;border-radius:50%;border:2px solid #ffffff35;background:#161823b8;bottom:17px}
     .sticks:before{left:19px}.sticks:after{right:19px}
+    .phoneHome{padding:14px 13px;display:grid;gap:8px}.phoneCard{padding:12px;border:1px solid #34384a;border-radius:11px;background:#171a25}
+    .phoneCard b{display:block;font-size:11px}.phoneCard span{display:block;color:#8f95aa;font-size:8px;margin-top:3px}.phoneCard.primary{border-color:#6e64b9;background:#25213e}
     .section{padding:96px 24px}.wrap{width:min(1050px,100%);margin:auto}.sectionHead{max-width:700px;margin-bottom:42px}
     h2{font-size:clamp(31px,5vw,50px);line-height:1.08;letter-spacing:-.045em;margin:0 0 15px}.sectionHead p{color:var(--mut);font-size:17px}
     .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card{padding:24px;border:1px solid var(--line);
@@ -70,47 +72,47 @@
       <div class="heroInner">
         <div>
           <p class="eyebrow">Rabbit Kit for Android</p>
-          <h1>Your PC.<br>In your hands.</h1>
-          <p class="lede">Stream and control your PC from your phone over Wi-Fi or a direct USB link. Pick the resolution, frame rate, bandwidth, touch behaviour, and gamepad layout you want.</p>
+          <h1>Rabbit Kit.<br>Now on Android.</h1>
+          <p class="lede">Use Rabbit Kit directly on your phone for notes, files, images, apps, conversions, hardware tools, vibration, torch and Morse. Link your PC only when you want its Windows tools, files, games, or full remote control.</p>
           <div class="actions">
-            <a class="button primary" href="./download/RabbitKit-Remote.apk" download>Download</a>
-            <a class="button secondary" href="#setup">How to connect</a>
+            <a class="button primary" href="./download/RabbitKit-Android.apk" download>Download</a>
+            <a class="button secondary" href="#setup">How to install</a>
           </div>
-          <div class="meta"><span id="version">Rabbit Remote</span> · Android 8.0 or newer · <span id="size">tiny download</span></div>
+          <div class="meta"><span id="version">Rabbit Kit</span> · Android 8.0 or newer · <span id="size">tiny download</span></div>
         </div>
         <div class="phone" aria-hidden="true"><div class="screen">
-          <div class="screenTop"><span class="rabbit">R</span><div><b>Rabbit Remote</b><div style="font-size:9px;color:#8f95aa">Full control · USB</div></div></div>
-          <div class="pcFrame"></div><div class="phoneTools"><i></i><i></i><i></i><i></i></div><div class="sticks"></div>
+          <div class="screenTop"><span class="rabbit">R</span><div><b>Rabbit Kit</b><div style="font-size:9px;color:#8f95aa">This phone</div></div></div>
+          <div class="phoneHome"><div class="phoneCard primary"><b>Use Rabbit Kit on this phone</b><span>Local tools · no PC required</span></div><div class="phoneCard"><b>Notes, files and create</b><span>Saved locally and ready to share</span></div><div class="phoneCard"><b>Vibration Lab + Morse torch</b><span>Patterns, strength, speed and repeat</span></div><div class="phoneCard"><b>Linked PC</b><span>Optional remote, Explorer and games</span></div></div>
         </div></div>
       </div>
     </section>
 
     <section id="features" class="section"><div class="wrap">
-      <div class="sectionHead"><p class="eyebrow">Built for speed</p><h2>A remote desktop without the heavy interface.</h2><p>The companion stays small. Your PC does the capture and encoding; the phone focuses on decoding, display, and controls.</p></div>
+      <div class="sectionHead"><p class="eyebrow">Useful without a PC</p><h2>The full Rabbit Kit starts on your phone.</h2><p>Local Android tools are the main app. Linked PC is an optional feature for the jobs that genuinely need Windows.</p></div>
       <div class="cards">
-        <article class="card"><span class="num">01</span><b>Adjustable picture</b><p>Adaptive, 1080p, native-resolution, and game presets. Choose 30, 45, or 60 fps and set H.264 bandwidth yourself.</p></article>
-        <article class="card"><span class="num">02</span><b>Wi-Fi or USB</b><p>Use your private local network for convenience, or route the stream through a cable for a steadier low-latency connection.</p></article>
-        <article class="card"><span class="num">03</span><b>Complete PC control</b><p>Direct touch, trackpad mode, left/right/middle click, drag, two-finger scroll, phone keyboard, modifiers, and clipboard transfer.</p></article>
-        <article class="card"><span class="num">04</span><b>Custom gamepad</b><p>Use a virtual Xbox controller with remappable buttons, adjustable sticks, deadzones, sensitivity, opacity, scale, and haptics.</p></article>
-        <article class="card"><span class="num">05</span><b>Launch your games</b><p>Browse installed Steam games and Rabbit Kit shortcuts from the phone, launch one, and move straight into fullscreen control.</p></article>
-        <article class="card"><span class="num">06</span><b>Phone to PC too</b><p>Rabbit Kit can mirror and control a connected Android phone in a resizable window or fullscreen, including phone audio.</p></article>
+        <article class="card"><span class="num">01</span><b>Notes, links and clipboard</b><p>Keep local notes, save links, export text, share content, and work with your phone clipboard.</p></article>
+        <article class="card"><span class="num">02</span><b>Files and creation</b><p>Pick files securely, preview images, edit photos, draw pixel art, convert units, format text and generate hashes.</p></article>
+        <article class="card"><span class="num">03</span><b>Android app manager</b><p>Browse launchable apps, open them, inspect Android settings, or request a normal uninstall.</p></article>
+        <article class="card"><span class="num">04</span><b>Vibration Lab</b><p>Adjust intensity and duration, then play steady, pulse, heartbeat, or SOS patterns.</p></article>
+        <article class="card"><span class="num">05</span><b>Torch and Morse</b><p>Translate typed phrases into repeatable Morse flashes with adjustable speed and supported torch strength.</p></article>
+        <article class="card"><span class="num">06</span><b>Optional linked PC</b><p>Connect only when wanted for HD remote control, typing, Explorer, Steam games, touch gamepad, and every Windows Rabbit Kit tool.</p></article>
       </div>
     </div></section>
 
     <section id="setup" class="section setup"><div class="wrap">
-      <div class="sectionHead"><p class="eyebrow">Three steps</p><h2>Connect without an account.</h2></div>
+      <div class="sectionHead"><p class="eyebrow">Three steps</p><h2>Install and start locally.</h2></div>
       <div class="steps">
-        <div class="step"><b>Download and open</b><span>Tap Download above, open the file, and approve Android's normal install screen.</span></div>
-        <div class="step"><b>Enable Phone Remote</b><span>On the PC, open Rabbit Kit → Cloud → Control this PC from your phone.</span></div>
-        <div class="step"><b>Pair once</b><span>Choose the PC in Rabbit Remote and enter the six-digit code shown by Rabbit Kit.</span></div>
+        <div class="step"><b>Download</b><span>Tap Download above, then open RabbitKit-Android.apk from your browser's Downloads list.</span></div>
+        <div class="step"><b>Allow this source</b><span>If Android asks, allow your browser to install this one downloaded app, then press Install or Update.</span></div>
+        <div class="step"><b>Open Rabbit Kit</b><span>Choose This phone immediately. Linked PC remains optional and can be paired later from inside the app.</span></div>
       </div>
-      <div class="trust"><b>Private-network design.</b> The remote picture, input, and clipboard stay between your paired devices on the same trusted Wi-Fi or USB cable. The LAN connection is not internet-encrypted, so do not forward its ports or use it on an untrusted public network. The app contacts rabbet.lol only to check whether an update is available.</div>
+      <div class="trust"><b>Local by default.</b> Phone notes and preferences remain on the device until you share them. If you enable Linked PC, its picture, input, and clipboard stay between paired devices on trusted Wi-Fi or USB. Do not forward the PC remote ports or use them on an untrusted public network.</div>
     </div></section>
 
     <section class="download">
-      <p class="eyebrow">Rabbit Remote</p><h2>Ready when your PC is.</h2>
-      <p>No account. No autoplay feed. Just your screen and your controls.</p>
-      <a class="button primary" href="./download/RabbitKit-Remote.apk" download>Download</a>
+      <p class="eyebrow">Rabbit Kit for Android</p><h2>Useful before you connect anything.</h2>
+      <p>Download, install, and choose This phone. Link a PC later only if you want to.</p>
+      <a class="button primary" href="./download/RabbitKit-Android.apk" download>Download</a>
       <div class="hash" id="hash"></div>
     </section>
   </main>
