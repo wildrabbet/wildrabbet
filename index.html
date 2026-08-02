@@ -8,6 +8,51 @@
   <title>wildrabbet</title>
   <meta name="description" content="wildrabbet: weird little web things made for fun" />
   <link rel="stylesheet" href="./style.css" />
+  <style id="useless-box-epic-styles">
+    /* Useless Box additions live here because every effect is temporary and isolated. */
+    .ub-wrap-layer{
+      position:relative; inset:auto; z-index:4; display:block; margin:10px 0 2px;
+      padding:12px; border:1px solid var(--line); border-radius:16px;
+      background:color-mix(in srgb,var(--card) 88%,var(--accent) 12%);
+      box-shadow:0 12px 32px rgba(20,24,40,.09); backdrop-filter:blur(8px);
+    }
+    .ub-wrap-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+    .ub-wrap-title{font-size:12px;font-weight:950;color:var(--ink);letter-spacing:.3px}
+    .ub-wrap-actions{display:flex;align-items:center;gap:6px}
+    .ub-wrap-actions button{
+      position:static; pointer-events:auto; cursor:pointer; padding:5px 9px;
+      border:1px solid var(--line); border-radius:999px; background:var(--card);
+      color:var(--ink); font:800 11px/1 system-ui; box-shadow:none;
+    }
+    .ub-wrap-grid{display:grid;grid-template-columns:repeat(12,minmax(14px,1fr));gap:5px}
+    .ub-wrap-cell{min-width:0;aspect-ratio:1;border-radius:999px;padding:0;pointer-events:auto}
+    .ub-wrap-cell:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+    .ub-epic-layer{position:fixed;inset:0;z-index:9996;overflow:hidden;pointer-events:none;contain:layout paint}
+    .ub-epic-layer.fade{opacity:0;transition:opacity .55s ease}
+    .ub-epic-label{
+      position:fixed;z-index:9998;padding:7px 11px;border:1px solid rgba(255,255,255,.35);
+      border-radius:999px;background:rgba(8,10,18,.78);color:#fff;font:900 11px/1 system-ui;
+      letter-spacing:.6px;box-shadow:0 10px 30px rgba(0,0,0,.22);backdrop-filter:blur(8px)
+    }
+    .ub-epic-button{pointer-events:auto;cursor:pointer;border:0;background:none;padding:0}
+    .ub-laser-line{position:absolute;left:0;right:0;height:2px;box-shadow:0 0 12px currentColor;opacity:.5}
+    .ub-laser-line.hot{height:5px;opacity:1;box-shadow:0 0 24px 6px currentColor}
+    .ub-garden-flower{position:fixed;transform:translate(-50%,-100%) scale(0);transform-origin:bottom center;animation:ubGrow .42s cubic-bezier(.2,1.7,.4,1) forwards}
+    @keyframes ubGrow{to{transform:translate(-50%,-100%) scale(1)}}
+    .ub-orbit-system{position:absolute;inset:-12px;border:1px dashed color-mix(in srgb,var(--accent) 52%,transparent);border-radius:28px;pointer-events:none;animation:ubOrbit 2.4s linear infinite}
+    .ub-orbit-moon{position:absolute;left:50%;top:-12px;font-size:19px;transform:translateX(-50%)}
+    @keyframes ubOrbit{to{transform:rotate(360deg)}}
+    .ub-scan-beam{position:absolute;top:0;bottom:0;width:4px;background:#48ffd7;box-shadow:0 0 22px 8px rgba(72,255,215,.45);animation:ubScan 3.8s ease-in-out both}
+    @keyframes ubScan{0%{left:-4%}50%{left:104%}100%{left:-4%}}
+    .ub-eq{display:flex;align-items:flex-end;gap:4px;height:52px}
+    .ub-eq i{display:block;width:7px;border-radius:5px;background:linear-gradient(#ff5ad4,#5af0ff);animation:ubEq .42s ease-in-out infinite alternate}
+    @keyframes ubEq{from{height:8px}to{height:48px}}
+    .ub-magnet{position:fixed;padding:6px 9px;border-radius:7px;background:#fff;color:#161824;font:900 13px/1 system-ui;box-shadow:0 5px 13px rgba(0,0,0,.22);transform:translate(-50%,-50%) rotate(var(--r))}
+    .ub-door{position:absolute;width:42px;height:62px;border:3px solid #fff6;border-radius:8px 8px 2px 2px;perspective:240px;overflow:visible}
+    .ub-door::before{content:'';position:absolute;inset:0;background:linear-gradient(145deg,#6a3cff,#ff5ad4);transform-origin:left;transition:transform .6s;box-shadow:inset -5px 0 #0002}
+    .ub-door.open::before{transform:rotateY(-82deg)}
+    @media(max-width:700px){.ub-wrap-grid{grid-template-columns:repeat(8,1fr)}.ub-wrap-layer{margin-inline:0}}
+  </style>
   <link rel="icon" href="data:," />
 </head>
 <body>
@@ -4397,29 +4442,51 @@
       // bubble wrap minigame
       function bubbleWrap(){
         const existing = document.querySelector('.ub-wrap-layer');
-        if (existing) { existing.remove(); return; }
+        if (existing) { existing.scrollIntoView({ behavior:'smooth', block:'nearest' }); return; }
         const layer = document.createElement('div');
         layer.className = 'ub-wrap-layer';
+        layer.setAttribute('aria-label', 'Bubble wrap mini toy');
+        const head = document.createElement('div');
+        head.className = 'ub-wrap-head';
+        const title = document.createElement('span');
+        title.className = 'ub-wrap-title';
+        const actions = document.createElement('div');
+        actions.className = 'ub-wrap-actions';
+        const reset = document.createElement('button');
+        reset.type = 'button'; reset.textContent = 'fresh sheet';
         const close = document.createElement('button');
-        close.className = 'ub-wrap-close'; close.textContent = 'done ✕';
-        close.addEventListener('pointerdown', (ev) => { ev.stopPropagation(); layer.remove(); });
-        layer.appendChild(close);
-        const cells = 96;
-        for (let i=0;i<cells;i++){
-          const b = document.createElement('button');
-          b.className = 'ub-wrap-cell';
-          b.addEventListener('pointerdown', (ev) => {
-            ev.stopPropagation();
-            if (b.classList.contains('popped')) return;
-            b.classList.add('popped');
-            beep('sine', r(500,1100), 0.05, 0.09);
-            spawnParticles(ev.clientX, ev.clientY, { count:r(3,6), shape:'circles', sizeMin:6, sizeMax:14, durMin:250, durMax:500 });
-            ubAddClicks(1);
-            ubPop(ev.clientX, ev.clientY, 'pop', { size:14 });
-          });
-          layer.appendChild(b);
+        close.type = 'button'; close.textContent = 'close';
+        actions.append(reset, close); head.append(title, actions); layer.appendChild(head);
+        const grid = document.createElement('div');
+        grid.className = 'ub-wrap-grid'; layer.appendChild(grid);
+        const cells = 48;
+        let popped = 0;
+        function renderSheet(){
+          popped = 0; grid.replaceChildren(); title.textContent = `bubble wrap · 0/${cells}`;
+          for (let i=0;i<cells;i++){
+            const b = document.createElement('button');
+            b.type = 'button'; b.className = 'ub-wrap-cell'; b.setAttribute('aria-label', `Pop bubble ${i + 1}`);
+            b.addEventListener('click', (ev) => {
+              ev.stopPropagation();
+              if (b.classList.contains('popped')) return;
+              b.classList.add('popped'); b.disabled = true; popped++;
+              title.textContent = `bubble wrap · ${popped}/${cells}`;
+              beep('sine', r(500,1100), 0.045, 0.075);
+              spawnParticles(ev.clientX, ev.clientY, { count:r(2,4), shape:'circles', sizeMin:5, sizeMax:11, durMin:220, durMax:420 });
+              ubAddClicks(1);
+              if (popped === cells){
+                title.textContent = 'sheet cleared ✨';
+                spawnParticles(layer.getBoundingClientRect().left + layer.offsetWidth / 2, layer.getBoundingClientRect().top + 20, { count:28, shape:'mixed', dxMax:220, dyUp:140 });
+              }
+            });
+            grid.appendChild(b);
+          }
         }
-        siteBody.appendChild(layer);
+        reset.addEventListener('click', ev => { ev.stopPropagation(); renderSheet(); });
+        close.addEventListener('click', ev => { ev.stopPropagation(); layer.remove(); });
+        renderSheet();
+        document.querySelector('.toyBoxWrap').appendChild(layer);
+        layer.scrollIntoView({ behavior:'smooth', block:'nearest' });
       }
 
       // ============================================================
@@ -4549,6 +4616,197 @@
         beep('sawtooth', r(180,260), 0.4, 0.05);
       }
 
+      // Thirty compact, self-cleaning Useless Box spectacles.
+      function epicLayer(name, life = 6000){
+        const layer = document.createElement('div');
+        layer.className = 'ub-epic-layer ' + name;
+        layer.setAttribute('aria-hidden', 'true');
+        siteBody.appendChild(layer);
+        if (life) setTimeout(() => fadeEpic(layer), life);
+        return layer;
+      }
+
+      function fadeEpic(layer){
+        if (!layer || !layer.isConnected || layer.dataset.closing) return;
+        layer.dataset.closing = '1'; layer.classList.add('fade');
+        setTimeout(() => layer.remove(), 600);
+      }
+
+      function epicLabel(layer, text, x = 16, y = 16){
+        const label = document.createElement('div');
+        label.className = 'ub-epic-label'; label.textContent = text;
+        label.style.left = typeof x === 'number' ? x + 'px' : x;
+        label.style.top = typeof y === 'number' ? y + 'px' : y;
+        layer.appendChild(label); return label;
+      }
+
+      function constellationLab(){
+        const layer = epicLayer('ub-constellation', 6500);
+        layer.style.background = 'radial-gradient(circle at 50% 40%,rgba(70,60,170,.16),transparent 55%)';
+        epicLabel(layer, 'CONSTELLATION LAB · LIVE SKY');
+        const ns = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(ns,'svg'); svg.setAttribute('viewBox',`0 0 ${innerWidth} ${innerHeight}`); svg.style.cssText='width:100%;height:100%';
+        const stars = Array.from({length:28},()=>({x:r(20,innerWidth-20),y:r(35,innerHeight-35),s:r(1.5,4)}));
+        stars.forEach((a,i)=>stars.slice(i+1).forEach(b=>{ const d=Math.hypot(a.x-b.x,a.y-b.y); if(d<210){ const line=document.createElementNS(ns,'line'); line.setAttribute('x1',a.x);line.setAttribute('y1',a.y);line.setAttribute('x2',b.x);line.setAttribute('y2',b.y);line.setAttribute('stroke',`rgba(140,210,255,${(1-d/210)*.55})`);line.setAttribute('stroke-width','1');svg.appendChild(line); }}));
+        stars.forEach((star,i)=>{ const c=document.createElementNS(ns,'circle'); c.setAttribute('cx',star.x);c.setAttribute('cy',star.y);c.setAttribute('r',star.s);c.setAttribute('fill',i%4?'#dff7ff':'#ffdb73');svg.appendChild(c);c.animate([{opacity:.25},{opacity:1},{opacity:.25}],{duration:r(900,2200),iterations:Infinity,delay:r(0,900)}); });
+        layer.appendChild(svg); beep('sine',880,.18,.035);
+      }
+
+      function cursorGarden(){
+        const layer = epicLayer('ub-cursor-garden', 0); epicLabel(layer,'CURSOR GARDEN · MOVE TO GROW');
+        let last=0, planted=0;
+        const move=ev=>{ const now=performance.now(); if(now-last<75||planted>70)return; last=now;planted++; const f=document.createElement('div');f.className='ub-garden-flower';f.textContent=rand(['🌷','🌻','🌼','🌸','🍄','🌱']);f.style.left=ev.clientX+'px';f.style.top=ev.clientY+'px';f.style.fontSize=r(18,32)+'px';layer.appendChild(f);setTimeout(()=>{f.style.transition='opacity .8s';f.style.opacity='0';setTimeout(()=>f.remove(),800);},4200); };
+        document.addEventListener('pointermove',move,{passive:true});
+        setTimeout(()=>{document.removeEventListener('pointermove',move);fadeEpic(layer);},7000);
+      }
+
+      function laserHarp(){
+        const layer=epicLayer('ub-laser-harp',0);epicLabel(layer,'LASER HARP · PLAY WITH YOUR CURSOR');
+        const beams=[]; const notes=[262,330,392,523,659,784,988];
+        notes.forEach((note,i)=>{const line=document.createElement('div');line.className='ub-laser-line';line.style.top=(18+i*10)+'%';line.style.color=`hsl(${i*48} 95% 65%)`;layer.appendChild(line);beams.push({line,note,y:(18+i*10)/100});});
+        let hot=-1,last=0;const move=ev=>{const idx=beams.findIndex(b=>Math.abs(ev.clientY-innerHeight*b.y)<12);if(idx!==hot&&idx>=0&&performance.now()-last>70){last=performance.now();hot=idx;beams.forEach((b,i)=>b.line.classList.toggle('hot',i===idx));beep('sine',beams[idx].note,.09,.045);spawnParticles(ev.clientX,ev.clientY,{count:5,hue:idx*48,sizeMin:4,sizeMax:9,durMin:250,durMax:480});}if(idx<0)hot=-1;};
+        document.addEventListener('pointermove',move,{passive:true});setTimeout(()=>{document.removeEventListener('pointermove',move);fadeEpic(layer);},8000);
+      }
+
+      function rabbitGrandPrix(){
+        const layer=epicLayer('ub-rabbit-race',7000);const label=epicLabel(layer,'RABBIT GRAND PRIX · STARTING GRID',16,'calc(100% - 184px)');
+        const track=document.createElement('div');track.style.cssText='position:absolute;left:12px;right:12px;bottom:18px;height:142px;border-radius:18px;background:repeating-linear-gradient(0deg,#15182a 0 26px,#20243a 26px 28px);border:2px solid #fff3;box-shadow:0 18px 50px #0005';layer.appendChild(track);
+        const racers=['🐇','🐰','🐇','🐰','🐇'];let winner=0,best=99;
+        racers.forEach((rabbit,i)=>{const el=document.createElement('div');el.textContent=rabbit;el.style.cssText=`position:absolute;left:8px;top:${i*27+3}px;font-size:24px`;track.appendChild(el);const duration=r(2200,4300);if(duration<best){best=duration;winner=i;}setTimeout(()=>el.animate([{transform:'translateX(0)'},{transform:`translateX(${Math.max(180,innerWidth-105)}px)`}],{duration,easing:'cubic-bezier(.2,.7,.25,1)',fill:'forwards'}),500);});
+        setTimeout(()=>{label.textContent=`LANE ${winner+1} WINS · PHOTO FINISH`;beep('triangle',740,.18,.06);},best+550);
+      }
+
+      function portalPost(){
+        const layer=epicLayer('ub-portal-post',6500);epicLabel(layer,'PORTAL POST · EXPRESS DIMENSIONAL DELIVERY');
+        const spots=[[16,70],[82,28]];
+        spots.forEach(([x,y],i)=>{const p=document.createElement('div');p.style.cssText=`position:absolute;left:${x}%;top:${y}%;width:92px;height:130px;border-radius:50%;transform:translate(-50%,-50%);border:8px solid ${i?'#ff5ad4':'#5af0ff'};box-shadow:0 0 32px 12px ${i?'#ff5ad477':'#5af0ff77'},inset 0 0 22px #000;background:#090b18aa`;p.animate([{transform:'translate(-50%,-50%) rotate(0)'},{transform:'translate(-50%,-50%) rotate(360deg)'}],{duration:1800,iterations:Infinity});layer.appendChild(p);});
+        for(let i=0;i<9;i++)setTimeout(()=>{const item=document.createElement('div');item.textContent=rand(['📦','🥕','✉️','🐇']);item.style.cssText='position:absolute;left:16%;top:70%;font-size:28px';layer.appendChild(item);item.animate([{transform:'translate(-50%,-50%) scale(1)',opacity:1},{transform:'translate(-50%,-50%) scale(0)',opacity:0}],{duration:650,fill:'forwards'}).onfinish=()=>{item.style.left='82%';item.style.top='28%';item.animate([{transform:'translate(-50%,-50%) scale(0)',opacity:0},{transform:`translate(${r(-180,180)}px,${r(-100,180)}px) scale(1.3)`,opacity:1}],{duration:900,fill:'forwards'}).onfinish=()=>item.remove();};},i*420);
+      }
+
+      function dominoDistrict(){
+        const layer=epicLayer('ub-domino-district',5200);epicLabel(layer,'DOMINO DISTRICT · STRUCTURAL FAILURE');
+        const count=Math.min(42,Math.floor(innerWidth/24));
+        for(let i=0;i<count;i++){const d=document.createElement('div');d.textContent=i%2?'•  •':'••';d.style.cssText=`position:absolute;left:${12+i*24}px;bottom:24px;width:15px;height:54px;border-radius:4px;background:hsl(${i*9} 78% 58%);color:#fff;font:900 10px/18px system-ui;text-align:center;transform-origin:bottom right;box-shadow:0 5px 8px #0003`;layer.appendChild(d);setTimeout(()=>{d.animate([{transform:'rotate(0)'},{transform:'rotate(78deg) translateX(8px)'}],{duration:420,easing:'cubic-bezier(.5,0,1,.5)',fill:'forwards'});beep('square',180+i*7,.025,.018);},500+i*72);}
+      }
+
+      function neonDoodle(){
+        const layer=epicLayer('ub-neon-doodle',0);epicLabel(layer,'NEON DOODLE · DRAW WITHOUT BLOCKING THE PAGE');
+        const canvas=document.createElement('canvas');canvas.width=innerWidth*devicePixelRatio;canvas.height=innerHeight*devicePixelRatio;canvas.style.cssText='width:100%;height:100%';layer.appendChild(canvas);const ctx=canvas.getContext('2d');ctx.scale(devicePixelRatio,devicePixelRatio);ctx.lineCap='round';ctx.lineJoin='round';ctx.lineWidth=5;let last=null,hue=0;
+        const move=ev=>{if(last){ctx.strokeStyle=`hsl(${hue++%360} 100% 65%)`;ctx.shadowColor=ctx.strokeStyle;ctx.shadowBlur=14;ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(ev.clientX,ev.clientY);ctx.stroke();}last={x:ev.clientX,y:ev.clientY};};
+        document.addEventListener('pointermove',move,{passive:true});setTimeout(()=>{document.removeEventListener('pointermove',move);fadeEpic(layer);},7000);
+      }
+
+      function cardOrchestra(){
+        const layer=epicLayer('ub-card-orchestra',5600);epicLabel(layer,'CARD ORCHESTRA · PROJECTS IN C MAJOR');
+        const notes=[262,294,330,349,392,440,494,523];
+        [...document.querySelectorAll('.card')].forEach((card,i)=>{setTimeout(()=>{card.animate([{transform:'translateY(0) scale(1)',filter:'brightness(1)'},{transform:'translateY(-18px) scale(1.035)',filter:`hue-rotate(${i*35}deg) brightness(1.35)`},{transform:'translateY(0) scale(1)',filter:'brightness(1)'}],{duration:620,easing:'ease-out'});beep(i%3?'sine':'triangle',notes[i%notes.length],.2,.045);spawnParticles(card.getBoundingClientRect().left+card.offsetWidth/2,card.getBoundingClientRect().top+10,{count:7,hue:i*40,dyUp:80});},i*210);});
+      }
+
+      function tagTornado(e){
+        const layer=epicLayer('ub-tag-tornado',6000);epicLabel(layer,'TAG TORNADO · METADATA WEATHER EVENT');const cx=e.clientX,cy=e.clientY;
+        [...document.querySelectorAll('.tag')].forEach((tag,i)=>{const token=document.createElement('div');token.className='ub-epic-label';token.textContent=tag.textContent;token.style.left=cx+'px';token.style.top=cy+'px';layer.appendChild(token);const angle=(i/Math.max(1,document.querySelectorAll('.tag').length))*Math.PI*2;token.animate([{transform:'translate(-50%,-50%) scale(.2)',opacity:0},{transform:`translate(${Math.cos(angle)*r(100,260)}px,${Math.sin(angle)*r(80,220)}px) rotate(${r(-360,360)}deg)`,opacity:1,offset:.55},{transform:`translate(${r(-40,40)}px,${-innerHeight*.65}px) rotate(${r(360,900)}deg)`,opacity:0}],{duration:r(3200,5200),easing:'cubic-bezier(.2,.7,.3,1)',fill:'forwards'});});
+      }
+
+      function moonService(){
+        const cards=[...document.querySelectorAll('.card')];epicLayer('ub-moon-service',6500);cards.forEach((card,i)=>{const orbit=document.createElement('div');orbit.className='ub-orbit-system';orbit.style.animationDuration=r(1.6,3.8)+'s';const moon=document.createElement('span');moon.className='ub-orbit-moon';moon.textContent=rand(['🌙','🛰️','🪐','☄️']);orbit.appendChild(moon);card.appendChild(orbit);setTimeout(()=>orbit.remove(),6200);});shout('LUNAR SERVICE ENABLED 🌙',{dur:900});
+      }
+
+      function blueprintScan(){
+        const layer=epicLayer('ub-blueprint-scan',6200);layer.style.background='rgba(0,35,80,.12)';epicLabel(layer,'LIVE BLUEPRINT · DOM SCAN');
+        const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`0 0 ${innerWidth} ${innerHeight}`);svg.style.cssText='width:100%;height:100%';
+        [...document.querySelectorAll('.card,.heroLeft,.heroRight')].forEach((el,i)=>{const b=el.getBoundingClientRect(),rect=document.createElementNS(ns,'rect');rect.setAttribute('x',b.left);rect.setAttribute('y',b.top);rect.setAttribute('width',b.width);rect.setAttribute('height',b.height);rect.setAttribute('fill','none');rect.setAttribute('stroke','#5af0ff');rect.setAttribute('stroke-dasharray','7 5');svg.appendChild(rect);const text=document.createElementNS(ns,'text');text.setAttribute('x',b.left+7);text.setAttribute('y',b.top+15);text.setAttribute('fill','#bdfcff');text.setAttribute('font-size','10');text.textContent=`NODE-${String(i+1).padStart(2,'0')} · ${Math.round(b.width)}×${Math.round(b.height)}`;svg.appendChild(text);});layer.appendChild(svg);const beam=document.createElement('div');beam.className='ub-scan-beam';layer.appendChild(beam);beep('sine',330,.6,.035);
+      }
+
+      function treasureHunt(){
+        const layer=epicLayer('ub-treasure-hunt',0);const label=epicLabel(layer,'TREASURE HUNT · FIND THE X · 0/3');let found=0;
+        const x=document.createElement('button');x.className='ub-epic-button';x.textContent='❌';x.setAttribute('aria-label','Treasure marker');x.style.cssText='position:fixed;z-index:9999;font-size:38px;filter:drop-shadow(0 5px 9px #0005);transition:left .25s,top .25s';layer.appendChild(x);
+        const move=()=>{x.style.left=r(45,innerWidth-70)+'px';x.style.top=r(70,innerHeight-80)+'px';};move();x.addEventListener('click',ev=>{ev.stopPropagation();found++;label.textContent=`TREASURE HUNT · ${found}/3`;beep('triangle',500+found*150,.12,.06);spawnParticles(ev.clientX,ev.clientY,{count:14,shape:'mixed'});if(found===3){x.textContent='🏆';label.textContent='TREASURE FOUND · ABSOLUTELY WORTH IT';ubAddClicks(1);setTimeout(()=>fadeEpic(layer),1300);}else move();});setTimeout(()=>fadeEpic(layer),12000);
+      }
+
+      function rabbitCourier(){
+        const layer=epicLayer('ub-rabbit-courier',7200);epicLabel(layer,'RABBIT COURIER · SAME-DAY CARROT SHIPPING');const cards=[...document.querySelectorAll('.card')];
+        for(let i=0;i<4;i++)setTimeout(()=>{const target=rand(cards).getBoundingClientRect(),runner=document.createElement('div');runner.textContent='🐇📦';runner.style.cssText=`position:fixed;left:-80px;top:${r(100,innerHeight-100)}px;font-size:31px;white-space:nowrap`;layer.appendChild(runner);runner.animate([{transform:'translateX(0) scaleX(1)'},{transform:`translateX(${target.left+target.width/2+80}px) translateY(${target.top-runner.offsetTop+target.height/2}px) scaleX(1)`}],{duration:1200,easing:'cubic-bezier(.2,.7,.25,1)',fill:'forwards'}).onfinish=()=>{runner.textContent='✅';setTimeout(()=>runner.remove(),450);};},i*1350);
+      }
+
+      function jellyfishClub(){
+        const layer=epicLayer('ub-jellyfish-club',7200);layer.style.background='linear-gradient(180deg,transparent 15%,rgba(25,110,170,.13))';epicLabel(layer,'JELLYFISH CLUB · DEEP WEB MEMBERS ONLY');
+        for(let i=0;i<14;i++){const j=document.createElement('div');j.textContent=rand(['🪼','🪼','🫧']);j.style.cssText=`position:absolute;left:${r(2,95)}%;top:${r(35,105)}%;font-size:${r(22,48)}px;filter:hue-rotate(${r(0,260)}deg) drop-shadow(0 0 12px #5af0ff88)`;layer.appendChild(j);j.animate([{transform:'translate(0,80px) rotate(-8deg)'},{transform:`translate(${r(-90,90)}px,${-innerHeight*.8}px) rotate(8deg)`}],{duration:r(4200,7600),easing:'ease-in-out',fill:'forwards'});}
+      }
+
+      function barcodeBeam(){
+        const layer=epicLayer('ub-barcode-beam',6000);epicLabel(layer,'RABBET INVENTORY SCANNER · DO NOT MOVE');const beam=document.createElement('div');beam.className='ub-scan-beam';layer.appendChild(beam);
+        [...document.querySelectorAll('.card')].forEach((card,i)=>setTimeout(()=>{const b=card.getBoundingClientRect(),tag=document.createElement('div');tag.className='ub-epic-label';tag.textContent=`▌▏▌▌▏ ${String(Math.floor(r(100000,999999)))} · ${card.querySelector('.cardTitle')?.textContent||'ITEM'}`;tag.style.left=(b.left+8)+'px';tag.style.top=(b.bottom-30)+'px';layer.appendChild(tag);beep('square',700+i*30,.045,.03);},500+i*240));
+      }
+
+      function microWeather(){
+        epicLayer('ub-micro-weather',6500);const weather=['☀️ 29°','🌧️ 14°','⛈️ 8°','🌨️ -2°','🌈 21°','🌪️ ???','🌙 12°'];
+        [...document.querySelectorAll('.card')].forEach((card,i)=>{const badge=document.createElement('div');badge.className='ub-epic-label';badge.textContent=weather[i%weather.length];badge.style.cssText='position:absolute;left:10px;top:10px;z-index:12';card.appendChild(badge);card.animate([{filter:'none'},{filter:`hue-rotate(${i*45}deg) saturate(1.4)`},{filter:'none'}],{duration:5400});setTimeout(()=>badge.remove(),6200);});shout('MICROCLIMATES INSTALLED',{dur:900});
+      }
+
+      function gravityCursor(){
+        const layer=epicLayer('ub-gravity-cursor',0);epicLabel(layer,'CURSOR GRAVITY · MASS DETECTED');const cards=[...document.querySelectorAll('.card,.aboutCard')],original=cards.map(el=>({el,t:el.style.transform,tr:el.style.transition}));
+        const move=ev=>cards.forEach(el=>{const b=el.getBoundingClientRect(),dx=(ev.clientX-(b.left+b.width/2))/innerWidth,dy=(ev.clientY-(b.top+b.height/2))/innerHeight;el.style.transition='transform .16s ease-out';el.style.transform=`perspective(700px) rotateX(${(-dy*14).toFixed(2)}deg) rotateY(${(dx*18).toFixed(2)}deg) translate(${(dx*9).toFixed(1)}px,${(dy*9).toFixed(1)}px)`;});
+        document.addEventListener('pointermove',move,{passive:true});setTimeout(()=>{document.removeEventListener('pointermove',move);original.forEach(({el,t,tr})=>{el.style.transform=t;el.style.transition=tr;});fadeEpic(layer);},6500);
+      }
+
+      function pageZipper(){
+        const layer=epicLayer('ub-page-zipper',5200);epicLabel(layer,'UNZIPPING WEBSITE · CONTENT MAY SHIFT');
+        ['left','right'].forEach(side=>{const panel=document.createElement('div');panel.style.cssText=`position:absolute;top:0;bottom:0;${side}:0;width:50%;background:linear-gradient(${side==='left'?'90deg':'270deg'},rgba(18,20,35,.35),rgba(110,60,255,.22));backdrop-filter:hue-rotate(${side==='left'?'-30':'30'}deg)`;layer.appendChild(panel);setTimeout(()=>panel.animate([{transform:'translateX(0)'},{transform:`translateX(${side==='left'?'-102%':'102%'})`}],{duration:1800,easing:'cubic-bezier(.6,0,.2,1)',fill:'forwards'}),800);});
+        const zip=document.createElement('div');zip.textContent='🔗\n🔗\n🔗\n🔗\n🔗\n🔗\n🔗';zip.style.cssText='white-space:pre;position:absolute;left:50%;top:-20px;transform:translateX(-50%);font-size:27px;line-height:34px;text-align:center';layer.appendChild(zip);zip.animate([{top:'-20px'},{top:'105%'}],{duration:1900,easing:'ease-in',fill:'forwards'});setTimeout(()=>siteFlash('rgba(130,80,255,.26)',260),2300);
+      }
+
+      function photocopierJam(){
+        const layer=epicLayer('ub-photocopier',6500);epicLabel(layer,'PHOTOCOPIER JAM · TOO MANY PROJECTS');
+        [...document.querySelectorAll('.card')].slice(0,8).forEach((card,i)=>{const b=card.getBoundingClientRect();for(let copy=0;copy<2;copy++){const page=document.createElement('div');page.textContent=card.querySelector('.cardTitle')?.textContent||'COPY';page.style.cssText=`position:fixed;left:${b.left}px;top:${b.top}px;width:${Math.min(b.width,230)}px;height:${Math.min(b.height,120)}px;padding:18px;border:2px solid #222;background:#f8f8f2;color:#111;font:900 15px/1.2 monospace;box-shadow:0 8px 20px #0004;filter:grayscale(1);transform:rotate(${r(-3,3)}deg)`;layer.appendChild(page);page.animate([{transform:'translate(0,0) scale(.7)',opacity:0},{transform:`translate(${r(-100,100)}px,${r(90,250)}px) rotate(${r(-16,16)}deg)`,opacity:1,offset:.5},{transform:`translate(${r(-160,160)}px,${innerHeight}px) rotate(${r(-30,30)}deg)`,opacity:0}],{duration:r(3500,5700),delay:i*130+copy*170,fill:'forwards'});}});beep('square',120,.7,.04);
+      }
+
+      function tinyPlanet(){
+        const layer=epicLayer('ub-tiny-planet',6500);epicLabel(layer,'TINY INTERNET · POPULATION: QUESTIONABLE');const system=document.createElement('div');system.style.cssText='position:absolute;left:50%;top:50%;width:320px;height:320px;transform:translate(-50%,-50%);border:1px dashed #fff5;border-radius:50%;animation:ubOrbit 9s linear infinite';layer.appendChild(system);const planet=document.createElement('div');planet.textContent='🌎';planet.style.cssText='position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:110px;filter:drop-shadow(0 0 26px #5af0ff88)';system.appendChild(planet);['STUFF','TOOLS','ABOUT','CHAOS','RABBET'].forEach((word,i)=>{const sat=document.createElement('div');sat.className='ub-epic-label';sat.textContent=word;const a=i/5*Math.PI*2;sat.style.left=(160+Math.cos(a)*145)+'px';sat.style.top=(160+Math.sin(a)*145)+'px';system.appendChild(sat);});
+      }
+
+      function rabbitDJ(){
+        const layer=epicLayer('ub-rabbit-dj',6800);epicLabel(layer,'DJ BUNNY · ONE NIGHT ONLY');const booth=document.createElement('div');booth.style.cssText='position:absolute;left:50%;bottom:18px;transform:translateX(-50%);padding:16px 24px 12px;border-radius:22px 22px 8px 8px;background:#15152aee;border:2px solid #fff3;color:white;text-align:center;box-shadow:0 0 50px #ff5ad477';booth.innerHTML='<div style="font-size:52px">🐰🎧</div><div style="font-size:28px">◉ ━━━ ◉</div>';const eq=document.createElement('div');eq.className='ub-eq';for(let i=0;i<18;i++){const bar=document.createElement('i');bar.style.animationDelay=(i*.04)+'s';eq.appendChild(bar);}booth.appendChild(eq);layer.appendChild(booth);let beat=0;const iv=setInterval(()=>{beep(beat++%2?'square':'triangle',rand([220,330,440,660]),.08,.035);siteFlash(`hsla(${beat*45%360},90%,60%,.08)`,90);},240);setTimeout(()=>clearInterval(iv),6200);
+      }
+
+      function fireflySwarm(){
+        const layer=epicLayer('ub-fireflies',0);epicLabel(layer,'FIREFLY SWARM · THEY LIKE YOUR CURSOR');let tx=innerWidth/2,ty=innerHeight/2,t=0;const flies=Array.from({length:34},()=>{const f=document.createElement('i');f.style.cssText=`position:absolute;width:${r(3,8)}px;height:${r(3,8)}px;border-radius:50%;background:#fff58a;box-shadow:0 0 12px 5px #eaff6b88`;layer.appendChild(f);return{f,a:r(0,Math.PI*2),rad:r(25,230),sp:r(.015,.055)};});const move=ev=>{tx=ev.clientX;ty=ev.clientY};document.addEventListener('pointermove',move,{passive:true});const iv=setInterval(()=>{t++;flies.forEach((o,i)=>{o.a+=o.sp;o.f.style.left=(tx+Math.cos(o.a+i)*o.rad)+'px';o.f.style.top=(ty+Math.sin(o.a*1.3+i)*o.rad*.65)+'px';o.f.style.opacity=(.35+.65*Math.abs(Math.sin(t*.08+i))).toFixed(2);});},30);setTimeout(()=>{clearInterval(iv);document.removeEventListener('pointermove',move);fadeEpic(layer);},7000);
+      }
+
+      function polaroidStorm(){
+        const layer=epicLayer('ub-polaroid-storm',7200);epicLabel(layer,'POLAROID STORM · MEMORIES DEVELOPING');const names=[...document.querySelectorAll('.cardTitle')].map(el=>el.textContent);
+        for(let i=0;i<18;i++)setTimeout(()=>{const p=document.createElement('div');p.style.cssText=`position:absolute;left:${r(-5,95)}%;top:-160px;width:${r(105,160)}px;height:${r(125,180)}px;padding:9px 9px 28px;background:#fff;color:#222;font:900 12px/1.2 system-ui;box-shadow:0 12px 28px #0005;transform:rotate(${r(-22,22)}deg)`;p.innerHTML=`<div style="height:75%;background:linear-gradient(${r(0,360)}deg,hsl(${r(0,360)} 80% 70%),#10142a);display:grid;place-items:center;font-size:34px">${rand(['🐇','✨','🌀','👁️','🥕'])}</div><div style="padding-top:8px">${rand(names)}</div>`;layer.appendChild(p);p.animate([{transform:`translateY(0) rotate(${r(-20,20)}deg)`},{transform:`translate(${r(-180,180)}px,${innerHeight+250}px) rotate(${r(-180,180)}deg)`}],{duration:r(3800,6500),easing:'linear',fill:'forwards'});},i*170);
+      }
+
+      function cardConveyor(){
+        epicLayer('ub-card-conveyor',6000);const cards=[...document.querySelectorAll('.card')];cards.forEach((card,i)=>setTimeout(()=>{card.animate([{transform:'translateX(0) rotate(0)'},{transform:'translateX(42px) rotate(2deg)'},{transform:'translateX(-42px) rotate(-2deg)'},{transform:'translateX(0) rotate(0)'}],{duration:2200,iterations:2,easing:'cubic-bezier(.4,0,.2,1)'});beep('square',150+i*18,.06,.025);},i*100));shout('CONVEYOR ONLINE ⚙️',{dur:900});
+      }
+
+      function morseRabbit(){
+        const layer=epicLayer('ub-morse-rabbit',7600);const label=epicLabel(layer,'MORSE RABBIT · TRANSMITTING RABBET',16,16);const lamp=document.createElement('div');lamp.textContent='🐇';lamp.style.cssText='position:absolute;left:50%;top:18%;transform:translate(-50%,-50%);font-size:72px;padding:18px;border-radius:50%;background:#16182a;box-shadow:0 0 0 #fff';layer.appendChild(lamp);const morse='.-. .- -... -... . -';let delay=400;[...morse].forEach(ch=>{if(ch===' '){delay+=180;return;}const dur=ch==='-'?360:130;setTimeout(()=>{lamp.style.boxShadow='0 0 70px 28px #fff59a';lamp.style.background='#fff7a8';beep('sine',720,dur/1000*.7,.035);setTimeout(()=>{lamp.style.boxShadow='0 0 0 #fff';lamp.style.background='#16182a';},dur);},delay);delay+=dur+120;});setTimeout(()=>label.textContent='MESSAGE SENT · RABBET',delay+200);
+      }
+
+      function dnaDance(){
+        const layer=epicLayer('ub-dna-dance',0);epicLabel(layer,'DNA DANCE · 99.9% RABBIT');const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`0 0 ${innerWidth} ${innerHeight}`);svg.style.cssText='width:100%;height:100%';layer.appendChild(svg);const nodes=[];for(let i=0;i<34;i++){const a=document.createElementNS(ns,'circle'),b=document.createElementNS(ns,'circle'),line=document.createElementNS(ns,'line');a.setAttribute('r','6');b.setAttribute('r','6');a.setAttribute('fill','#ff5ad4');b.setAttribute('fill','#5af0ff');line.setAttribute('stroke','#ffffff66');line.setAttribute('stroke-width','2');svg.append(line,a,b);nodes.push({a,b,line,x:(i+1)/(35)*innerWidth,p:i*.45});}let start=performance.now();const frame=now=>{const t=(now-start)/500;nodes.forEach(n=>{const y1=innerHeight/2+Math.sin(t+n.p)*120,y2=innerHeight/2-Math.sin(t+n.p)*120;n.a.setAttribute('cx',n.x);n.a.setAttribute('cy',y1);n.b.setAttribute('cx',n.x);n.b.setAttribute('cy',y2);n.line.setAttribute('x1',n.x);n.line.setAttribute('y1',y1);n.line.setAttribute('x2',n.x);n.line.setAttribute('y2',y2);});if(now-start<6500)requestAnimationFrame(frame);else fadeEpic(layer);};requestAnimationFrame(frame);
+      }
+
+      function receiptPrinter(){
+        const layer=epicLayer('ub-receipt-printer',7000);epicLabel(layer,'RECEIPT PRINTER · TOTALLY NECESSARY');const receipt=document.createElement('div');const names=[...document.querySelectorAll('.cardTitle')].map(el=>el.textContent);receipt.style.cssText='position:absolute;right:24px;top:-520px;width:min(290px,80vw);padding:22px 18px 36px;background:#fffef4;color:#171717;font:700 12px/1.55 monospace;box-shadow:0 18px 50px #0005;clip-path:polygon(0 0,100% 0,100% 97%,96% 100%,92% 97%,88% 100%,84% 97%,80% 100%,76% 97%,72% 100%,68% 97%,64% 100%,60% 97%,56% 100%,52% 97%,48% 100%,44% 97%,40% 100%,36% 97%,32% 100%,28% 97%,24% 100%,20% 97%,16% 100%,12% 97%,8% 100%,4% 97%,0 100%)';receipt.innerHTML=`<div style="text-align:center;font-size:18px">RABBET.LOL</div><div style="text-align:center">USELESS BOX RECEIPT</div><hr>${names.map((n,i)=>`${String(i+1).padStart(2,'0')} ${n}<span style="float:right">$${r(0,99).toFixed(2)}</span>`).join('<br>')}<hr>CHAOS TAX <span style="float:right">∞</span><br><b>TOTAL <span style="float:right">PRICELESS</span></b><br><br><div style="text-align:center">NO REFUNDS · 🐇</div>`;layer.appendChild(receipt);receipt.animate([{top:'-520px'},{top:'72px'}],{duration:1800,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});beep('square',95,1.2,.035);
+      }
+
+      function magneticPoetry(){
+        const layer=epicLayer('ub-magnetic-poetry',7000);epicLabel(layer,'MAGNETIC POETRY · THE WEBSITE HAS FEELINGS');const words=['tiny','rabbit','eats','the','internet','at','midnight','and','dreams','in','neon','pixels'];
+        words.forEach((word,i)=>{const m=document.createElement('div');m.className='ub-magnet';m.textContent=word;m.style.setProperty('--r',r(-18,18)+'deg');m.style.left=r(30,innerWidth-30)+'px';m.style.top=r(80,innerHeight-40)+'px';layer.appendChild(m);const row=Math.floor(i/6),col=i%6;setTimeout(()=>m.animate([{left:m.style.left,top:m.style.top},{left:(innerWidth/2-210+col*75)+'px',top:(innerHeight/2-25+row*58)+'px',transform:'translate(-50%,-50%) rotate(0deg)'}],{duration:1400,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'}),900+i*70);});
+      }
+
+      function rabbitPinball(){
+        const layer=epicLayer('ub-rabbit-pinball',0);epicLabel(layer,'RABBIT PINBALL · MULTIBUN ACTIVE');const ball=document.createElement('div');ball.textContent='🐇';ball.style.cssText='position:absolute;font-size:34px;filter:drop-shadow(0 0 12px #fff);will-change:transform';layer.appendChild(ball);let x=innerWidth*.5,y=innerHeight*.25,vx=r(7,11)*(Math.random()<.5?-1:1),vy=r(6,10),frames=0;const cards=[...document.querySelectorAll('.card')];const iv=setInterval(()=>{x+=vx;y+=vy;if(x<4||x>innerWidth-42){vx*=-1;beep('square',260,.04,.025);}if(y<35||y>innerHeight-46){vy*=-1;beep('square',330,.04,.025);}ball.style.transform=`translate(${x}px,${y}px) rotate(${frames*13}deg)`;cards.forEach(card=>{const b=card.getBoundingClientRect();if(x>b.left-20&&x<b.right&&y>b.top-20&&y<b.bottom){vx*=-1;vy*=-1;card.animate([{filter:'brightness(1)'},{filter:'brightness(1.8)'},{filter:'brightness(1)'}],{duration:220});}});if(++frames>300){clearInterval(iv);fadeEpic(layer);}},20);
+      }
+
+      function dimensionDoors(){
+        epicLayer('ub-dimension-doors',7000);const worlds=['🌌','🌋','🏰','🍄','🦄','🛰️','🌊','👁️'];
+        [...document.querySelectorAll('.card')].forEach((card,i)=>{const door=document.createElement('div');door.className='ub-door';door.style.left=r(18,72)+'%';door.style.top=r(18,58)+'%';card.appendChild(door);setTimeout(()=>{door.classList.add('open');const world=document.createElement('span');world.textContent=worlds[i%worlds.length];world.style.cssText='position:absolute;left:8px;top:16px;font-size:25px;z-index:-1';door.appendChild(world);for(let j=0;j<3;j++)setTimeout(()=>launchEmoji(world.textContent,card.getBoundingClientRect().left+door.offsetLeft+20,card.getBoundingClientRect().top+door.offsetTop+25,{dx:r(-80,80),dy:r(-80,80),size:r(16,28)}),j*180);},500+i*180);setTimeout(()=>door.remove(),6500);});shout('DIMENSION DOORS UNLOCKED',{dur:950});
+      }
+
       function fireRandomEffects(e, n){
         const words = Object.keys(ACTIONS);
         for (let i=0;i<n;i++){
@@ -4594,6 +4852,36 @@
         "star shower": (e) => { for(let i=0;i<10;i++) setTimeout(()=>launchEmoji(rand(['⭐','🌟','✨','💫']), r(0,window.innerWidth), -10, {dy:window.innerHeight, dx:r(-40,40), dur:r(1400,2400), size:r(16,28)}),i*120); siteSparkle(3000); beep('sine',r(600,1000),0.08,0.05); },
         "rain of frogs": (e) => { for(let i=0;i<r(8,14);i++) setTimeout(()=>launchEmoji('🐸', r(0,window.innerWidth), -10, {dy:window.innerHeight, dx:r(-30,30), dur:r(1400,2200), size:r(24,38)}),i*100); siteFall('🐸',2500); beep('sine',r(200,400),0.12,0.08); },
         "dizzy spin": (e) => { toyBox.style.transition='transform 1.4s cubic-bezier(.2,.8,.2,1)'; toyBox.style.transform='rotate(1080deg)'; setTimeout(()=>{toyBox.style.transform='';setTimeout(()=>toyBox.style.transition='',700);},1500); siteFall('💫',2000); beep('sine',r(300,700),0.16,0.08); spawnParticles(e.clientX,e.clientY,{count:r(16,24),dxMax:200,dyUp:200}); },
+        "constellation lab": () => constellationLab(),
+        "cursor garden": () => cursorGarden(),
+        "laser harp": () => laserHarp(),
+        "rabbit grand prix": () => rabbitGrandPrix(),
+        "portal post": () => portalPost(),
+        "domino district": () => dominoDistrict(),
+        "neon doodle": () => neonDoodle(),
+        "card orchestra": () => cardOrchestra(),
+        "tag tornado": (e) => tagTornado(e),
+        "moon service": () => moonService(),
+        "blueprint scan": () => blueprintScan(),
+        "treasure hunt": () => treasureHunt(),
+        "rabbit courier": () => rabbitCourier(),
+        "jellyfish club": () => jellyfishClub(),
+        "barcode beam": () => barcodeBeam(),
+        "micro weather": () => microWeather(),
+        "gravity cursor": () => gravityCursor(),
+        "page zipper": () => pageZipper(),
+        "photocopier jam": () => photocopierJam(),
+        "tiny planet": () => tinyPlanet(),
+        "rabbit dj": () => rabbitDJ(),
+        "firefly swarm": () => fireflySwarm(),
+        "polaroid storm": () => polaroidStorm(),
+        "card conveyor": () => cardConveyor(),
+        "morse rabbit": () => morseRabbit(),
+        "dna dance": () => dnaDance(),
+        "receipt printer": () => receiptPrinter(),
+        "magnetic poetry": () => magneticPoetry(),
+        "rabbit pinball": () => rabbitPinball(),
+        "dimension doors": () => dimensionDoors(),
       });
 
       // register the new words so they appear on the box
@@ -4602,7 +4890,13 @@
         "fireworks","rocket","confetti cannon","screen crack","sheep","duck army","bees",
         "bullet time","high five","boing","money","stonks","glitter bomb","sprinkles",
         "trampoline","laser show","kaboom","yes","no","again","combo boost","chaos",
-        "roulette","vacuum","heart burst","star shower","rain of frogs","dizzy spin"
+        "roulette","vacuum","heart burst","star shower","rain of frogs","dizzy spin",
+        "constellation lab","cursor garden","laser harp","rabbit grand prix","portal post",
+        "domino district","neon doodle","card orchestra","tag tornado","moon service",
+        "blueprint scan","treasure hunt","rabbit courier","jellyfish club","barcode beam",
+        "micro weather","gravity cursor","page zipper","photocopier jam","tiny planet",
+        "rabbit dj","firefly swarm","polaroid storm","card conveyor","morse rabbit",
+        "dna dance","receipt printer","magnetic poetry","rabbit pinball","dimension doors"
       ];
       NEW_WORDS.forEach(w => { if (!ACTION_WORDS.includes(w)) ACTION_WORDS.push(w); });
 
