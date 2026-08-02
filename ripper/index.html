@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ripper · wildrabbet</title>
+  <meta name="description" content="Ripper: a Windows tool that extracts models, textures, audio and interface art out of PC games. Persona 5 Royal, Persona 5 Strikers, Yu-Gi-Oh! Link Evolution, The Simpsons: Hit &amp; Run, and a generic ripper for everything else." />
+  <link rel="stylesheet" href="./ripper.css" />
+  <link rel="icon" href="data:," />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="top">
+    <a class="logo" href="../">
+      <span class="mark" aria-hidden="true">🐇</span>
+      <span class="word">wildrabbet</span>
+    </a>
+    <nav class="nav">
+      <a href="../#tools">Tools</a>
+      <a href="#games">Games</a>
+      <a href="#generic">Any game</a>
+      <a href="#request">Request</a>
+      <a class="navCta" href="#get">Get Ripper</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow">Windows · free</p>
+      <h1 class="brand">Ripper</h1>
+      <p class="lede">
+        Pulls models, textures, animations, audio and interface art out of PC games
+        and writes them as files you can actually open — GLB, PNG, WAV. Point it at a
+        game folder and it works out the rest.
+      </p>
+      <div class="ctaRow">
+        <a class="btn primary" id="downloadBtn" href="https://github.com/wildrabbet/wildrabbet/releases/latest">Download</a>
+        <a class="btn ghost" href="#games">See supported games</a>
+        <a class="btn ghost" href="#request">Request a game</a>
+      </div>
+      <p class="releaseMeta">
+        Latest: <strong id="releaseVersion">checking…</strong>
+        <span aria-hidden="true">·</span> Windows 10/11
+        <span aria-hidden="true">·</span> <span id="releaseSize">one file</span>
+        <span aria-hidden="true">·</span> nothing else to install
+      </p>
+    </section>
+
+    <section class="section" id="games">
+      <h2>Games it knows</h2>
+      <p>
+        Each of these has a dedicated ripper that understands the game's own formats,
+        rather than dumping raw archives and leaving you to guess.
+      </p>
+
+      <div class="games" style="margin-top:1.5rem">
+        <div class="game">
+          <span class="tag">full support</span>
+          <h3>Persona 5 Royal</h3>
+          <p>
+            Palace maps room by room, split props, skyboxes, the decoded lighting setups,
+            character models and expressions, and the voice banks. Exports textured GLB.
+          </p>
+        </div>
+
+        <div class="game">
+          <span class="tag">full support</span>
+          <h3>Persona 5 Strikers</h3>
+          <p>
+            Models, textures, animations and audio out of the Koei Tecmo RDB databases.
+            Compressed payloads are inflated and encrypted ones are decrypted on the way out.
+          </p>
+        </div>
+
+        <div class="game">
+          <span class="tag">full support</span>
+          <h3>Yu-Gi-Oh! Link Evolution</h3>
+          <p>
+            Every card frame and border, the duel field, the deck editor and the rest of the
+            interface — unpacked and sliced out of the sprite sheets into named PNGs.
+          </p>
+        </div>
+
+        <div class="game">
+          <span class="tag">partial</span>
+          <h3>The Simpsons: Hit &amp; Run</h3>
+          <p>
+            Cars export to textured Blender and GLB today. Characters, props, furniture,
+            animations and audio are staged next.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="generic">
+      <h2>And any other game</h2>
+      <p>
+        The generic ripper surveys a folder and tells you what is in it: which archives it
+        can open, which need a specialist tool, and which it does not recognise. It unpacks
+        Zip-family archives (including the <code>.pak</code> and <code>.obb</code> files that
+        are really zips), Valve VPK, Quake PAK and Doom WAD.
+      </p>
+      <p>
+        For containers nothing can parse, it can carve known file signatures straight out of
+        the bytes and recover the textures and audio stored inside.
+      </p>
+
+      <div class="notes">
+        <p style="margin-top:0">
+          <strong>What carving cannot do.</strong> Carved files have no names and no folder
+          structure, and anything that was compressed inside its container will not appear —
+          only data stored whole can be recovered this way. Ripper says which of the two you
+          are getting rather than presenting them as the same thing.
+        </p>
+        <p style="margin-bottom:0">
+          Where a format genuinely needs a dedicated tool — Unity bundles, encrypted Unreal
+          paks, Bethesda archives — Ripper names the tool that handles it instead of writing
+          files that look extracted and are not.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="request">
+      <h2>Want a game added?</h2>
+      <p>
+        There is a <strong>Request a game</strong> button on Ripper's front screen. Name the
+        game, say what you can see in its folder, and it goes straight to the inbox. Requests
+        with the store page and a list of file extensions are the ones that get built first.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Updates itself</h2>
+      <p>
+        Ripper checks for a new version when it opens and offers to install it. The download
+        is verified against a published checksum before anything runs — if it does not match,
+        it is deleted rather than executed.
+      </p>
+    </section>
+
+    <section id="get" class="get">
+      <h2>Get Ripper</h2>
+      <p>
+        One file, <span id="getSize">about 67 MB</span>. It carries its own copy of everything
+        it needs, so there is no runtime to install first.
+      </p>
+      <a class="btn primary" id="getBtn" href="https://github.com/wildrabbet/wildrabbet/releases/latest">Download Ripper</a>
+      <ol class="steps" style="margin-top:1.4rem">
+        <li>Run <code>Ripper-Setup.exe</code></li>
+        <li>Choose <strong>Install</strong> for shortcuts and updates, or <strong>Just run it</strong> to use it portably</li>
+        <li>Pick a game, point it at the folder, extract</li>
+      </ol>
+      <p style="margin-bottom:0">
+        Installing is per-user and needs no administrator prompt. Windows SmartScreen may warn
+        about a new download — the checksum for every release is published in
+        <a href="./update.json" style="color:var(--accent)">update.json</a>.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>Fair use</h2>
+      <p>
+        Ripper reads games you already own, on your own machine. It does not download game
+        data, break copy protection, or ship anyone else's assets. What you extract stays
+        yours to deal with — respect the rights of the people who made it.
+      </p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <a href="../">← wildrabbet</a>
+    <span class="dot">·</span>
+    <span>Ripper</span>
+  </footer>
+
+  <script>
+    // The page advertises whatever update.json currently points at, so a release
+    // only has to update one file for the site to follow.
+    fetch("./update.json", { cache: "no-store" })
+      .then(function (response) { return response.ok ? response.json() : Promise.reject(); })
+      .then(function (release) {
+        var version = document.getElementById("releaseVersion");
+        if (version) version.textContent = "v" + (release.display_version || release.version);
+
+        if (release.size) {
+          var mb = (release.size / 1048576).toFixed(1) + " MB";
+          var size = document.getElementById("releaseSize");
+          var getSize = document.getElementById("getSize");
+          if (size) size.textContent = mb;
+          if (getSize) getSize.textContent = mb;
+        }
+
+        if (release.url) {
+          ["downloadBtn", "getBtn"].forEach(function (id) {
+            var link = document.getElementById(id);
+            if (link) link.href = release.url;
+          });
+        }
+      })
+      .catch(function () {
+        var version = document.getElementById("releaseVersion");
+        if (version) version.textContent = "current release";
+      });
+  </script>
+</body>
+</html>

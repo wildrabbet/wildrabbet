@@ -1,0 +1,10 @@
+{
+    "version":  "2026.8.3.1",
+    "display_version":  "2026.8.3.1",
+    "paused":  false,
+    "url":  "https://github.com/wildrabbet/wildrabbet/releases/download/ripper-v2026.8.3.1/Ripper-Setup.exe",
+    "sha256":  "574ab20bea5fefb3d1d56074545e8ffe90936dc73a9f83d2035dafba050a9b31",
+    "size":  70375827,
+    "published":  "2026-08-02T15:54:31.2708222Z",
+    "notes":  "First public release. Persona 5 Royal, Persona 5 Strikers, Yu-Gi-Oh! Link Evolution, The Simpsons: Hit \u0026 Run, plus a generic ripper for any other game."
+}
