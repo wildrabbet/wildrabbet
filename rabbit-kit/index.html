@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Rabbit Kit · wildrabbet</title>
-  <meta name="description" content="Rabbit Kit — a local Windows toolbox for convert, sprites, macros, keybinds, Rabbit Script, and no-size-limit file transfer between your own PCs." />
+  <meta name="description" content="Rabbit Kit — a lightweight Windows and Android toolbox for capture, creation, automation, files, recovery, gaming, device control, and local transfer." />
   <link rel="stylesheet" href="./rabbit-kit.css" />
   <link rel="icon" href="data:," />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -22,6 +22,8 @@
     <nav class="nav">
       <a href="../#tools">Tools</a>
       <a href="#features">Features</a>
+      <a href="#feature-index">Index</a>
+      <a class="mobileApkLink" href="../apk/">Android app</a>
       <a class="navCta" href="#get">Get Rabbit Kit</a>
     </nav>
   </header>
@@ -38,13 +40,14 @@
           <div class="ctaRow">
             <a class="btn primary" href="./download/RabbitKit-Setup.exe">Download</a>
             <a class="btn ghost" href="#features">See features</a>
+            <a class="btn ghost mobileApkCta" href="../apk/">Get Android app</a>
           </div>
           <p class="releaseMeta">Latest: <strong id="releaseVersion">checking...</strong> <span aria-hidden="true">&middot;</span> Windows 10/11</p>
         </div>
       </div>
     </section>
 
-    <section class="strip cloudStrip">
+    <section class="strip cloudStrip" id="feat-cloud">
       <div class="stripInner">
         <p class="eyebrow">New in Rabbit Kit</p>
         <h2>Your own device Cloud</h2>
@@ -52,8 +55,25 @@
       </div>
     </section>
 
+    <section class="featureIndex" id="feature-index" aria-labelledby="featureIndexTitle">
+      <div class="indexHead">
+        <p class="eyebrow">Everything, organised</p>
+        <h2 id="featureIndexTitle">Jump directly to a Rabbit Kit feature</h2>
+        <p>Choose a category, then select a feature. Every link scrolls to its full description below.</p>
+      </div>
+      <div class="indexGroups">
+        <div class="indexGroup"><h3>01 · Connect</h3><div class="indexLinks"><a href="#feat-cloud">Cloud notes &amp; links</a><a href="#feat-transfer">LAN file transfer</a><a href="#feat-android">Android app</a><a href="#feat-remote">Remote control</a></div></div>
+        <div class="indexGroup"><h3>02 · Capture</h3><div class="indexLinks"><a href="#feat-screenshots">Screenshots</a><a href="#feat-video">Video &amp; clips</a><a href="#feat-clipboard">Clipboard</a></div></div>
+        <div class="indexGroup"><h3>03 · Create</h3><div class="indexLinks"><a href="#feat-convert">Convert</a><a href="#feat-photo">Photo editor</a><a href="#feat-sprite">Sprite sheets</a><a href="#feat-pixel">Pixel art</a><a href="#feat-pdf">PDF</a><a href="#feat-painter">Auto-Paint</a></div></div>
+        <div class="indexGroup"><h3>04 · Automate</h3><div class="indexLinks"><a href="#feat-macros">Macros</a><a href="#feat-binds">Keybinds</a><a href="#feat-script">Rabbit Script</a><a href="#feat-profiles">Profiles</a></div></div>
+        <div class="indexGroup"><h3>05 · PC &amp; Files</h3><div class="indexLinks"><a href="#feat-programs">Programs</a><a href="#feat-recovery">Deleted-file recovery</a><a href="#feat-search">Search</a><a href="#feat-files">Files &amp; notes</a><a href="#feat-organize">Auto-organize</a></div></div>
+        <div class="indexGroup"><h3>06 · Gaming &amp; Hardware</h3><div class="indexLinks"><a href="#feat-gaming">Gaming</a><a href="#feat-gpu">GPU</a><a href="#feat-devices">Devices</a><a href="#feat-hearing">Hearing tools</a></div></div>
+        <div class="indexGroup"><h3>07 · Everyday &amp; System</h3><div class="indexLinks"><a href="#feat-tools">Utilities</a><a href="#feat-web">Web &amp; ping</a><a href="#feat-mail">Mail</a><a href="#feat-fun">Fun</a><a href="#feat-online">Online</a><a href="#feat-plugins">Plugins</a><a href="#feat-settings">Settings</a></div></div>
+      </div>
+    </section>
+
     <section id="features" class="features">
-      <article class="feat">
+      <article class="feat" id="feat-convert">
         <div class="featText">
           <h2>Convert anything</h2>
           <p>Bulk convert images, video, and audio. Recursive folders. Cross-type paths like mp4 to mp3 or gif.</p>
@@ -63,7 +83,7 @@
         </div>
       </article>
 
-      <article class="feat flip">
+      <article class="feat flip" id="feat-sprite">
         <div class="featText">
           <h2>Sprite sheets from video</h2>
           <p>Turn webm, mp4, gif, or mov into a horizontal strip and a ready loader script. ffmpeg under the hood.</p>
@@ -73,7 +93,7 @@
         </div>
       </article>
 
-      <article class="feat">
+      <article class="feat" id="feat-macros">
         <div class="featText">
           <h2>Macros that feel human</h2>
           <p>Record mouse and keyboard, edit steps, loop, and playback with optional human-like motion. Global hotkeys. F10 always stops.</p>
@@ -83,7 +103,7 @@
         </div>
       </article>
 
-      <article class="feat flip">
+      <article class="feat flip" id="feat-binds">
         <div class="featText">
           <h2>Analog walk on a keyboard</h2>
           <p>Keybinds push a virtual Xbox stick to the deflection you set. Or fire a macro or Rabbit Script from a held key.</p>
@@ -93,7 +113,7 @@
         </div>
       </article>
 
-      <article class="feat">
+      <article class="feat" id="feat-script">
         <div class="featText">
           <h2>Rabbit Script</h2>
           <p>Drag blocks or write code. Launch apps, wait, ping, click, call macros and scripts, build overlays. Variables with <code>var name</code> or <code>${name}</code>.</p>
@@ -103,7 +123,7 @@
         </div>
       </article>
 
-      <article class="feat flip">
+      <article class="feat flip" id="feat-search">
         <div class="featText">
           <h2>Search your PC</h2>
           <p>Build a local index, find files and apps fast, and pull results into scripts as <code>${result}</code> and <code>${count}</code>.</p>
@@ -113,7 +133,7 @@
         </div>
       </article>
 
-      <article class="feat">
+      <article class="feat" id="feat-gaming">
         <div class="featText">
           <h2>Gaming overlays</h2>
           <p>Crosshair, GPU HUD, auto high-priority on launch, and game shortcuts in one place.</p>
@@ -123,7 +143,7 @@
         </div>
       </article>
 
-      <article class="feat flip">
+      <article class="feat flip" id="feat-fun">
         <div class="featText">
           <h2>Fun extras</h2>
           <p>Dice, wheels, radio globe, GeoGuessr, and more when you want a break from tooling.</p>
@@ -134,7 +154,48 @@
       </article>
     </section>
 
-    <section class="strip">
+    <section class="featureAtlas" aria-label="Rabbit Kit feature details">
+      <div class="atlasGroup"><div class="atlasTitle"><span>Connect</span><h2>Your devices, working together</h2></div><div class="atlasGrid">
+        <article class="miniFeature" id="feat-transfer"><b>LAN file transfer</b><p>Send individual files or complete folders directly between paired PCs over your own network, preserving structure and verifying every file.</p></article>
+        <article class="miniFeature" id="feat-android"><b>Rabbit Kit for Android</b><p>Use notes, files, image tools, app management, device diagnostics, Vibration Lab, torch and Morse locally. Remote control stays optional.</p><a href="../apk/">Download the Android app →</a></article>
+        <article class="miniFeature" id="feat-remote"><b>Remote control</b><p>Control the complete PC from Android with HD streaming, keyboard input, clipboard, Explorer, fullscreen games and a custom touch gamepad.</p></article>
+      </div></div>
+      <div class="atlasGroup"><div class="atlasTitle"><span>Capture</span><h2>Fast capture without clutter</h2></div><div class="atlasGrid">
+        <article class="miniFeature" id="feat-screenshots"><b>Screenshots</b><p>Press Print Screen for a frozen ShareX-style region and window selector, then copy, save or open the result immediately.</p></article>
+        <article class="miniFeature" id="feat-video"><b>Video &amp; clips</b><p>Record screens, build lightweight game clips and prepare footage for editing or later cloud upload without autoplay-heavy interfaces.</p></article>
+        <article class="miniFeature" id="feat-clipboard"><b>Clipboard</b><p>Move text between your phone and PC, type phone text into Windows and pause reads automatically around private fields.</p></article>
+      </div></div>
+      <div class="atlasGroup"><div class="atlasTitle"><span>Create</span><h2>Small studios for everyday work</h2></div><div class="atlasGrid">
+        <article class="miniFeature" id="feat-photo"><b>Photo editor</b><p>Crop, resize, rotate, filter and export images without opening a heavyweight creative suite.</p></article>
+        <article class="miniFeature" id="feat-pixel"><b>Pixel art</b><p>Draw grid-aligned pixel art with focused controls and export clean game-ready images.</p></article>
+        <article class="miniFeature" id="feat-pdf"><b>PDF tools</b><p>Combine, split and prepare PDFs alongside the rest of your files.</p></article>
+        <article class="miniFeature" id="feat-painter"><b>Auto-Paint</b><p>Turn image colour and position data into controlled painting actions for compatible desktop canvases.</p></article>
+      </div></div>
+      <div class="atlasGroup"><div class="atlasTitle"><span>Automate</span><h2>Repeat work your way</h2></div><div class="atlasGrid">
+        <article class="miniFeature" id="feat-profiles"><b>Profiles</b><p>Save reusable Rabbit Kit configurations for different games, work sessions and devices.</p></article>
+      </div></div>
+      <div class="atlasGroup"><div class="atlasTitle"><span>PC &amp; Files</span><h2>Understand and organise your machine</h2></div><div class="atlasGrid">
+        <article class="miniFeature" id="feat-programs"><b>Programs</b><p>Inspect installed applications, locate their folders, sort and filter them, or remove the detected application folder with guarded system-path protection.</p></article>
+        <article class="miniFeature" id="feat-recovery"><b>Deleted-file recovery</b><p>Search deleted NTFS records or carve unallocated space for recoverable images, with source-volume protection and honest SSD/TRIM limits.</p></article>
+        <article class="miniFeature" id="feat-files"><b>Files &amp; notes</b><p>Browse working files, preview images, edit dependable local notes and move selected files to your Android device.</p></article>
+        <article class="miniFeature" id="feat-organize"><b>Auto-organize</b><p>Sort desktop and working folders into editable categories while keeping the rules visible and reversible.</p></article>
+      </div></div>
+      <div class="atlasGroup"><div class="atlasTitle"><span>Gaming &amp; Hardware</span><h2>Performance and device control</h2></div><div class="atlasGrid">
+        <article class="miniFeature" id="feat-gpu"><b>GPU</b><p>View graphics information, run focused checks and surface useful performance details without decorative dashboards.</p></article>
+        <article class="miniFeature" id="feat-devices"><b>Devices</b><p>Manage Android mirroring and control, Bluetooth and audio shortcuts, microphones, cameras and connected-device diagnostics.</p></article>
+        <article class="miniFeature" id="feat-hearing"><b>Hearing tools</b><p>Keep ordinary Windows audio controls separate from clearly labelled experimental diagnostics and developer-only device research.</p></article>
+      </div></div>
+      <div class="atlasGroup"><div class="atlasTitle"><span>Everyday &amp; System</span><h2>Useful details, kept optional</h2></div><div class="atlasGrid">
+        <article class="miniFeature" id="feat-tools"><b>Utilities</b><p>Text tools, generators, calculations, timers and compact helpers for jobs that should take seconds.</p></article>
+        <article class="miniFeature" id="feat-web"><b>Web &amp; ping</b><p>Check addresses and connectivity with clear results instead of a wall of networking jargon.</p></article>
+        <article class="miniFeature" id="feat-mail"><b>Mail</b><p>Prepare and hand off messages and attachments through the mail workflow you already use.</p></article>
+        <article class="miniFeature" id="feat-online"><b>Profile, friends &amp; forum</b><p>Optional online identity and community tools remain hidden until you choose to enable them.</p></article>
+        <article class="miniFeature" id="feat-plugins"><b>Plugins</b><p>Add specialist capabilities without making the default Rabbit Kit installation feel heavy.</p></article>
+        <article class="miniFeature" id="feat-settings"><b>Settings</b><p>Choose exactly which feature categories appear, manage keybinds and updates, and keep the interface focused on your own workflow.</p></article>
+      </div></div>
+    </section>
+
+    <section class="strip" id="feat-transfer-summary">
       <div class="stripInner">
         <h2>Fast, direct device transfer</h2>
         <p>Pair your machines once, then send files and complete folders straight over your network. There is no upload wait or artificial size cap, and every file is checked on arrival.</p>

@@ -85,6 +85,8 @@ code {
   font-weight: 600;
 }
 .navCta:hover { filter: brightness(1.05); }
+.mobileApkLink,
+.mobileApkCta { display: none; }
 
 .hero {
   padding: 0;
@@ -205,6 +207,61 @@ code {
   vertical-align: top;
 }
 
+[id^="feat-"] { scroll-margin-top: 86px; }
+
+.featureIndex {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 4.5rem clamp(1.25rem, 4vw, 3rem) 3rem;
+}
+.indexHead {
+  max-width: 680px;
+  margin-bottom: 1.8rem;
+}
+.indexHead h2,
+.atlasTitle h2 {
+  margin: 0;
+  font-family: var(--display);
+  letter-spacing: -0.035em;
+}
+.indexHead h2 { font-size: clamp(2rem, 4vw, 3.15rem); }
+.indexHead > p:last-child { color: var(--muted); margin: 0.8rem 0 0; }
+.indexGroups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+.indexGroup {
+  padding: 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: linear-gradient(145deg, rgba(23,27,36,0.95), rgba(14,17,23,0.95));
+}
+.indexGroup h3 {
+  margin: 0 0 0.75rem;
+  color: var(--accent);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.indexLinks { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.indexLinks a {
+  padding: 0.48rem 0.68rem;
+  border-radius: 8px;
+  color: rgba(232,234,239,0.78);
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(232,234,239,0.09);
+  font-size: 0.88rem;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.indexLinks a:hover,
+.indexLinks a:focus-visible {
+  color: var(--ink);
+  border-color: rgba(57,209,184,0.45);
+  background: var(--accent-dim);
+  outline: none;
+}
+
 .features {
   max-width: 1100px;
   margin: 0 auto;
@@ -235,6 +292,48 @@ code {
   color: var(--muted);
   max-width: 28rem;
 }
+
+.featureAtlas {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 2rem clamp(1.25rem, 4vw, 3rem) 4rem;
+}
+.atlasGroup {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.34fr) minmax(0, 1fr);
+  gap: 1.4rem;
+  padding: 1.5rem 0;
+  border-top: 1px solid var(--line);
+}
+.atlasGroup:last-child { border-bottom: 1px solid var(--line); }
+.atlasTitle { position: sticky; top: 86px; align-self: start; }
+.atlasTitle span {
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.atlasTitle h2 { margin-top: 0.4rem; font-size: 1.3rem; }
+.atlasGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+.miniFeature {
+  min-height: 150px;
+  padding: 1.15rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(23,27,36,0.72);
+}
+.miniFeature:target {
+  border-color: rgba(57,209,184,0.72);
+  box-shadow: 0 0 0 4px rgba(57,209,184,0.08);
+}
+.miniFeature b { font-size: 1rem; }
+.miniFeature p { margin: 0.55rem 0 0; color: var(--muted); font-size: 0.92rem; }
+.miniFeature a { display: inline-block; margin-top: 0.85rem; color: var(--accent); font-weight: 600; }
 
 .strip {
   margin: 2rem 0 0;
@@ -327,7 +426,30 @@ code {
     background:
       linear-gradient(180deg, rgba(8,10,14,0.35) 0%, rgba(8,10,14,0.88) 55%, rgba(8,10,14,0.96) 100%);
   }
-  .nav a:not(.navCta) { display: none; }
+  .nav a:not(.navCta):not(.mobileApkLink) { display: none; }
+  .mobileApkLink {
+    display: inline-flex;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .mobileApkCta { display: inline-flex; }
+  .featureIndex { padding-top: 3.2rem; }
+  .indexGroups { grid-template-columns: 1fr; }
+  .atlasGroup { grid-template-columns: 1fr; gap: 0.85rem; }
+  .atlasTitle { position: static; }
+  .atlasGrid { grid-template-columns: 1fr; }
+  .miniFeature { min-height: 0; }
+}
+
+@media (max-width: 520px) {
+  .top { padding-inline: 0.85rem; }
+  .word { display: none; }
+  .nav { gap: 0.55rem; }
+  .navCta { padding-inline: 0.68rem; }
+  .heroCopy { padding-bottom: 2.4rem; }
+  .indexGroup { padding: 0.9rem; }
+  .indexLinks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .indexLinks a { display: flex; align-items: center; min-height: 42px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
