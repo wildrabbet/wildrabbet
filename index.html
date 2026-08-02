@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://upload.wikimedia.org https://*.wikimedia.org; connect-src 'self' https://en.wikipedia.org; frame-src https://www.youtube.com; media-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://upload.wikimedia.org https://*.wikimedia.org; connect-src 'self' https://en.wikipedia.org https://abacus.jasoncameron.dev https://api64.ipify.org; frame-src https://www.youtube.com; media-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" />
   <meta name="referrer" content="no-referrer" />
   <title>wildrabbet</title>
-  <meta name="description" content="wildrabbet — weird little web things made for fun" />
+  <meta name="description" content="wildrabbet: weird little web things made for fun" />
   <link rel="stylesheet" href="./style.css" />
   <link rel="icon" href="data:," />
 </head>
@@ -21,6 +21,8 @@
       <a href="#stuff">Stuff</a>
       <a href="#tools">Tools</a>
       <a href="#about">About</a>
+      <a class="navContact" href="mailto:admin@rabbet.lol?subject=Contact%20from%20rabbet.lol">Contact us</a>
+      <a class="navBusiness" href="mailto:admin@rabbet.lol?subject=Business%20enquiry%20from%20rabbet.lol">Business enquiries</a>
     </nav>
   </header>
 
@@ -54,8 +56,8 @@
           <div class="toyBoxStats">
             <span class="statPill comboPill" id="comboPill" hidden>combo x1</span>
             <span class="statPill cpsPill" id="cpsPill" hidden>0.0/s</span>
-            <span class="statPill" id="myClicks">you: 0</span>
-            <span class="statPill totalPill" id="totalClicks">this browser: 0</span>
+            <span class="statPill" id="myClicks" title="All-time clicks for this public IP. The address is hashed before counter storage.">You: 0</span>
+            <span class="statPill totalPill" id="totalClicks" title="All-time clicks from everyone.">Everyone: 0</span>
           </div>
         </div>
       <div class="heroRight" id="toyBox" aria-label="Useless box playground" tabindex="0">
@@ -198,13 +200,13 @@
           <div class="cardTitle">Rabbit Kit</div>
           <div class="cardDesc">Windows toolbox app. Convert, sprites, macros, keybinds, Rabbit Script.</div>
         </a>
-        <a class="card c8" href="https://rabbetmodels.b-cdn.net/discover/">
+        <a class="card c8" href="https://rabbetmodels.b-cdn.net/discover/" rel="nofollow" aria-label="Rabbet Archive, owner only">
           <div class="cardTop">
             <div class="emoji">◫</div>
-            <div class="tag">3D archive</div>
+            <div class="tag">owner only</div>
           </div>
           <div class="cardTitle">Rabbet Archive</div>
-          <div class="cardDesc">Searchable 3D model catalogue with previews, licences, checksums, and downloads.</div>
+          <div class="cardDesc">Private 3D model catalogue for the site owner.</div>
         </a>
       </div>
     </section>
@@ -349,7 +351,7 @@
         // filler-turned-chaos (all have actions now)
         "brain tickle", "internet moment", "W behavior",
         "tiny chaos", "unlicensed fun", "no thoughts", "just vibes",
-        "certified moment", "oop—", "404 brain", "vibe check",
+        "certified moment", "oop-", "404 brain", "vibe check",
         "smooth brain", "big mood", "rent free",
         "why", "lol ok", "based",
         // text styling effects (persistent)
@@ -400,31 +402,155 @@
       const totalClicksEl = document.getElementById('totalClicks');
       const gravBall = document.getElementById('gravBall');
 
-      // ===== PRIVATE LOCAL COUNTER =====
-      // Counts stay in this browser. The homepage makes no tracking or counter
-      // requests to third-party services.
+      // ===== ALL-TIME COUNTERS =====
+      // The first tally follows the visitor's public IP across browsers. The raw
+      // address is hashed in this browser and never used as a counter key. The
+      // second tally is the combined all-time count for everyone.
+      const ABACUS = 'https://abacus.jasoncameron.dev';
+      const IP_LOOKUP = 'https://api64.ipify.org?format=json';
+      const COUNTER_NS = 'rabbit.lol';
+      const EVERYONE_KEY = 'uselessbox-v2';
+      const PERSONAL_PREFIX = 'uselessbox-ip-v1-';
+      const BURST_PER_COUNTER = 10;
+      let pendingEveryone = parseInt(localStorage.getItem('ub:pending:everyone') || localStorage.getItem('ub:pending') || '0', 10) || 0;
+      let pendingYou = parseInt(localStorage.getItem('ub:pending:you') || '0', 10) || 0;
+      let personalKey = '';
+      let flushTimer = null;
+      let flushing = false;
 
       function renderCounts() {
-        myClicksEl.textContent = `you: ${clickCount.toLocaleString()}`;
-        totalClicksEl.textContent = `this browser: ${totalCount.toLocaleString()}`;
+        myClicksEl.textContent = `You: ${clickCount.toLocaleString()}`;
+        totalClicksEl.textContent = `Everyone: ${totalCount.toLocaleString()}`;
       }
 
       function saveLocal() {
         localStorage.setItem('ub:my', String(clickCount));
+        localStorage.setItem('ub:total', String(totalCount));
+        localStorage.setItem('ub:pending:everyone', String(pendingEveryone));
+        if (personalKey) {
+          localStorage.setItem('ub:identity', personalKey);
+          localStorage.setItem('ub:my:' + personalKey, String(clickCount));
+          localStorage.setItem('ub:pending:' + personalKey, String(pendingYou));
+          localStorage.removeItem('ub:pending:you');
+        } else {
+          localStorage.setItem('ub:pending:you', String(pendingYou));
+        }
+        localStorage.removeItem('ub:pending');
       }
 
       clickCount = parseInt(localStorage.getItem('ub:my') || '0', 10) || 0;
-      totalCount = clickCount;
-      localStorage.removeItem('ub:total');
-      localStorage.removeItem('ub:pending');
+      totalCount = parseInt(localStorage.getItem('ub:total') || String(clickCount), 10) || clickCount;
       renderCounts();
 
-      function updateStats() {
-        clickCount++;
-        totalCount = clickCount;
-        saveLocal();
-        renderCounts();
+      async function counterValue(key) {
+        try {
+          const response = await fetch(`${ABACUS}/get/${COUNTER_NS}/${key}`, { cache:'no-store' });
+          if (!response.ok) return null;
+          const data = await response.json();
+          const value = parseInt(data.value, 10);
+          return Number.isFinite(value) ? value : null;
+        } catch (error) { return null; }
       }
+
+      async function hashPublicAddress(address) {
+        const bytes = new TextEncoder().encode('rabbet-useless-box-v1:' + address);
+        const digest = await crypto.subtle.digest('SHA-256', bytes);
+        return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('').slice(0, 40);
+      }
+
+      function scheduleFlush(delay = 1000) {
+        clearTimeout(flushTimer);
+        flushTimer = setTimeout(flushPending, delay);
+      }
+
+      async function hitCounter(key, kind) {
+        try {
+          const response = await fetch(`${ABACUS}/hit/${COUNTER_NS}/${key}`, { cache:'no-store' });
+          if (!response.ok) return { kind, ok:false, limited:response.status === 429 };
+          const data = await response.json();
+          return { kind, ok:true, value:parseInt(data.value, 10) || 0 };
+        } catch (error) { return { kind, ok:false, limited:false }; }
+      }
+
+      async function flushPending() {
+        if (flushing || (!pendingEveryone && (!personalKey || !pendingYou))) return;
+        flushing = true;
+        const jobs = [];
+        const everyoneBatch = Math.min(pendingEveryone, BURST_PER_COUNTER);
+        const youBatch = personalKey ? Math.min(pendingYou, BURST_PER_COUNTER) : 0;
+        for (let index = 0; index < everyoneBatch; index++) jobs.push(hitCounter(EVERYONE_KEY, 'everyone'));
+        for (let index = 0; index < youBatch; index++) jobs.push(hitCounter(personalKey, 'you'));
+        const results = await Promise.all(jobs);
+        let everyoneDone = 0, youDone = 0, everyoneRemote = 0, youRemote = 0, limited = false;
+        results.forEach(result => {
+          limited = limited || result.limited;
+          if (!result.ok) return;
+          if (result.kind === 'everyone') { everyoneDone++; everyoneRemote = Math.max(everyoneRemote, result.value); }
+          else { youDone++; youRemote = Math.max(youRemote, result.value); }
+        });
+        pendingEveryone = Math.max(0, pendingEveryone - everyoneDone);
+        pendingYou = Math.max(0, pendingYou - youDone);
+        if (everyoneRemote) totalCount = Math.max(totalCount, everyoneRemote + pendingEveryone);
+        if (youRemote) clickCount = Math.max(clickCount, youRemote + pendingYou);
+        saveLocal(); renderCounts();
+        flushing = false;
+        if (pendingEveryone || (personalKey && pendingYou)) scheduleFlush(limited ? 10000 : (results.some(result => result.ok) ? 1200 : 5000));
+      }
+
+      async function initializeCounters() {
+        const everyoneRemote = await counterValue(EVERYONE_KEY);
+        if (everyoneRemote != null) totalCount = Math.max(totalCount, everyoneRemote + pendingEveryone);
+        try {
+          const ipResponse = await fetch(IP_LOOKUP, { cache:'no-store' });
+          if (!ipResponse.ok) throw new Error('address unavailable');
+          const ipData = await ipResponse.json();
+          if (!ipData.ip) throw new Error('address unavailable');
+          personalKey = PERSONAL_PREFIX + await hashPublicAddress(ipData.ip);
+          const previousIdentity = localStorage.getItem('ub:identity') || '';
+          const storedForIdentity = parseInt(localStorage.getItem('ub:my:' + personalKey) || '0', 10) || 0;
+          const storedPending = parseInt(localStorage.getItem('ub:pending:' + personalKey) || '0', 10) || 0;
+          const carriedPending = pendingYou;
+          pendingYou = storedPending + carriedPending;
+          const migrationBase = previousIdentity ? storedForIdentity : Math.max(0, clickCount - carriedPending);
+          let youRemote = null;
+          try {
+            const createResponse = await fetch(`${ABACUS}/create/${COUNTER_NS}/${personalKey}?initializer=${migrationBase}`, { cache:'no-store' });
+            if (createResponse.status === 201) {
+              const created = await createResponse.json();
+              youRemote = parseInt(created.value, 10) || migrationBase;
+            }
+          } catch (error) {}
+          if (youRemote == null) youRemote = await counterValue(personalKey);
+          clickCount = Math.max(migrationBase, storedForIdentity, (youRemote || 0) + pendingYou);
+          saveLocal(); renderCounts();
+          if (pendingYou || pendingEveryone) scheduleFlush(300);
+        } catch (error) {
+          saveLocal(); renderCounts();
+        }
+      }
+
+      function addTrackedClicks(amount = 1) {
+        const count = Math.max(0, Math.floor(amount));
+        if (!count) return;
+        clickCount += count;
+        totalCount += count;
+        pendingYou += count;
+        pendingEveryone += count;
+        saveLocal(); renderCounts(); scheduleFlush();
+      }
+
+      function updateStats() { addTrackedClicks(1); }
+
+      initializeCounters();
+      setInterval(async () => {
+        const everyoneRemote = await counterValue(EVERYONE_KEY);
+        if (everyoneRemote != null) totalCount = Math.max(totalCount, everyoneRemote + pendingEveryone);
+        if (personalKey) {
+          const youRemote = await counterValue(personalKey);
+          if (youRemote != null) clickCount = Math.max(clickCount, youRemote + pendingYou);
+        }
+        saveLocal(); renderCounts();
+      }, 30000);
 
       function rand(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
       function r(min, max){ return min + Math.random() * (max - min); }
@@ -819,7 +945,7 @@
           if (kind === 'fire') t.textContent = rand(['🔥', '✦', '·']);
           else if (kind === 'ice') t.textContent = rand(['❄', '·', '✦']);
           else if (kind === 'rainbow') t.style.background = `hsl(${(now / 4) % 360} 90% 55%)`;
-          else if (kind === 'scimmy') t.textContent = rand(['／', '＼', '—']);
+          else if (kind === 'scimmy') t.textContent = rand(['／', '＼', '-']);
           else if (kind === 'ags') t.textContent = rand(['✦', '✧', '✧']);
           else if (kind === 'sword') t.textContent = '·';
           else if (kind === 'banana') t.textContent = rand(['🍌', '✨']);
@@ -1443,7 +1569,7 @@
 
       function showRoyalRabbitEmail() {
         showFakePopup(
-          'Postbox — Royal Rabbit',
+          'Postbox: Royal Rabbit',
           'Dear Friend,\n\nI am a royal rabbit with MANY carrots.\nI need your trusted assistance to move forty-seven million carrots before winter.\nPlease reply with directions to the nearest enormous vegetable shed.\n\nBountifully,\nHRH Bun of Somewhere',
           [
             { label: 'Send a map', act: 'reply' },
@@ -1463,7 +1589,7 @@
         const dlg = document.createElement('div');
         dlg.className = 'yt-window';
         dlg.innerHTML = `
-          <div class="yt-titlebar"><span class="yt-dots"><i></i><i></i><i></i></span><span>YouTube — Rick Astley</span><button type="button" class="err-x">✕</button></div>
+          <div class="yt-titlebar"><span class="yt-dots"><i></i><i></i><i></i></span><span>YouTube: Rick Astley</span><button type="button" class="err-x">✕</button></div>
           <div class="yt-body">
             <div class="yt-player">
               <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&controls=1" title="YouTube video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
@@ -1919,7 +2045,7 @@
           if (y - R < 0) { y = R; vy = Math.abs(vy); hue += 40; ping(); }
           if (y + R > window.innerHeight) { y = window.innerHeight - R; vy = -Math.abs(vy); hue += 40; ping(); }
 
-          // cards act as bumpers — push out along the shallowest overlap
+          // cards act as bumpers: push out along the shallowest overlap
           document.querySelectorAll('.card, .heroLeft, .heroRight, .aboutCard').forEach(el => {
             const b = el.getBoundingClientRect();
             if (!b.width) return;
@@ -2076,7 +2202,7 @@
         "90s": (e) => { toggle90s(); spawnParticles(e.clientX,e.clientY,{count:r(16,24),shape:"mixed",durMin:500,durMax:1000}); beep("triangle",r(400,700),0.12,0.09); },
         "DVD": (e) => { toggleDVD(); spawnParticles(e.clientX,e.clientY,{count:r(12,20),shape:"circles",durMin:400,durMax:800}); beep("sine",r(300,500),0.14,0.08); },
 
-        // ex-filler words — now they all do stuff
+        // ex-filler words: now they all do stuff
         "beep": (e) => { beep("square",r(600,1200),0.08,0.12); beep("square",r(800,1400),0.06,0.10); spawnParticles(e.clientX,e.clientY,{count:r(6,10),shape:"squares",sizeMin:4,sizeMax:10,durMin:200,durMax:400}); siteBody.classList.add('page-pulse'); setTimeout(()=>siteBody.classList.remove('page-pulse'),400); },
         "boop": (e) => { beep("sine",r(400,800),0.14,0.08); zoomPulse(); spawnParticles(e.clientX,e.clientY,{count:r(8,14),shape:"circles",durMin:400,durMax:700}); document.querySelectorAll('.card').forEach((c,i)=>{c.style.transition='transform .3s ease';c.style.transform='scale(0.96)';setTimeout(()=>c.style.transform='',300+i*50);}); },
         "bzzz": (e) => { let i=0; const iv=setInterval(()=>{siteBody.style.transform=`translateX(${r(-2,2)}px)`;i++;if(i>20){clearInterval(iv);siteBody.style.transform='';}},30); beep("square",r(120,200),0.20,0.06); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"squares",durMin:150,durMax:350,dxMax:100}); },
@@ -2244,7 +2370,7 @@
         "ink spill": (e) => { const c=document.createElement('div');c.className='site-effect-layer ink-layer';for(let i=0;i<5;i++){const blob=document.createElement('div');blob.className='ink-blob';blob.style.left=r(10,80)+'%';blob.style.top=r(10,80)+'%';const size=r(100,300);blob.style.width=size+'px';blob.style.height=size+'px';blob.style.animationDelay=r(0,1)+'s';blob.style.background='radial-gradient(circle, rgba(10,10,30,0.7) 0%, transparent 70%)';c.appendChild(blob);}siteBody.appendChild(c);setTimeout(()=>{c.classList.add('fadeOut');setTimeout(()=>c.remove(),800);},4000); beep("sine",r(100,250),0.16,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
         "radar": (e) => { const c=document.createElement('div');c.className='site-effect-layer radar-layer';const ring=document.createElement('div');ring.className='radar-ring';c.appendChild(ring);const sweep=document.createElement('div');sweep.className='radar-sweep';c.appendChild(sweep);for(let i=0;i<r(5,10);i++){const dot=document.createElement('div');dot.className='radar-dot';dot.style.left=r(20,80)+'%';dot.style.top=r(20,80)+'%';dot.style.animationDelay=r(0,3)+'s';c.appendChild(dot);}siteBody.appendChild(c);setTimeout(()=>{c.classList.add('fadeOut');setTimeout(()=>c.remove(),600);},5000); beep("sine",r(300,500),0.10,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"circles"}); },
         "prism": (e) => { const c=document.createElement('div');c.className='site-effect-layer prism-layer';for(let i=0;i<7;i++){const band=document.createElement('div');band.className='prism-band';band.style.background='hsla('+(i*51)+' 90% 55%, .15)';band.style.top=(10+i*11)+'%';band.style.animationDelay=(i*0.1)+'s';c.appendChild(band);}siteBody.appendChild(c);setTimeout(()=>{c.classList.add('fadeOut');setTimeout(()=>c.remove(),600);},4000); beep("triangle",r(400,800),0.12,0.08); siteSparkle(2000); spawnParticles(e.clientX,e.clientY,{count:r(16,24),shape:"mixed"}); },
-        // ===== FILLER WORDS — NOW ALL DO PERMANENT CHAOS =====
+        // ===== FILLER WORDS: NOW ALL DO PERMANENT CHAOS =====
         "brain tickle": (e) => { togglePageClass('page-braintickle'); siteSparkle(3000); beep("triangle",r(600,1100),0.10,0.07); spawnParticles(e.clientX,e.clientY,{count:r(16,24),shape:"mixed"}); },
         "internet moment": (e) => { togglePageClass('page-dialup'); toggleCRT(); show404Dialog(); beep("square",r(200,400),0.10,0.10); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"squares"}); },
         "W behavior": (e) => { document.querySelectorAll('.card').forEach((c,i)=>{c.style.transition='transform .6s ease';c.style.transform='rotate('+r(-25,25)+'deg) translate('+r(-50,50)+'px,'+r(-40,40)+'px) scale('+r(0.7,1.3)+')';}); siteFlash('rgba(255,215,0,.3)',300); beep("triangle",r(500,900),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(20,30),shape:"mixed"}); },
@@ -2253,12 +2379,12 @@
         "no thoughts": (e) => { togglePageClass('page-nothoughts'); beep("sine",r(150,280),0.18,0.06); spawnParticles(e.clientX,e.clientY,{count:r(6,10),durMin:1200,durMax:2000}); },
         "just vibes": (e) => { togglePageClass('page-justvibes'); togglePlasma(); beep("sine",r(250,450),0.14,0.06); spawnParticles(e.clientX,e.clientY,{count:r(14,22),shape:"circles",durMin:800,durMax:1500}); },
         "certified moment": (e) => { document.querySelectorAll('.card').forEach(c=>{let s=c.querySelector('.stamp-mark');if(!s){s=document.createElement('div');s.className='stamp-mark';s.textContent='CERTIFIED ✓';s.style.transform='rotate('+r(-20,-5)+'deg)';s.style.color='hsl(140 70% 35%)';c.appendChild(s);}}); beep("triangle",r(400,600),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(12,18)}); },
-        "oop—": (e) => { const cards=document.querySelectorAll('.card'); const pick=cards[Math.floor(Math.random()*cards.length)]; pick.style.transition='all 1s ease'; pick.style.transform='translateY(300px) rotate(45deg) scale(0.3)'; pick.style.opacity='0.1'; siteFall('😬',2500); beep("sine",r(200,400),0.14,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18)}); },
+        "oop-": (e) => { const cards=document.querySelectorAll('.card'); const pick=cards[Math.floor(Math.random()*cards.length)]; pick.style.transition='all 1s ease'; pick.style.transform='translateY(300px) rotate(45deg) scale(0.3)'; pick.style.opacity='0.1'; siteFall('😬',2500); beep("sine",r(200,400),0.14,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18)}); },
         "404 brain": (e) => { document.querySelectorAll('.cardTitle').forEach(el=>{el.textContent='???';}); document.querySelectorAll('.cardDesc').forEach(el=>{el.textContent='[content not found]';}); togglePageClass('page-static'); beep("square",r(100,250),0.12,0.12); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"squares"}); },
         "vibe check": (e) => { const vibes=['immaculate','questionable','cursed','chaotic good','neutral evil','absolutely not','approved','pending review','failed','transcendent']; document.querySelectorAll('.card').forEach(c=>{let v=c.querySelector('.vibe-badge');if(v)v.remove(); v=document.createElement('div');v.className='vibe-badge';v.textContent='vibe: '+rand(vibes);c.appendChild(v);}); beep("triangle",r(400,700),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"mixed"}); },
         "smooth brain": (e) => { document.querySelectorAll('.card,.aboutCard,.heroLeft,.heroRight').forEach(c=>{c.style.transition='border-radius 1s ease';c.style.borderRadius='50%';}); beep("sine",r(200,350),0.16,0.07); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"circles"}); },
         "big mood": (e) => { const moods=['😤','😭','🥺','😍','💀','🤡','😳','🫠','😶‍🌫️','🥴']; document.querySelectorAll('.emoji').forEach(el=>{el.textContent=rand(moods);}); siteBody.style.transition='transform .5s'; siteBody.style.transform='scale(1.03)'; beep("sine",r(200,400),0.14,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18),shape:"hearts"}); },
-        "rent free": (e) => { showFakePopup('🏠 Eviction Notice','Occupant: that thought\nAddress: your head\nAmount owed: $0.00\nStatus: DENIED — tenant is rent-free forever',[{label:'Appeal',act:'appeal'},{label:'Accept brainworm',act:'close'},{label:'Call landlord',act:'call'}],{appeal:()=>showFakePopup('Appeal','Denied. The thought stays.',[{label:'OK',act:'close'}]),call:()=>showFakePopup('Calling…','Landlord: "figure it out"\n*click*',[{label:'Hang up',act:'close'}])}); togglePageClass('page-braintickle'); beep("sine",r(300,500),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
+        "rent free": (e) => { showFakePopup('🏠 Eviction Notice','Occupant: that thought\nAddress: your head\nAmount owed: $0.00\nStatus: DENIED: tenant is rent-free forever',[{label:'Appeal',act:'appeal'},{label:'Accept brainworm',act:'close'},{label:'Call landlord',act:'call'}],{appeal:()=>showFakePopup('Appeal','Denied. The thought stays.',[{label:'OK',act:'close'}]),call:()=>showFakePopup('Calling…','Landlord: "figure it out"\n*click*',[{label:'Hang up',act:'close'}])}); togglePageClass('page-braintickle'); beep("sine",r(300,500),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(10,16)}); },
         "why": (e) => { const whyLayer=document.createElement('div');whyLayer.className='why-layer';for(let i=0;i<60;i++){const w=document.createElement('div');w.className='why-text';w.textContent='why';w.style.left=r(0,100)+'%';w.style.top=r(0,100)+'%';w.style.fontSize=r(10,40)+'px';w.style.opacity=r(0.1,0.5);w.style.transform='rotate('+r(-30,30)+'deg)';whyLayer.appendChild(w);}siteBody.appendChild(whyLayer); beep("sine",r(150,300),0.16,0.07); spawnParticles(e.clientX,e.clientY,{count:r(8,14)}); },
         "lol ok": (e) => { document.querySelectorAll('.card').forEach((c,i)=>{c.style.transition='all .6s ease';c.style.transform='perspective(400px) rotateX('+r(-15,15)+'deg) rotateY('+r(-15,15)+'deg) translate('+r(-30,30)+'px,'+r(-20,20)+'px)';c.style.filter='hue-rotate('+r(0,360)+'deg)';}); beep("triangle",r(300,600),0.10,0.09); spawnParticles(e.clientX,e.clientY,{count:r(14,22)}); },
         "based": (e) => { togglePageClass('page-based'); siteFall(rand(['👑','💪','🗿','⚡']),3500); siteSparkle(2500); beep("triangle",r(400,700),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(18,28),shape:"mixed"}); },
@@ -3258,7 +3384,7 @@
         "update": (e) => { showUpdatePopup(); beep("square",r(200,400),0.10,0.09); },
         // ===== CURSORS =====
         "D scimmy": (e) => { setWeaponCursor('scimmy'); showMemeBanner('Dragon scimitar equipped', 'rs'); beep("square",r(200,350),0.1,0.1); spawnParticles(e.clientX,e.clientY,{count:r(10,16),shape:"squares"}); },
-        "AGS": (e) => { setWeaponCursor('ags'); showMemeBanner('Armadyl godsword equipped — spec bar loading', 'rs'); beep("triangle",r(250,450),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(12,18),hue:45}); },
+        "AGS": (e) => { setWeaponCursor('ags'); showMemeBanner('Armadyl godsword equipped: spec bar loading', 'rs'); beep("triangle",r(250,450),0.12,0.09); spawnParticles(e.clientX,e.clientY,{count:r(12,18),hue:45}); },
         "fire cursor": (e) => { setCursor('🔥'); startCursorTrail('fire'); beep("sawtooth",r(120,200),0.12,0.08); spawnParticles(e.clientX,e.clientY,{count:r(12,18),hue:20}); },
         "ice cursor": (e) => { setCursor('❄'); startCursorTrail('ice'); beep("sine",r(500,800),0.12,0.06); spawnParticles(e.clientX,e.clientY,{count:r(12,18),hue:200}); },
         "banana cursor": (e) => { setCursor('🍌'); startCursorTrail('banana'); beep("triangle",r(400,700),0.1,0.07); spawnParticles(e.clientX,e.clientY,{count:r(10,16),hue:50}); },
@@ -3294,7 +3420,7 @@
         siteFlash('rgba(255,255,255,.15)', 150);
       }
 
-      // Rainbow text — each text element gets a random hue
+      // Rainbow text: each text element gets a random hue
       function applyRainbowText() {
         document.querySelectorAll(TEXT_TARGETS).forEach(el => {
           if (el.closest('.error-dialog') || el.closest('.heroRight')) return;
@@ -3305,7 +3431,7 @@
         siteFlash('rgba(255,255,255,.15)', 150);
       }
 
-      // Cyber text — green monospace hacker aesthetic
+      // Cyber text: green monospace hacker aesthetic
       function applyCyberText() {
         document.querySelectorAll(TEXT_TARGETS).forEach(el => {
           if (el.closest('.error-dialog') || el.closest('.heroRight')) return;
@@ -3320,7 +3446,7 @@
         siteFlash('rgba(0,255,65,.15)', 200);
       }
 
-      // Pastel text — each element a soft pastel color
+      // Pastel text: each element a soft pastel color
       function applyPastelText() {
         const pastels = ['#ffb3ba','#bae1ff','#baffc9','#ffffba','#e8baff','#ffd9ba','#c9baff','#baffee'];
         document.querySelectorAll(TEXT_TARGETS).forEach(el => {
@@ -3354,7 +3480,7 @@
       // Tracks all active page-level themes and blends colors
       const activeThemes = new Set();
 
-      // Color theme definitions — these set CSS variables + inline styles
+      // Color theme definitions: these set CSS variables + inline styles
       // Themes that primarily change colors (bg, text, card colors)
       const COLOR_THEMES = {
         'page-neon':       { bg:'#0a0a14', ink:'#e0e0ff', card:'rgba(10,10,30,.7)', nav:'rgba(10,10,25,.9)', muted:'rgba(200,190,255,.5)', accent:280, filter:'' },
@@ -3392,7 +3518,7 @@
         'page-feverdream': { bg:'#1a0028', ink:'#ff80ff', card:'rgba(40,0,60,.4)', nav:'rgba(26,0,40,.9)', muted:'rgba(255,128,255,.35)', accent:300, filter:'' },
       };
 
-      // Filter-based themes (apply via CSS filter — these blend by default!)
+      // Filter-based themes (apply via CSS filter: these blend by default!)
       const FILTER_THEMES = ['page-bw','page-bruh','page-sheesh','page-lava','page-ocean','page-rain','page-negative','page-acid'];
 
       // Parse a hex/rgb color to [r,g,b]
@@ -3418,7 +3544,7 @@
         const activeColorThemes = [...activeThemes].filter(t => COLOR_THEMES[t]).map(t => COLOR_THEMES[t]);
 
         if (activeColorThemes.length === 0) {
-          // No color themes active — clear inline overrides, let default CSS work
+          // No color themes active: clear inline overrides, let default CSS work
           siteBody.style.background = '';
           siteBody.style.color = '';
           document.querySelectorAll('.card,.aboutCard,.heroLeft').forEach(el => el.style.background = '');
@@ -3472,7 +3598,7 @@
         document.documentElement.style.setProperty('--muted', muteds[muteds.length-1]);
       }
 
-      // Visual impact kick — fires every time any theme is toggled
+      // Visual impact kick: fires every time any theme is toggled
       function themeKick(e, isAdding) {
         // Big flash
         siteFlash(isAdding ? 'rgba(255,255,255,.25)' : 'rgba(0,0,0,.15)', 200);
@@ -3485,7 +3611,7 @@
       }
 
       function togglePageClass(cls) {
-        // ALWAYS STACK — never remove. Refresh the page to reset.
+        // ALWAYS STACK: never remove. Refresh the page to reset.
         const isNew = !siteBody.classList.contains(cls);
         siteBody.classList.add(cls);
         activeThemes.add(cls);
@@ -3699,7 +3825,7 @@
           el.querySelector('.toy-icon').textContent = def.open;
           el.querySelector('.toy-hint').textContent = 'opened!';
           beep('triangle', r(400, 900), 0.12, 0.08);
-          // Surprise payload — stacks with everything
+          // Surprise payload: stacks with everything
           const surprise = rand(ACTION_WORDS.filter(w => isActionWord(w) && !TOY_WORDS.has(w)));
           const fake = { clientX: ev.clientX, clientY: ev.clientY };
           const action = ACTIONS[surprise];
@@ -3845,7 +3971,7 @@
       }
 
       // =================================================================
-      // ===== ADDICTION ENGINE — dopamine, combos, toys, milestones =====
+      // ===== ADDICTION ENGINE: dopamine, combos, toys, milestones =====
       // =================================================================
       const comboPillEl = document.getElementById('comboPill');
       const cpsPillEl   = document.getElementById('cpsPill');
@@ -3952,13 +4078,10 @@
         ], { duration: 2200, easing:'ease-out' }).onfinish = () => b.remove();
       }
 
-      // Bonus clicks from toys stay in this browser.
-      function ubAddClicks(n){
-        n = Math.max(0, Math.floor(n));
-        if (!n) return;
-        clickCount += n;
-        totalCount = clickCount;
-        saveLocal(); renderCounts();
+      // A toy interaction is one real click. Visual bonuses never inflate the
+      // personal or Everyone tallies.
+      function ubAddClicks(){
+        addTrackedClicks(1);
         checkMilestone();
       }
 
@@ -3973,7 +4096,7 @@
           msLabelEl.textContent = clickCount.toLocaleString() + ' / ' + next.toLocaleString() + ' clicks';
         } else {
           msFillEl.style.width = '100%';
-          msLabelEl.textContent = clickCount.toLocaleString() + ' clicks — legend';
+          msLabelEl.textContent = clickCount.toLocaleString() + ' clicks: legend';
         }
         // celebrate newly crossed milestones
         for (const m of MILESTONES){
@@ -4013,7 +4136,7 @@
         } else {
           cpsPillEl.hidden = true;
         }
-        if (cps >= 8) achieve('cps8', 'Machine-gun fingers — 8 clicks/sec!');
+        if (cps >= 8) achieve('cps8', 'Machine-gun fingers: 8 clicks/sec!');
         if (cps >= 12) achieve('cps12', 'Are you a robot? 12 clicks/sec!');
       }
 
@@ -4048,13 +4171,13 @@
         updateCPS();
         clickRing(e.clientX, e.clientY);
 
-        // (no floating +1 / COMBO shout popups — current streak lives in the combo pill)
+        // (no floating +1 / COMBO shout popups: current streak lives in the combo pill)
 
         // soft achievements for high streaks (toast only, no screen shout)
-        if (combo === 10) achieve('combo10', 'Combo x10 — on fire!');
-        if (combo === 25) achieve('combo25', 'Combo x25 — unstoppable!');
-        if (combo === 50) achieve('combo50', 'Combo x50 — GODLIKE!');
-        if (combo === 100) achieve('combo100', 'Combo x100 — how?!');
+        if (combo === 10) achieve('combo10', 'Combo x10: on fire!');
+        if (combo === 25) achieve('combo25', 'Combo x25: unstoppable!');
+        if (combo === 50) achieve('combo50', 'Combo x50: GODLIKE!');
+        if (combo === 100) achieve('combo100', 'Combo x100: how?!');
 
         // fever
         if (combo >= FEVER_COMBO && !feverActive) enterFever();
@@ -4067,12 +4190,12 @@
           }
         }
 
-        achieve('first', 'First contact 🐇 — welcome to the box');
+        achieve('first', 'First contact 🐇: welcome to the box');
         if (bestCombo >= 3 && wasAction === false) {} // noop
 
         checkMilestone();
 
-        // feed the trip engine — fast, sustained clicking bends reality
+        // feed the trip engine: fast, sustained clicking bends reality
         tripAddHeat(clickTimes.length, e);
 
         // surprise toy drop
@@ -4089,9 +4212,9 @@
 
       // ===== IDLE TAUNTS ("come back and click me") =====
       const TAUNTS = [
-        ['bored already? 👀', 'click me', 'hello? 🐇', 'i dare you', 'poke me'],
-        ['still there?', "don't leave me", 'one more click', 'i miss you', 'pspspsps 🐈'],
-        ['the box is lonely', 'CLICK. ME. NOW.', 'i live for this', 'do it for the combo', 'we were having fun'],
+        ['still around? 👀', 'hello? 🐇', 'the box is waiting', 'poke whenever', 'quiet in here'],
+        ['taking a small nap', 'come back whenever', 'no rush', 'still here when you are', 'pspspsps 🐈'],
+        ['the rabbit wandered off', 'idle mode activated', 'the box is resting', 'tap when ready', 'nothing to report'],
       ];
       function showTaunt(){
         hideTaunt();
@@ -4125,7 +4248,7 @@
       // ============================================================
       function rewardBurst(x, y, amount){
         ubAddClicks(amount);
-        ubPop(x, y, '+' + amount, { crit:true, size:r(26,34) });
+        ubPop(x, y, 'bonus!', { crit:true, size:r(26,34) });
         spawnParticles(x, y, { count:r(14,22), shape:'mixed', durMin:400, durMax:900, dxMax:200, dyUp:240 });
         beep('triangle', r(500,800), 0.10, 0.08); beep('sine', r(700,1000), 0.12, 0.06);
       }
@@ -4183,7 +4306,7 @@
         }
       }
 
-      // piñata — needs a few whacks
+      // piñata: needs a few whacks
       function spawnPinata(){
         const p = document.createElement('button');
         p.className = 'ub-pinata';
@@ -4210,7 +4333,7 @@
         });
       }
 
-      // gift box — open for a random reward
+      // gift box: open for a random reward
       function dropGift(){
         const g = document.createElement('button');
         g.className = 'ub-gift';
@@ -4253,7 +4376,7 @@
           const win = final[0] === final[1] && final[1] === final[2];
           if (win){
             shout('🎰 JACKPOT! 🎰', { color:'#ffd23f' });
-            achieve('jackpot', 'JACKPOT — three of a kind!');
+            achieve('jackpot', 'JACKPOT: three of a kind!');
             const cx = window.innerWidth/2;
             for (let i=0;i<10;i++) setTimeout(()=>spawnParticles(cx+r(-120,120), window.innerHeight*0.35, {count:r(14,22), shape:'mixed', dxMax:280, dyUp:340}), i*80);
             siteFall(rand(['🪙','💰','⭐','7️⃣']), 4000);
@@ -4492,7 +4615,7 @@
       NEW_WORDS.forEach(w => { if (!ACTION_WORDS.includes(w)) ACTION_WORDS.push(w); });
 
       // ================================================================
-      // ===== LSD TRIP ENGINE — reality bends the longer you spam =======
+      // ===== LSD TRIP ENGINE: reality bends the longer you spam =======
       // ================================================================
       // Heat accumulates per click, faster when clicks-per-second is high.
       // It only NET-builds under sustained fast spam (decay outpaces slow
@@ -4547,7 +4670,7 @@
         const dt = Math.min(0.05, (t - lastTripT) / 1000);
         lastTripT = t;
 
-        // decay — grows slightly with level so peak spam is required to hold it
+        // decay: grows slightly with level so peak spam is required to hold it
         heat = Math.max(0, heat - (7 + tripLevel * 5) * dt);
         // ease level toward heat ratio for smoothness
         const target = heat / HEAT_MAX;
@@ -4571,7 +4694,7 @@
         }
 
         // rotating pinwheel + breathing rings + hue wash
-        const eased = L * L; // ramps late — subtle until you really commit
+        const eased = L * L; // ramps late: subtle until you really commit
         spiralEl.style.opacity = (L * 0.5).toFixed(3);
         spiralEl.style.transform = `translate(-50%,-50%) rotate(${spiralAngle}deg) scale(${1 + L * 0.35})`;
         const ringPulse = 1 + Math.sin(tripPhase * 2.2) * 0.16 * L + L * 0.12;
@@ -4612,7 +4735,7 @@
       requestAnimationFrame(tripLoop);
 
       // Once you're deep in the spiral, don't let a stray spam-click on a
-      // (chaos-flung) link yank you off the page — the trip keeps you.
+      // (chaos-flung) link yank you off the page: the trip keeps you.
       document.addEventListener('click', (ev) => {
         if (tripLevel > 0.28){
           const a = ev.target.closest && ev.target.closest('a[href]');
