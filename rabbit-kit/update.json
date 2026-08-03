@@ -1,9 +1,9 @@
 {
-    "version":  "2026.8.3.4",
-    "display_version":  "2026.8.3.4",
+    "version":  "2026.8.3.5",
+    "display_version":  "2026.8.3.5",
     "paused":  false,
     "url":  "https://www.rabbet.lol/rabbit-kit/download/RabbitKit-Setup.exe",
-    "sha256":  "2ef047c6c2db3cf7b3dafcf7e0188ab9a42e8c25da3142293b54cf0e02f97e70",
-    "size":  25563161,
-    "published":  "2026-08-03T10:06:12.8457521Z"
+    "sha256":  "3161e0904b66e836315ffa1351930fbd7d5acee0c15e9c867844e23cad850da1",
+    "size":  25562541,
+    "published":  "2026-08-03T10:26:17.4130965Z"
 }
