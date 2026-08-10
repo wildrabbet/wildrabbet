@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sequentia — engine tests</title>
+<style>
+  body { background:#08120e; color:#dfe7e3; font:13px/1.55 "Segoe UI",system-ui,sans-serif; margin:0; padding:28px; }
+  h1 { font-size:20px; letter-spacing:.1em; text-transform:uppercase; color:#d9b65c; margin:0 0 4px; }
+  #summary { font-size:16px; margin:14px 0 20px; padding:12px 16px; border-radius:8px; }
+  #summary.pass { background:rgba(79,211,155,.14); border:1px solid #4fd39b; color:#b9f3da; }
+  #summary.fail { background:rgba(255,90,90,.14); border:1px solid #ff5a5a; color:#ffc9c9; }
+  ol { padding-left: 26px; }
+  li { margin:3px 0; }
+  li.ok { color:#89d9b6; }
+  li.bad { color:#ff8f8f; font-weight:600; }
+  .why { color:#9aa8a3; }
+  code { background:rgba(255,255,255,.07); padding:1px 5px; border-radius:4px; }
+</style>
+</head>
+<body>
+<h1>Sequentia engine tests</h1>
+<p class="why">Headless assertions over <code>SQ.Board</code> and <code>SQ.Engine</code>. Open this file directly.</p>
+<div id="summary">running…</div>
+<ol id="results"></ol>
+
+<script src="../js/cards.js"></script>
+<script src="../js/board.js"></script>
+<script src="../js/engine.js"></script>
+<script src="../js/ai.js"></script>
+<script src="../js/net.js"></script>
+<script>
+(function () {
+  'use strict';
+  var results = [], failures = 0;
+
+  var pending = [];        // async tests still in flight
+
+  function test(name, fn) {
+    try {
+      var msg = fn();
+      results.push({ ok: true, name: name, msg: msg || '' });
+    } catch (err) {
+      failures++;
+      results.push({ ok: false, name: name, msg: err.message });
+    }
+  }
+
+  /* Async variant, for the parts of the networking layer that are promise-based
+   * (the compressed invite codes). Results are rendered once everything settles. */
+  function atest(name, fn) {
+    var slot = { ok: true, name: name, msg: '' };
+    results.push(slot);
+    pending.push(Promise.resolve().then(fn).then(function (msg) {
+      slot.msg = msg || '';
+    }, function (err) {
+      failures++;
+      slot.ok = false;
+      slot.msg = err && err.message ? err.message : String(err);
+    }));
+  }
+  function assert(cond, msg) { if (!cond) throw new Error(msg || 'assertion failed'); }
+  function eq(a, b, msg) {
+    if (a !== b) throw new Error((msg || 'expected') + ': got ' + JSON.stringify(a) + ', want ' + JSON.stringify(b));
+  }
+
+  var E = SQ.Engine, B = SQ.Board, C = SQ.Cards;
+
+  function game(opts) {
+    return E.createGame(Object.assign({ seed: 12345 }, opts || {}));
+  }
+  // Force chips onto the board without going through play().
+  function chips(st, cells, player) {
+    cells.forEach(function (i) { st.board[i].chip = player; });
+  }
+  // Give a player an exact hand.
+  function setHand(st, p, cards) { st.hands[p] = cards.slice(); }
+
+  /* ------------------------------------------------------------ layout */
+
+  test('board layout validates', function () {
+    var problems = B.validate();
+    assert(problems.length === 0, problems.join('; '));
+    return '100 cells, 96 cards, 48 distinct × 2, no jacks';
+  });
+
+  test('corners are the free spaces', function () {
+    B.CORNERS.forEach(function (i) { eq(B.LAYOUT_FLAT[i], 'FREE', 'corner ' + i); });
+    return B.CORNERS.map(B.coord).join(', ');
+  });
+
+  test('every non-jack card maps to exactly 2 cells', function () {
+    var n = 0;
+    C.fullDeck().forEach(function (id) {
+      if (C.isJack(id)) { eq(B.cellsForCard(id).length, 0, 'jack ' + id + ' on board'); return; }
+      eq(B.cellsForCard(id).length, 2, id); n++;
+    });
+    eq(n, 48, 'non-jack count');
+    return '48 cards × 2 spaces';
+  });
+
+  /* -------------------------------------------------------------- cards */
+
+  test('deck and jack classification', function () {
+    eq(C.fullDeck().length, 52, 'deck size');
+    var uniq = {}; C.fullDeck().forEach(function (id) { uniq[id] = 1; });
+    eq(Object.keys(uniq).length, 52, 'unique ids');
+    ['JS', 'JH'].forEach(function (id) {
+      assert(C.isOneEyedJack(id), id + ' should be one-eyed');
+      assert(!C.isTwoEyedJack(id), id + ' should not be two-eyed');
+    });
+    ['JD', 'JC'].forEach(function (id) {
+      assert(C.isTwoEyedJack(id), id + ' should be two-eyed');
+      assert(!C.isOneEyedJack(id), id + ' should not be one-eyed');
+    });
+    assert(!C.isJack('TD') && !C.isJack('QS'), 'non-jacks misclassified');
+    return 'JS/JH one-eyed, JD/JC two-eyed';
+  });
+
+  /* -------------------------------------------------------------- setup */
+
+  test('two-player deal: 7 cards each, 104-card draw pile', function () {
+    var st = game();
+    eq(st.hands.length, 2, 'players');
+    eq(st.hands[0].length, 7, 'p0 hand');
+    eq(st.hands[1].length, 7, 'p1 hand');
+    eq(st.deck.length, 104 - 14, 'deck remainder');
+    eq(st.seqToWin, 2, 'sequences to win');
+    return '7 + 7, ' + st.deck.length + ' left in the pile';
+  });
+
+  test('deal sizes and win targets by player count', function () {
+    eq(E.handSizeFor(2), 7); eq(E.handSizeFor(3), 6); eq(E.handSizeFor(4), 6);
+    eq(E.handSizeFor(6), 5); eq(E.handSizeFor(8), 4); eq(E.handSizeFor(9), 4);
+    eq(E.handSizeFor(12), 3);
+    eq(E.sequencesToWin(2), 2, '2 teams'); eq(E.sequencesToWin(3), 1, '3 teams');
+    return '2p:7 3p:6 4p:6 6p:5 8p:4 12p:3 — 2 teams need 2, 3 teams need 1';
+  });
+
+  test('a fresh non-jack card has 2 legal spaces', function () {
+    var st = game();
+    setHand(st, 0, ['6S']);
+    eq(E.legalTargets(st, '6S').length, 2, '6S targets');
+    return '6S -> ' + E.legalTargets(st, '6S').map(B.coord).join(', ');
+  });
+
+  /* --------------------------------------------------- sequence detection */
+
+  test('five in a row horizontally scores', function () {
+    var st = game();
+    chips(st, [20, 21, 22, 23, 24], 0);
+    var found = E.findNewSequences(st, 24, 0);
+    eq(found.length, 1, 'sequences found');
+    eq(found[0].cells.join(','), '20,21,22,23,24', 'cells');
+    return 'row: ' + found[0].cells.map(B.coord).join(' ');
+  });
+
+  test('five in a row vertically scores', function () {
+    var st = game();
+    chips(st, [11, 21, 31, 41, 51], 0);
+    var found = E.findNewSequences(st, 51, 0);
+    eq(found.length, 1, 'sequences found');
+    return 'col: ' + found[0].cells.map(B.coord).join(' ');
+  });
+
+  test('five on a diagonal scores', function () {
+    var st = game();
+    chips(st, [11, 22, 33, 44, 55], 0);
+    var found = E.findNewSequences(st, 55, 0);
+    eq(found.length, 1, 'diagonal');
+    return 'diag: ' + found[0].cells.map(B.coord).join(' ');
+  });
+
+  test('five on the anti-diagonal scores', function () {
+    var st = game();
+    chips(st, [15, 24, 33, 42, 51], 0);
+    var found = E.findNewSequences(st, 51, 0);
+    eq(found.length, 1, 'anti-diagonal');
+    return 'anti: ' + found[0].cells.map(B.coord).join(' ');
+  });
+
+  test('four in a row does NOT score', function () {
+    var st = game();
+    chips(st, [20, 21, 22, 23], 0);
+    eq(E.findNewSequences(st, 23, 0).length, 0, 'should not score');
+    return 'four chips is not a sequence';
+  });
+
+  test('a gap breaks the line', function () {
+    var st = game();
+    chips(st, [20, 21, 23, 24, 25], 0);
+    eq(E.findNewSequences(st, 25, 0).length, 0, 'gap at 22 should break it');
+    return 'discontiguous chips do not score';
+  });
+
+  test("an opponent's chip breaks the line", function () {
+    var st = game();
+    chips(st, [20, 21, 23, 24], 0);
+    chips(st, [22], 1);
+    eq(E.findNewSequences(st, 24, 0).length, 0, 'enemy chip should break it');
+    return 'enemy chip blocks';
+  });
+
+  /* --------------------------------------------------------- free corners */
+
+  test('a free corner completes a sequence with only 4 chips', function () {
+    var st = game();
+    chips(st, [1, 2, 3, 4], 0);          // cell 0 is the top-left FREE corner
+    var found = E.findNewSequences(st, 4, 0);
+    eq(found.length, 1, 'corner sequence');
+    assert(found[0].cells.indexOf(0) >= 0, 'the corner should be included');
+    return '4 chips + ' + B.coord(0) + ' corner';
+  });
+
+  test('a corner counts for both players simultaneously', function () {
+    var st = game();
+    chips(st, [1, 2, 3, 4], 0);
+    eq(E.findNewSequences(st, 4, 0).length, 1, 'p0 uses the corner');
+    var st2 = game();
+    chips(st2, [10, 20, 30, 40], 1);     // down the left edge from the same corner
+    eq(E.findNewSequences(st2, 40, 1).length, 1, 'p1 uses the same corner');
+    return 'the corner is wild for everyone';
+  });
+
+  /* ------------------------------------------------- shared chip rule */
+
+  test('a second sequence may reuse exactly one chip', function () {
+    var st = game();
+    chips(st, [20, 21, 22, 23, 24], 0);
+    var first = E.findNewSequences(st, 24, 0);
+    eq(first.length, 1, 'first sequence');
+    // record it so the sharing rule has something to check against
+    st.sequences.push({ id: 0, team: 0, by: 0, cells: first[0].cells, dir: first[0].dir });
+    first[0].cells.forEach(function (i) { st.board[i].seqs.push(0); });
+    st.seqCount[0] = 1;
+
+    // Extending to 28 gives the window 24..28, which reuses only cell 24.
+    chips(st, [25, 26, 27, 28], 0);
+    var second = E.findNewSequences(st, 28, 0);
+    eq(second.length, 1, 'second sequence should be allowed');
+    eq(second[0].cells.join(','), '24,25,26,27,28', 'window');
+    return 'shares only ' + B.coord(24);
+  });
+
+  test('a second sequence may NOT reuse two chips', function () {
+    var st = game();
+    chips(st, [20, 21, 22, 23, 24], 0);
+    var first = E.findNewSequences(st, 24, 0);
+    st.sequences.push({ id: 0, team: 0, by: 0, cells: first[0].cells, dir: first[0].dir });
+    first[0].cells.forEach(function (i) { st.board[i].seqs.push(0); });
+    st.seqCount[0] = 1;
+
+    // Only 25..27 added: the only window containing 27 is 23..27, which would
+    // reuse both 23 and 24. That must be refused.
+    chips(st, [25, 26, 27], 0);
+    eq(E.findNewSequences(st, 27, 0).length, 0, 'two shared chips must be refused');
+    return 'window 23..27 correctly rejected';
+  });
+
+  /* ------------------------------------------------------------- jacks */
+
+  test('two-eyed jack targets every open space and nothing else', function () {
+    var st = game();
+    chips(st, [55], 1);
+    var t = E.legalTargets(st, 'JD');
+    eq(t.length, 100 - 4 - 1, 'open spaces');   // minus 4 corners, minus the taken one
+    assert(t.indexOf(55) < 0, 'should not target a taken space');
+    B.CORNERS.forEach(function (i) { assert(t.indexOf(i) < 0, 'should not target corner ' + i); });
+    return t.length + ' open spaces';
+  });
+
+  test("one-eyed jack targets only opponents' unprotected chips", function () {
+    var st = game();
+    chips(st, [30, 31], 1);      // opponent
+    chips(st, [40], 0);          // own
+    var t = E.legalTargets(st, 'JS');
+    eq(t.length, 2, 'removable chips');
+    assert(t.indexOf(40) < 0, 'must not target own chip');
+    assert(t.indexOf(30) >= 0 && t.indexOf(31) >= 0, 'should target both enemy chips');
+    return 'targets ' + t.map(B.coord).join(', ');
+  });
+
+  test('one-eyed jack cannot remove a chip locked in a sequence', function () {
+    var st = game();
+    chips(st, [20, 21, 22, 23, 24], 1);
+    var seq = E.findNewSequences(st, 24, 1);
+    st.sequences.push({ id: 0, team: 1, by: 1, cells: seq[0].cells, dir: seq[0].dir });
+    seq[0].cells.forEach(function (i) { st.board[i].seqs.push(0); });
+    chips(st, [35], 1);          // a loose enemy chip outside the sequence
+    var t = E.legalTargets(st, 'JS');
+    eq(t.length, 1, 'only the loose chip is removable');
+    eq(t[0], 35, 'removable cell');
+    return 'sequence chips are immune; only ' + B.coord(35) + ' is removable';
+  });
+
+  test('playing a one-eyed jack removes the chip and ends the turn', function () {
+    var st = game();
+    chips(st, [35], 1);
+    setHand(st, 0, ['JS']);
+    var res = E.play(st, 'JS', 35);
+    assert(res.ok, res.why);
+    eq(res.kind, 'remove', 'move kind');
+    eq(st.board[35].chip, null, 'chip removed');
+    eq(st.turn, 1, 'turn passed');
+    assert(st.discard.indexOf('JS') >= 0, 'jack discarded');
+    return 'chip removed, turn passed to p1';
+  });
+
+  test('playing a two-eyed jack places a chip anywhere open', function () {
+    var st = game();
+    setHand(st, 0, ['JC']);
+    var res = E.play(st, 'JC', 55);
+    assert(res.ok, res.why);
+    eq(res.kind, 'wild', 'move kind');
+    eq(st.board[55].chip, 0, 'chip placed');
+    return 'wild chip placed at ' + B.coord(55);
+  });
+
+  /* -------------------------------------------------------- dead cards */
+
+  test('a card is dead only when both its spaces are taken', function () {
+    var st = game();
+    var cells = B.cellsForCard('6S');
+    assert(!E.isDead(st, '6S'), 'should not be dead yet');
+    chips(st, [cells[0]], 1);
+    assert(!E.isDead(st, '6S'), 'one space taken is not dead');
+    chips(st, [cells[1]], 1);
+    assert(E.isDead(st, '6S'), 'both taken should be dead');
+    assert(!E.isDead(st, 'JS') && !E.isDead(st, 'JD'), 'jacks are never dead');
+    return 'both spaces covered = dead; jacks never die';
+  });
+
+  test('dead card swap works once per turn and does not use the play', function () {
+    var st = game();
+    chips(st, B.cellsForCard('6S'), 1);
+    chips(st, B.cellsForCard('7S'), 1);
+    setHand(st, 0, ['6S', '7S', 'AD']);
+    eq(E.deadCardsInHand(st, 0).length, 2, 'dead cards detected');
+
+    var before = st.turn;
+    var r1 = E.discardDead(st, '6S');
+    assert(r1.ok, r1.why);
+    eq(st.turn, before, 'swapping must not pass the turn');
+    eq(st.hands[0].length, 3, 'hand size preserved');
+
+    var r2 = E.discardDead(st, '7S');
+    assert(!r2.ok, 'a second swap in the same turn must be refused');
+
+    var r3 = E.discardDead(st, 'AD');
+    assert(!r3.ok, 'a live card must not be swappable');
+    return 'one swap per turn, hand size preserved';
+  });
+
+  test('a live card cannot be played onto a taken space', function () {
+    var st = game();
+    var cells = B.cellsForCard('6S');
+    chips(st, [cells[0]], 1);
+    setHand(st, 0, ['6S']);
+    var res = E.play(st, '6S', cells[0]);
+    assert(!res.ok, 'should have been refused');
+    assert(/already taken/i.test(res.why), 'reason should mention it is taken, got: ' + res.why);
+    return 'refused: ' + res.why;
+  });
+
+  test('a card cannot be played on a space showing a different card', function () {
+    var st = game();
+    setHand(st, 0, ['6S']);
+    var wrong = B.cellsForCard('QH')[0];
+    var res = E.play(st, '6S', wrong);
+    assert(!res.ok, 'should have been refused');
+    return 'refused: ' + res.why;
+  });
+
+  test('corners cannot be played on', function () {
+    var st = game();
+    setHand(st, 0, ['JC']);
+    var res = E.play(st, 'JC', 0);
+    assert(!res.ok, 'a wild must not be playable on a free corner');
+    return 'refused: ' + res.why;
+  });
+
+  test('playing out of turn is refused', function () {
+    var st = game();
+    var card = st.hands[1][0];
+    var v = E.validate(st, 1, card, B.cellsForCard(card)[0]);
+    assert(!v.ok, 'player 1 must not move on player 0\'s turn');
+    return 'refused: ' + v.why;
+  });
+
+  /* ---------------------------------------------------- turn mechanics */
+
+  test('a normal play discards, draws, and passes the turn', function () {
+    var st = game();
+    var card = st.hands[0].filter(function (c) { return !C.isJack(c); })[0];
+    var deckBefore = st.deck.length;
+    var res = E.play(st, card, E.legalTargets(st, card)[0]);
+    assert(res.ok, res.why);
+    eq(st.hands[0].length, 7, 'hand refilled to 7');
+    eq(st.deck.length, deckBefore - 1, 'one card drawn');
+    assert(st.discard.indexOf(card) >= 0, 'card discarded');
+    eq(st.turn, 1, 'turn passed');
+    return 'hand stays at 7, deck ' + deckBefore + ' -> ' + st.deck.length;
+  });
+
+  test('an empty draw pile reshuffles the discards', function () {
+    var st = game();
+    st.discard = st.deck.splice(0);          // move everything to the discard pile
+    eq(st.deck.length, 0, 'deck emptied');
+    var card = st.hands[0].filter(function (c) { return !C.isJack(c); })[0];
+    var res = E.play(st, card, E.legalTargets(st, card)[0]);
+    assert(res.ok, res.why);
+    assert(res.drew, 'should still have drawn a card');
+    assert(st.deck.length > 0, 'discards should have been reshuffled into the deck');
+    return 'reshuffled, drew ' + C.label(res.drew);
+  });
+
+  /* --------------------------------------------------------------- win */
+
+  test('two sequences wins the game', function () {
+    var st = game();
+    // First sequence: 20..24 via a real play on 24.
+    chips(st, [20, 21, 22, 23], 0);
+    var card24 = st.board[24].card;
+    setHand(st, 0, [card24]);
+    var r1 = E.play(st, card24, 24);
+    assert(r1.ok, r1.why);
+    eq(r1.newSequences.length, 1, 'first sequence scored');
+    eq(st.seqCount[0], 1, 'sequence count');
+    eq(st.winner, null, 'not won yet');
+    assert(st.board[24].seqs.length === 1, 'chip locked into the sequence');
+
+    // Second sequence sharing exactly one chip: 24..28.
+    st.turn = 0;
+    chips(st, [25, 26, 27], 0);
+    var card28 = st.board[28].card;
+    setHand(st, 0, [card28]);
+    var r2 = E.play(st, card28, 28);
+    assert(r2.ok, r2.why);
+    eq(r2.newSequences.length, 1, 'second sequence scored');
+    eq(st.seqCount[0], 2, 'two sequences');
+    eq(st.winner, 0, 'team 0 should have won');
+    eq(st.phase, 'gameover', 'game should be over');
+    return 'won with ' + st.seqCount[0] + ' sequences';
+  });
+
+  test('no moves are accepted after the game is over', function () {
+    var st = game();
+    st.phase = 'gameover'; st.winner = 0;
+    var card = st.hands[0][0];
+    var res = E.play(st, card, B.cellsForCard(card)[0] || 55);
+    assert(!res.ok, 'moves after game over must be refused');
+    return 'refused: ' + res.why;
+  });
+
+  /* ------------------------------------------------ random full game */
+
+  test('200 random full games finish without throwing or corrupting state', function () {
+    var wins = 0, draws = 0, longest = 0;
+    for (var g = 0; g < 200; g++) {
+      var st = E.createGame({ seed: 1000 + g });
+      var guard = 0;
+      while (st.phase === 'play' && guard++ < 4000) {
+        var p = st.turn;
+        var h = st.hands[p];
+        // swap a dead card when possible, like a real player would
+        var dead = E.deadCardsInHand(st, p);
+        if (dead.length && !st.deadUsedThisTurn) E.discardDead(st, dead[0]);
+
+        var options = [];
+        h.forEach(function (id) {
+          E.legalTargets(st, id).forEach(function (c) { options.push([id, c]); });
+        });
+        if (!options.length) { if (!E.pass(st).ok) break; continue; }
+        var pick = options[Math.floor(st._rand() * options.length)];
+        var r = E.play(st, pick[0], pick[1]);
+        assert(r.ok, 'legal move rejected: ' + r.why);
+
+        // invariants. Note a single placement can complete two lines at once, so
+        // seqCount may overshoot seqToWin on the winning move — what must hold is
+        // that reaching the target ends the game immediately.
+        assert(st.hands[0].length <= 8 && st.hands[1].length <= 8, 'hand overflow');
+        for (var t in st.seqCount) {
+          if (st.seqCount[t] >= st.seqToWin) {
+            assert(st.phase === 'gameover' && st.winner === Number(t),
+              'team ' + t + ' reached ' + st.seqCount[t] + ' sequences but the game did not end');
+          }
+        }
+      }
+      assert(guard < 4000, 'game ' + g + ' failed to terminate');
+      longest = Math.max(longest, st.turnNumber);
+      if (st.winner == null) draws++; else wins++;
+      eq(st.phase, 'gameover', 'game ' + g + ' should have ended');
+    }
+    return wins + ' decided, ' + draws + ' drawn, longest ' + longest + ' turns';
+  });
+
+  test('random games never produce an illegal board', function () {
+    for (var g = 0; g < 40; g++) {
+      var st = E.createGame({ seed: 500 + g });
+      var guard = 0;
+      while (st.phase === 'play' && guard++ < 4000) {
+        var opts = [];
+        st.hands[st.turn].forEach(function (id) {
+          E.legalTargets(st, id).forEach(function (c) { opts.push([id, c]); });
+        });
+        if (!opts.length) { if (!E.pass(st).ok) break; continue; }
+        var pick = opts[Math.floor(st._rand() * opts.length)];
+        E.play(st, pick[0], pick[1]);
+      }
+      // corners must never hold a chip; every recorded sequence must be a real line
+      B.CORNERS.forEach(function (i) { assert(st.board[i].chip === null, 'corner got a chip'); });
+      st.sequences.forEach(function (s) {
+        eq(s.cells.length, 5, 'sequence length');
+        var rs = s.cells.map(function (i) { return Math.floor(i / 10); });
+        var cs = s.cells.map(function (i) { return i % 10; });
+        var dr = rs[1] - rs[0], dc = cs[1] - cs[0];
+        for (var k = 1; k < 5; k++) {
+          eq(rs[k] - rs[k - 1], dr, 'row step');
+          eq(cs[k] - cs[k - 1], dc, 'col step');
+        }
+        s.cells.forEach(function (i) {
+          var cell = st.board[i];
+          assert(cell.free || (cell.chip !== null && st.players[cell.chip].team === s.team),
+            'sequence cell ' + i + ' is not owned by team ' + s.team);
+        });
+      });
+    }
+    return '40 games: corners clean, all sequences are real collinear runs';
+  });
+
+  /* ------------------------------------------------- rosters, teams, seating */
+
+  test('every official player count splits into official team counts', function () {
+    var got = E.PLAYER_COUNTS.map(function (n) { return n + ':' + E.validTeamCounts(n).join('/'); });
+    eq(got.join(' '), '2:2 3:3 4:2 6:2/3 8:2 9:3 10:2 12:2/3', 'team options');
+    return got.join('  ');
+  });
+
+  test('every configuration deals the official hand and win target', function () {
+    var lines = [];
+    E.PLAYER_COUNTS.forEach(function (pc) {
+      E.validTeamCounts(pc).forEach(function (tc) {
+        var st = E.createGame({ seed: 4, players: E.makeRoster(pc, tc, {}) });
+        var want = E.handSizeFor(pc);
+        st.hands.forEach(function (h, i) { eq(h.length, want, pc + 'p seat ' + i + ' hand'); });
+        eq(st.teams.length, tc, pc + 'p team count');
+        eq(st.seqToWin, E.sequencesToWin(tc), pc + 'p win target');
+        eq(st.deck.length, 104 - pc * want, pc + 'p draw pile');
+        lines.push(pc + 'p/' + tc + 't:' + want + 'c');
+      });
+    });
+    return lines.join(' ');
+  });
+
+  test('teammates are seated alternately and share one colour', function () {
+    var st = E.createGame({ seed: 4, players: E.makeRoster(6, 3, {}) });
+    st.players.forEach(function (p, i) { eq(p.team, i % 3, 'seat ' + i + ' team'); });
+    st.teams.forEach(function (t) {
+      var cols = {};
+      E.teamMembers(st, t).forEach(function (p) { cols[p.color] = 1; });
+      eq(Object.keys(cols).length, 1, 'team ' + t + ' colour count');
+    });
+    var all = {};
+    st.players.forEach(function (p) { all[p.color] = 1; });
+    eq(Object.keys(all).length, 3, 'distinct team colours');
+    return st.players.map(function (p) { return 't' + p.team; }).join(' ') + ' — one colour each';
+  });
+
+  test("teammates' chips combine into a single sequence", function () {
+    var st = E.createGame({ seed: 4, players: E.makeRoster(4, 2, { names: ['A', 'B', 'C', 'D'] }) });
+    chips(st, [20, 21, 22], 0);          // seat 0, team 0
+    chips(st, [23], 2);                  // seat 2, also team 0
+    var card = st.board[24].card;
+    setHand(st, 2, [card]);
+    st.turn = 2;
+    var r = E.play(st, card, 24);
+    assert(r.ok, 'play rejected');
+    eq(r.newSequences.length, 1, 'sequences from mixed teammates');
+    eq(r.newSequences[0].team, 0, 'sequence team');
+    eq(st.seqCount[0], 1, 'team 0 score');
+    eq(st.seqCount[1], 0, 'team 1 score');
+    return 'seats 0 and 2 built one line: ' + r.newSequences[0].cells.map(B.coord).join(' ');
+  });
+
+  test('a one-eyed jack cannot remove a teammate chip', function () {
+    var st = E.createGame({ seed: 4, players: E.makeRoster(4, 2, {}) });
+    chips(st, [50], 2);                  // teammate of seat 0
+    chips(st, [51], 1);                  // opponent
+    chips(st, [52], 3);                  // opponent
+    st.turn = 0;
+    setHand(st, 0, ['JS']);
+    var t = E.legalTargets(st, 'JS');
+    assert(t.indexOf(50) < 0, 'teammate chip was targetable');
+    assert(t.indexOf(51) >= 0 && t.indexOf(52) >= 0, 'opponent chips not targetable');
+    eq(t.length, 2, 'target count');
+    return 'only opponents ' + t.map(B.coord).join(', ') + ' — teammate at F6 is safe';
+  });
+
+  test('three teams win on a single sequence', function () {
+    var st = E.createGame({ seed: 4, players: E.makeRoster(6, 3, {}) });
+    eq(st.seqToWin, 1, 'win target');
+    chips(st, [30, 31, 32, 33], 0);
+    var card = st.board[34].card;
+    setHand(st, 0, [card]);
+    st.turn = 0;
+    var r = E.play(st, card, 34);
+    eq(r.newSequences.length, 1, 'sequence');
+    eq(r.winner, 0, 'winner');
+    eq(st.phase, 'gameover', 'phase');
+    return 'team 0 won immediately on its first sequence';
+  });
+
+  test('playing rotates the turn through every seat and back', function () {
+    var st = E.createGame({ seed: 4, players: E.makeRoster(6, 3, {}) });
+    var seats = [], teams = [];
+    for (var i = 0; i < 7; i++) {
+      seats.push(st.turn);
+      teams.push(E.teamOf(st, st.turn));
+      // Play the first playable card this seat holds, so endTurn does the advancing.
+      var h = st.hands[st.turn], done = false;
+      for (var k = 0; k < h.length && !done; k++) {
+        var t = E.legalTargets(st, h[k]);
+        if (t.length) { assert(E.play(st, h[k], t[0]).ok, 'play refused'); done = true; }
+      }
+      assert(done, 'seat ' + st.turn + ' had no legal move on a fresh board');
+    }
+    eq(seats.join(''), '0123450', 'seat rotation');
+    eq(teams.join(''), '0120120', 'team rotation');
+    return 'seats 0-5 then wraps; teams cycle 0,1,2 so no two teammates play back to back';
+  });
+
+  test('random full games in every configuration stay legal', function () {
+    var played = 0;
+    E.PLAYER_COUNTS.forEach(function (pc) {
+      E.validTeamCounts(pc).forEach(function (tc) {
+        for (var g = 0; g < 4; g++) {
+          var st = E.createGame({ seed: 900 + g * 31 + pc, players: E.makeRoster(pc, tc, {}) });
+          var guard = 0;
+          while (st.phase === 'play' && guard++ < 1200) {
+            var h = st.hands[st.turn], moved = false;
+            for (var k = 0; k < h.length && !moved; k++) {
+              var t = E.legalTargets(st, h[k]);
+              if (t.length) { assert(E.play(st, h[k], t[0]).ok, 'legal play refused'); moved = true; }
+            }
+            if (!moved && !E.pass(st).ok) break;
+          }
+          // Whatever happened, the board must still be coherent.
+          [0, 9, 90, 99].forEach(function (i) { eq(st.board[i].chip, null, 'corner got a chip'); });
+          st.players.forEach(function (p, i) {
+            assert(st.hands[i].length <= E.handSizeFor(pc), 'seat ' + i + ' overdrew');
+          });
+          st.sequences.forEach(function (s) { eq(s.cells.length, 5, 'sequence length'); });
+          played++;
+        }
+      });
+    });
+    return played + ' games across all 10 configurations finished coherently';
+  });
+
+  /* ------------------------------------------------------------------- AI */
+
+  var AI = SQ.AI;
+
+  test('the board has exactly 192 five-in-a-row windows', function () {
+    var W = AI._internals.ALL_WINDOWS;
+    eq(W.length, 192, 'window count');       // 60 rows + 60 cols + 36 + 36 diagonals
+    eq(AI._internals.WINDOWS[55].length, 20, 'windows through a central cell');
+    eq(AI._internals.WINDOWS[0].length, 3, 'windows through a corner');
+    W.forEach(function (w) { eq(w.length, 5, 'window length'); });
+    return '192 windows; 20 through the middle, 3 through a corner';
+  });
+
+  test('every level takes a win that is sitting in front of it', function () {
+    var seen = [];
+    AI.LEVEL_LIST.forEach(function (lvl) {
+      var st = game({ players: E.makeRoster(2, 2, {}) });
+      chips(st, [20, 21, 22, 23], 0);
+      st.seqCount[0] = st.seqToWin - 1;      // this sequence ends the game
+      var winner = st.board[24].card;
+      setHand(st, 0, [winner, st.board[70].card, st.board[71].card]);
+      st.turn = 0;
+      var m = AI.chooseMove(st, 0, lvl);
+      eq(m.cell, 24, lvl + ' missed the winning square');
+      seen.push(lvl);
+    });
+    return seen.join(', ') + ' all played E3 to win';
+  });
+
+  test('medium and hard block a four-in-a-row; easy does not look', function () {
+    function tryLevel(lvl) {
+      var st = game({ players: E.makeRoster(2, 2, {}) });
+      chips(st, [30, 31, 32, 33], 1);        // opponent one square from scoring
+      setHand(st, 0, [st.board[34].card, st.board[80].card]);
+      st.turn = 0;
+      return AI.chooseMove(st, 0, lvl).cell === 34;
+    }
+    assert(tryLevel('medium'), 'medium failed to block');
+    assert(tryLevel('hard'), 'hard failed to block');
+    return 'medium and hard both took E4; easy ignores defence by design';
+  });
+
+  test('a one-eyed jack goes for the most valuable chip', function () {
+    var st = game({ players: E.makeRoster(2, 2, {}) });
+    chips(st, [40, 41, 42, 43], 1);          // dangerous run
+    chips(st, [95], 1);                      // harmless loner
+    setHand(st, 0, ['JS']);
+    st.turn = 0;
+    var m = AI.chooseMove(st, 0, 'hard');
+    assert([40, 41, 42, 43].indexOf(m.cell) >= 0, 'went for the wrong chip: ' + B.coord(m.cell));
+    var big = AI._internals.chipValue(st, 41), small = AI._internals.chipValue(st, 95);
+    assert(big > small, 'chip valuation is backwards');
+    return 'took ' + B.coord(m.cell) + ' (worth ' + big + ') over the loner (worth ' + small + ')';
+  });
+
+  test('a wild jack is saved when an ordinary card will do', function () {
+    var st = game({ players: E.makeRoster(2, 2, {}) });
+    var plain = st.board[55].card;
+    setHand(st, 0, ['JC', plain]);
+    st.turn = 0;
+    var m = AI.chooseMove(st, 0, 'hard');
+    eq(m.card, plain, 'burned the wild jack unnecessarily');
+    return 'played ' + C.label(plain) + ' and kept the jack';
+  });
+
+  test('the AI never proposes an illegal move', function () {
+    var checked = 0;
+    AI.LEVEL_LIST.forEach(function (lvl) {
+      [2, 4, 6].forEach(function (pc) {          // all three split into two teams
+        var st = E.createGame({ seed: 300 + pc, players: E.makeRoster(pc, 2, {}) });
+        var guard = 0;
+        while (st.phase === 'play' && guard++ < 400) {
+          var m = AI.chooseMove(st, st.turn, lvl);
+          if (!m) { if (!E.pass(st).ok) break; continue; }
+          assert(E.legalTargets(st, m.card).indexOf(m.cell) >= 0, lvl + ' proposed an illegal target');
+          assert(st.hands[st.turn].indexOf(m.card) >= 0, lvl + ' played a card it does not hold');
+          assert(E.play(st, m.card, m.cell).ok, lvl + ' move was refused by the engine');
+          checked++;
+        }
+      });
+    });
+    return checked + ' AI moves across all levels, every one legal';
+  });
+
+  test('choosing a move never mutates the game state', function () {
+    var st = game({ players: E.makeRoster(2, 2, {}) });
+    chips(st, [20, 21, 22], 0);
+    chips(st, [30, 31], 1);
+    setHand(st, 0, ['JC', 'JS', st.board[23].card]);
+    st.turn = 0;
+    var before = E.snapshot(st);
+    AI.LEVEL_LIST.forEach(function (lvl) { AI.chooseMove(st, 0, lvl); });
+    eq(E.snapshot(st), before, 'AI left footprints on the state');
+    return 'board, hands and turn identical after all three levels evaluated';
+  });
+
+  test('stronger levels actually beat weaker ones', function () {
+    function match(l0, l1, seed) {
+      var st = E.createGame({ seed: seed, players: E.makeRoster(2, 2, {}) });
+      var guard = 0;
+      while (st.phase === 'play' && guard++ < 600) {
+        var seat = st.turn, lvl = seat === 0 ? l0 : l1;
+        var d = AI.deadSwap(st, seat);
+        if (d) E.discardDead(st, d);
+        var m = AI.chooseMove(st, seat, lvl);
+        if (!m) { if (!E.pass(st).ok) break; continue; }
+        if (!E.play(st, m.card, m.cell).ok) throw new Error('illegal AI move');
+      }
+      return st.winner;
+    }
+    // Each pairing plays both seats of the same deal, so seat order cannot flatter
+    // either side. Kept small enough to stay a fast test.
+    function duel(a, b, n) {
+      var aw = 0, bw = 0;
+      for (var i = 0; i < n; i++) {
+        var s = 7000 + i * 101;
+        if (match(a, b, s) === 0) aw++; else bw++;
+        if (match(b, a, s) === 1) aw++; else bw++;
+      }
+      return Math.round(aw / (aw + bw) * 100);
+    }
+    var mOverE = duel('medium', 'easy', 12);
+    var hOverE = duel('hard', 'easy', 12);
+    assert(mOverE > 55, 'medium only scored ' + mOverE + '% against easy');
+    assert(hOverE > 55, 'hard only scored ' + hOverE + '% against easy');
+    return 'medium ' + mOverE + '% and hard ' + hOverE + '% against easy over 24 games each';
+  });
+
+  /* ---------------------------------------------------------------- online */
+
+  var Net = SQ.Net;
+
+  test('a redacted view never carries another player\'s cards', function () {
+    var st = E.createGame({ seed: 42, players: E.makeRoster(4, 2, {}) });
+    st.players.forEach(function (viewer) {
+      var v = Net.encodeView(st, viewer.index);
+      eq(v.seat, viewer.index, 'view seat');
+      // Own hand arrives in full; everyone else is only a count.
+      assert(Array.isArray(v.hands[viewer.index]), 'own hand should be an array');
+      eq(v.hands[viewer.index].length, st.hands[viewer.index].length, 'own hand length');
+      st.players.forEach(function (other) {
+        if (other.index === viewer.index) return;
+        eq(typeof v.hands[other.index], 'number', 'seat ' + other.index + ' should be a count');
+      });
+      // And no other seat's card ids may appear anywhere in the payload.
+      var wire = JSON.stringify(v);
+      var mine = v.hands[viewer.index];
+      st.players.forEach(function (other) {
+        if (other.index === viewer.index) return;
+        st.hands[other.index].forEach(function (card) {
+          if (mine.indexOf(card) >= 0) return;        // legitimately also in our hand
+          // A bare card id would appear quoted in the JSON.
+          assert(wire.indexOf('"' + card + '"') < 0,
+            'seat ' + other.index + "'s " + card + ' leaked to seat ' + viewer.index);
+        });
+      });
+    });
+    return 'checked all 4 seats: own hand in full, others as counts, zero leaks';
+  });
+
+  test('the deck and discard travel as counts, not as cards', function () {
+    var st = E.createGame({ seed: 43, players: E.makeRoster(2, 2, {}) });
+    st.discard.push('QH', '3C');
+    var v = Net.encodeView(st, 1);
+    eq(typeof v.deck, 'number', 'deck should be a count');
+    eq(typeof v.discard, 'number', 'discard should be a count');
+    var wire = JSON.stringify(v);
+    st.deck.forEach(function (card) {
+      if (v.hands[1].indexOf(card) >= 0) return;
+      assert(wire.indexOf('"' + card + '"') < 0, 'draw pile card ' + card + ' leaked');
+    });
+    return 'draw pile of ' + v.deck + ' and discard of ' + v.discard + ' sent as numbers only';
+  });
+
+  test('a decoded view is usable by the rules engine', function () {
+    var st = E.createGame({ seed: 44, players: E.makeRoster(2, 2, {}) });
+    chips(st, [20, 21], 0);
+    chips(st, [55], 1);
+    var mirror = Net.decodeView(Net.encodeView(st, 1));
+    assert(mirror.remote, 'mirror should be flagged remote');
+    eq(mirror.mySeat, 1, 'mirror seat');
+    eq(mirror.board.length, 100, 'board size');
+    eq(mirror.board.filter(function (c) { return c.free; }).length, 4, 'free corners');
+    eq(mirror.board[20].chip, 0, 'chip mirrored');
+    eq(mirror.board[55].chip, 1, 'chip mirrored');
+    // Static layout is rebuilt locally rather than sent.
+    eq(mirror.board[35].card, st.board[35].card, 'card layout');
+    // Opponent hands become nulls of the right length.
+    eq(mirror.hands[0].length, st.hands[0].length, 'opponent hand length');
+    assert(mirror.hands[0].every(function (x) { return x === null; }), 'opponent cards should be null');
+    // And the engine can still answer questions about our own cards.
+    var mine = mirror.hands[1].filter(function (c) { return !C.isJack(c); })[0];
+    var t = E.legalTargets(mirror, mine, 1);
+    eq(t.length, E.legalTargets(st, mine, 1).length, 'legal targets match the host');
+    return 'mirror drives legalTargets identically to the host state';
+  });
+
+  test('legalTargets answers for the seat asked about, not just whoever is up', function () {
+    var st = E.createGame({ seed: 45, players: E.makeRoster(2, 2, {}) });
+    chips(st, [50], 0);        // seat 0's chip
+    chips(st, [51], 1);        // seat 1's chip
+    st.turn = 0;
+    // A one-eyed jack may only take the *other* team's chip, whoever is asking.
+    var forSeat0 = E.legalTargets(st, 'JS', 0);
+    var forSeat1 = E.legalTargets(st, 'JS', 1);
+    assert(forSeat0.indexOf(51) >= 0 && forSeat0.indexOf(50) < 0, 'seat 0 should target 51 only');
+    assert(forSeat1.indexOf(50) >= 0 && forSeat1.indexOf(51) < 0, 'seat 1 should target 50 only');
+    return 'seat 0 sees F6, seat 1 sees E6 — each only the opponent chip';
+  });
+
+  atest('an invite code survives a round trip', function () {
+    var payload = { k: 'offer', sdp: 'v=0\r\no=- 1 2 IN IP4 127.0.0.1\r\ns=-\r\n', meta: { name: 'Ada' } };
+    return Net.packCode(payload).then(function (code) {
+      assert(/^SQ[01]/.test(code), 'code should carry a version tag, got ' + code.slice(0, 6));
+      assert(!/[^A-Za-z0-9_-]/.test(code.slice(3)), 'code body should be URL-safe base64');
+      return Net.unpackCode(code).then(function (back) {
+        eq(JSON.stringify(back), JSON.stringify(payload), 'round trip');
+        return code.length + '-char code unpacked back to an identical payload';
+      });
+    });
+  });
+
+  atest('whitespace and line breaks in a pasted code are tolerated', function () {
+    return Net.packCode({ k: 'answer', sdp: 'test' }).then(function (code) {
+      var mangled = '  ' + code.slice(0, 20) + '\n' + code.slice(20, 40) + '\r\n  ' + code.slice(40) + '  ';
+      return Net.unpackCode(mangled).then(function (back) {
+        eq(back.k, 'answer', 'kind survived');
+        eq(back.sdp, 'test', 'sdp survived');
+        return 'a code broken across lines by a chat app still parses';
+      });
+    });
+  });
+
+  atest('a damaged code is rejected with a readable message', function () {
+    return Net.unpackCode('not-a-code-at-all').then(function () {
+      throw new Error('garbage was accepted');
+    }, function (err) {
+      assert(/Sequentia code/.test(err.message), 'unhelpful message: ' + err.message);
+      return 'rejected with: "' + err.message + '"';
+    });
+  });
+
+  atest('the pipe transport carries messages both ways', function () {
+    var pipe = Net.createPipe();
+    var got = { a: [], b: [] };
+    var opened = { a: false, b: false };
+    pipe.a.onMessage = function (t) { got.a.push(t); };
+    pipe.b.onMessage = function (t) { got.b.push(t); };
+    pipe.a.onOpen = function () { opened.a = true; };
+    pipe.b.onOpen = function () { opened.b = true; };
+    pipe.open();
+    return new Promise(function (resolve) { setTimeout(resolve, 30); }).then(function () {
+      pipe.a.send('to-b');
+      pipe.b.send('to-a');
+      return new Promise(function (resolve) { setTimeout(resolve, 30); });
+    }).then(function () {
+      assert(opened.a && opened.b, 'both ends should open');
+      eq(got.b.join(), 'to-b', 'a -> b');
+      eq(got.a.join(), 'to-a', 'b -> a');
+      return 'both ends opened and delivered in both directions';
+    });
+  });
+
+  /* ------------------------------------------------------------- render */
+
+  function renderAll() {
+    var out = document.getElementById('results');
+    out.innerHTML = '';
+    results.forEach(function (r) {
+      var li = document.createElement('li');
+      li.className = r.ok ? 'ok' : 'bad';
+      li.innerHTML = (r.ok ? '✓ ' : '✗ ') + r.name +
+        (r.msg ? ' <span class="why">— ' + r.msg + '</span>' : '');
+      out.appendChild(li);
+    });
+    var s = document.getElementById('summary');
+    s.className = failures ? 'fail' : 'pass';
+    s.textContent = failures
+      ? failures + ' of ' + results.length + ' tests FAILED'
+      : 'All ' + results.length + ' tests passed';
+    window.SQ_TEST_RESULT = { total: results.length, failures: failures, results: results };
+  }
+
+  renderAll();                                   // show the synchronous results at once
+  if (pending.length) {
+    document.getElementById('summary').textContent =
+      'running ' + pending.length + ' async tests…';
+    Promise.all(pending).then(renderAll);
+  }
+})();
+</script>
+</body>
+</html>

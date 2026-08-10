@@ -1,0 +1,125 @@
+{
+    "Map/SizeTest": {
+        "height": 4300,
+        "width": 2
+    },
+    "activeFile": "C:/Users/whoac/Desktop/Iso_Thick_R-Stone_01a-White-128x72.tsx",
+    "expandedProjectPaths": [
+    ],
+    "fileStates": {
+        "C:/Users/whoac/Desktop/Iso_Thick_R-Stone_01a-White-128x72.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "Iso_Tile_L-Black-128x64.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "Iso_Tile_L-Blank-128x64.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "Iso_Tile_L-White-128x64.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "Iso_Tile_R-Black-128x64.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "Iso_Tile_R-Blank-128x64.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "Iso_Tile_R-White-128x64.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "Word Board Iso Left Black.tmx": {
+            "scale": 0.5986979166666667,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 958.7472814267071,
+                "y": 477.7033492822966
+            }
+        },
+        "Word Board Iso Left Blank.tmx": {
+            "scale": 0.5986979166666667,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 958.7472814267071,
+                "y": 481.0439321444105
+            }
+        },
+        "Word Board Iso Left White.tmx": {
+            "scale": 0.5986979166666667,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 955.4066985645933,
+                "y": 479.37364071335355
+            }
+        },
+        "Word Board Iso Right Black.tmx": {
+            "scale": 0.5,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 978,
+                "y": 414
+            }
+        },
+        "Word Board Iso Right Blank.tmx": {
+            "scale": 0.5986979166666667,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 955.4066985645933,
+                "y": 481.0439321444105
+            }
+        },
+        "Word Board Iso Right White.tmx": {
+            "scale": 0.5986979166666667,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 955.4066985645933,
+                "y": 479.37364071335355
+            }
+        }
+    },
+    "last.imagePath": "D:/John's Graphic Packs/Isometric Letter Tiles/Isometric/Tiles/Thick/Stone01",
+    "map.height": 15,
+    "map.lastUsedFormat": "tmx",
+    "map.orientation": null,
+    "map.tileHeight": 64,
+    "map.tileWidth": 128,
+    "map.width": 15,
+    "openFiles": [
+        "Word Board Iso Left Black.tmx",
+        "Word Board Iso Right Black.tmx",
+        "Word Board Iso Left White.tmx",
+        "Word Board Iso Right White.tmx",
+        "Word Board Iso Left Blank.tmx",
+        "Word Board Iso Right Blank.tmx",
+        "C:/Users/whoac/Desktop/Iso_Thick_R-Stone_01a-White-128x72.tsx"
+    ],
+    "project": "Isometric Boards.tiled-project",
+    "recentFiles": [
+        "C:/Users/whoac/Desktop/Iso_Thick_R-Stone_01a-White-128x72.tsx",
+        "Word Board Iso Left Black.tmx",
+        "Word Board Iso Right Black.tmx",
+        "Word Board Iso Left White.tmx",
+        "Word Board Iso Right White.tmx",
+        "Word Board Iso Left Blank.tmx",
+        "Word Board Iso Right Blank.tmx",
+        "Iso_Tile_R-Blank-128x64.tsx",
+        "Iso_Tile_L-Blank-128x64.tsx",
+        "Iso_Tile_R-White-128x64.tsx",
+        "Iso_Tile_L-White-128x64.tsx",
+        "Iso_Tile_R-Black-128x64.tsx"
+    ],
+    "tileset.lastUsedFormat": "tsx",
+    "tileset.tileSize": {
+        "height": 64,
+        "width": 128
+    },
+    "tileset.transparentColor": "#008080",
+    "tileset.useTransparentColor": true
+}

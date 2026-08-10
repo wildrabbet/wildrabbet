@@ -1,0 +1,61 @@
+/* Sequentia — SQ.Find supplemental styles.
+ *
+ * Injected by js/find.js (index.html is owned by the lead), so this file needs
+ * no <link>.  It only ADDS rules that css/sequentia.css does not define; the
+ * core .hit / .filtering look lives there and is not redefined here.
+ *
+ * The base sheet paints .hit, .target, .target-remove and .blocked all through
+ * ::before, and .last-move / .snap through ::after, so a tile that is both a
+ * find hit and a drag target can only show one of the two rings.  The rules
+ * below give the find hit a second, outline-based ring in exactly that case, so
+ * the two systems coexist instead of masking each other.
+ */
+
+/* ---- find hit + drag target at the same time ---- */
+.tile.hit.target,
+.tile.hit.target-remove,
+.tile.hit.blocked,
+.tile.hit.snap {
+  outline: 2px solid var(--gold, #d9b65c);
+  outline-offset: 5px;
+  border-radius: var(--tile-r, 6px);
+}
+
+/* Never dim a live drag target just because a filter is running. */
+#board.filtering .tile.target,
+#board.filtering .tile.target-remove,
+#board.filtering .tile.snap {
+  opacity: 1;
+  filter: none;
+}
+/* Blocked targets stay legible but subdued. */
+#board.filtering .tile.blocked {
+  opacity: .55;
+  filter: none;
+}
+
+/* ---- transient one-shot ring: SQ.Find.flash() ---- */
+.tile.find-flash {
+  outline: 3px solid var(--gold-hi, #f6e3a6);
+  outline-offset: 3px;
+  border-radius: var(--tile-r, 6px);
+  z-index: 7;
+  animation: findFlashPulse .3s ease-in-out 3 alternate;
+}
+@keyframes findFlashPulse {
+  from { outline-color: rgba(246, 227, 166, 1); }
+  to   { outline-color: rgba(246, 227, 166, .12); }
+}
+/* A flash must be visible even while the board is dimmed by a filter. */
+#board.filtering .tile.find-flash { opacity: 1; filter: none; }
+
+/* ---- no-match feedback in the find bar ---- */
+#findbar.find-nomatch {
+  border-color: rgba(255, 90, 90, .5);
+}
+#findbar.find-nomatch .find-count {
+  color: #ff8a8a;
+}
+
+/* Rank chips read better with tabular digits. */
+#ft-ranks .ft-chip { font-variant-numeric: tabular-nums; }

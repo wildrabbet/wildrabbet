@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sequentia — Card Render Preview</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 32px 80px;
+    background: radial-gradient(1200px 700px at 50% -10%, #1d3b2f, #0c1a16 60%, #070f0d);
+    color: #e8e4d8;
+    font: 14px/1.5 ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  }
+  h1 { font: 600 26px/1.2 Georgia, serif; margin: 0 0 4px; letter-spacing: .02em; }
+  .sub { color: #93a79d; margin: 0 0 22px; }
+  h2 { font: 600 15px/1 ui-sans-serif, system-ui, sans-serif; text-transform: uppercase;
+       letter-spacing: .16em; color: #8fae9f; margin: 34px 0 14px;
+       border-bottom: 1px solid #22392f; padding-bottom: 8px; }
+
+  #validation { padding: 12px 16px; border-radius: 8px; font-family: ui-monospace, Consolas, monospace;
+    font-size: 12.5px; white-space: pre-wrap; border: 1px solid; margin-bottom: 8px; }
+  .pass { background: #0e2a1a; border-color: #2f7d4f; color: #9ff0bd; }
+  .fail { background: #33110f; border-color: #a03a30; color: #ffb3aa; }
+
+  .grid { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 12px; }
+  .grid.backs { grid-template-columns: repeat(6, minmax(0, 1fr)); max-width: 780px; }
+  .cell { text-align: center; }
+  .cell svg { width: 100%; height: auto; display: block;
+    border-radius: 6.5%/4.6%;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,.55)); }
+  .cap { font-size: 10px; color: #6f8a7d; margin-top: 5px; letter-spacing: .06em; }
+
+  .giant { display: flex; gap: 34px; flex-wrap: wrap; align-items: flex-start; }
+  .giant .one svg { width: 600px; max-width: 92vw; height: auto;
+    border-radius: 4%/2.9%;
+    filter: drop-shadow(0 18px 40px rgba(0,0,0,.7)); }
+  .giant .one .cap { font-size: 13px; margin-top: 10px; }
+
+  .zoom { display: flex; gap: 24px; flex-wrap: wrap; }
+  .zoom .one svg { width: 300px; height: auto; filter: drop-shadow(0 8px 18px rgba(0,0,0,.6)); }
+
+  .tiny { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end; }
+  .tiny .one svg { width: 64px; height: auto; }
+
+  .chips { display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+    background: #10201b; border: 1px solid #22392f; border-radius: 8px; padding: 10px 14px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; background: #fdfbf6; color: #222;
+    border-radius: 999px; padding: 4px 12px 4px 10px; font-weight: 600; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>Sequentia — Procedural Card Renderer</h1>
+<p class="sub">SQ.Cards &middot; viewBox 0 0 240 336 &middot; pure-string SVG, zero dependencies</p>
+
+<div id="validation">running…</div>
+
+<h2>Giant card (quality inspection)</h2>
+<div class="giant" id="giant"></div>
+
+<h2>Court cards — all twelve</h2>
+<div class="zoom" id="courts"></div>
+
+<h2>Small-size legibility (64px)</h2>
+<div class="tiny" id="tiny"></div>
+
+<h2>Full deck — 52 cards</h2>
+<div class="grid" id="deck"></div>
+
+<h2>Card back</h2>
+<div class="grid backs" id="backs"></div>
+
+<h2>suitGlyph() chips</h2>
+<div class="chips" id="chips"></div>
+
+<script src="../js/cards.js"></script>
+<script>
+(function () {
+  var C = window.SQ && window.SQ.Cards;
+  var vbox = document.getElementById('validation');
+
+  if (!C) {
+    vbox.className = 'fail';
+    vbox.textContent = 'FAIL — SQ.Cards did not load (check ../js/cards.js path)';
+    return;
+  }
+
+  function cell(html, caption, cls) {
+    var d = document.createElement('div');
+    d.className = 'cell' + (cls ? ' ' + cls : '');
+    d.innerHTML = html + (caption ? '<div class="cap">' + caption + '</div>' : '');
+    return d;
+  }
+
+  /* ---------- validation ---------- */
+  var results = [];
+  function check(name, fn) {
+    var ok = false, detail = '';
+    try { var r = fn(); ok = r === true; if (r !== true) detail = ' — ' + r; }
+    catch (e) { detail = ' — threw: ' + e.message; }
+    results.push({ name: name, ok: ok, detail: detail });
+  }
+
+  check('fullDeck().length === 52', function () {
+    var n = C.fullDeck().length;
+    return n === 52 ? true : 'got ' + n;
+  });
+
+  check('all 52 ids unique', function () {
+    var seen = {}, d = C.fullDeck();
+    for (var i = 0; i < d.length; i++) {
+      if (seen[d[i]]) return 'duplicate ' + d[i];
+      seen[d[i]] = 1;
+    }
+    return Object.keys(seen).length === 52 ? true : 'only ' + Object.keys(seen).length;
+  });
+
+  check('every svg() returns a string starting with "<svg"', function () {
+    var d = C.fullDeck();
+    for (var i = 0; i < d.length; i++) {
+      var s = C.svg(d[i]);
+      if (typeof s !== 'string') return d[i] + ' returned ' + typeof s;
+      if (s.indexOf('<svg') !== 0) return d[i] + ' starts with ' + s.slice(0, 12);
+    }
+    return typeof C.backSvg() === 'string' && C.backSvg().indexOf('<svg') === 0
+      ? true : 'backSvg() malformed';
+  });
+
+  check('no duplicate id="" when a card is rendered 3x', function () {
+    var blob = C.svg('QH') + C.svg('QH') + C.svg('QH') +
+               C.svg('TD') + C.svg('TD') + C.svg('TD') +
+               C.backSvg() + C.backSvg() + C.backSvg();
+    var ids = blob.match(/\bid="[^"]+"/g) || [];
+    var seen = {}, dupes = [];
+    for (var i = 0; i < ids.length; i++) {
+      if (seen[ids[i]]) dupes.push(ids[i]);
+      seen[ids[i]] = 1;
+    }
+    if (!ids.length) return 'no ids found at all (expected some defs)';
+    return dupes.length === 0 ? true : dupes.length + ' dupes e.g. ' + dupes[0];
+  });
+
+  check('no duplicate ids across the whole rendered page', function () {
+    var all = document.querySelectorAll('[id]'), seen = {}, dupes = [];
+    for (var i = 0; i < all.length; i++) {
+      var v = all[i].getAttribute('id');
+      if (seen[v]) dupes.push(v);
+      seen[v] = 1;
+    }
+    return dupes.length === 0 ? true : dupes.length + ' dupes e.g. ' + dupes[0];
+  });
+
+  check('no external references in output', function () {
+    var d = C.fullDeck(), bad = /(https?:)?\/\/(?!www\.w3\.org)|xlink:href|<image|url\((?!#)/;
+    for (var i = 0; i < d.length; i++) {
+      if (bad.test(C.svg(d[i]))) return d[i] + ' has an external ref';
+    }
+    return bad.test(C.backSvg()) ? 'backSvg has an external ref' : true;
+  });
+
+  check('no width/height attrs on root <svg>', function () {
+    var s = C.svg('AS');
+    var head = s.slice(0, s.indexOf('>'));
+    return /\swidth=|\sheight=/.test(head) ? 'found: ' + head : true;
+  });
+
+  check('jack eye classification', function () {
+    var one = ['JS', 'JH'], two = ['JD', 'JC'], i;
+    for (i = 0; i < 2; i++) {
+      if (!C.isOneEyedJack(one[i])) return one[i] + ' should be one-eyed';
+      if (!C.isTwoEyedJack(two[i])) return two[i] + ' should be two-eyed';
+      if (C.isTwoEyedJack(one[i]) || C.isOneEyedJack(two[i])) return 'cross-classified';
+    }
+    return (C.isJack('JS') && !C.isJack('QS') &&
+            !C.isOneEyedJack('AS') && !C.isTwoEyedJack('AS')) ? true : 'isJack wrong';
+  });
+
+  check('parse()/label()/id() contract', function () {
+    var p = C.parse('TD');
+    if (p.rank !== 'T' || p.suit !== 'D' || p.color !== 'red' ||
+        p.rankLabel !== '10' || p.suitName !== 'diamonds') return 'parse(TD) = ' + JSON.stringify(p);
+    if (C.label('TD') !== '10 of Diamonds') return 'label(TD) = ' + C.label('TD');
+    if (C.label('QH') !== 'Queen of Hearts') return 'label(QH) = ' + C.label('QH');
+    if (C.id('Q', 'H') !== 'QH') return 'id() wrong';
+    return C.parse('QH').color === 'red' && C.parse('KS').color === 'black' ? true : 'color wrong';
+  });
+
+  check('pip count matches rank on every number card', function () {
+    var vals = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, 'T': 10 };
+    for (var r in vals) {
+      for (var s = 0; s < C.SUITS.length; s++) {
+        var e = C.el(r + C.SUITS[s]);
+        // every suit glyph (pips + the two corner indices) is a scaled <g>
+        var n = e.querySelectorAll('g[transform*="scale("]').length - 2;
+        if (n !== vals[r]) return r + C.SUITS[s] + ' has ' + n + ' pips, expected ' + vals[r];
+      }
+    }
+    return true;
+  });
+
+  check('lower-half pips are rotated 180', function () {
+    var e = C.el('9S');
+    var gs = e.querySelectorAll('g[transform*="scale("]'), rot = 0;
+    for (var i = 0; i < gs.length; i++) {
+      if (gs[i].getAttribute('transform').indexOf('rotate(180)') >= 0) rot++;
+    }
+    // 9 = two columns of four + one dead centre -> 4 pips below centre
+    return rot === 4 ? true : 'got ' + rot + ' rotated pips, expected 4';
+  });
+
+  check('el() returns an SVGElement', function () {
+    var e = C.el('AS');
+    return (e && e.tagName.toLowerCase() === 'svg') ? true : 'got ' + (e && e.tagName);
+  });
+
+  /* ---------- render ---------- */
+  var giant = document.getElementById('giant');
+  ['AS', 'KH'].forEach(function (cid) {
+    giant.appendChild(cell(C.svg(cid), C.label(cid) + ' — 600px', 'one'));
+  });
+
+  var courts = document.getElementById('courts');
+  ['J', 'Q', 'K'].forEach(function (r) {
+    C.SUITS.forEach(function (s) {
+      var cid = r + s;
+      var tag = C.isOneEyedJack(cid) ? ' (one-eyed)' : C.isTwoEyedJack(cid) ? ' (two-eyed)' : '';
+      courts.appendChild(cell(C.svg(cid), C.label(cid) + tag, 'one'));
+    });
+  });
+
+  var tiny = document.getElementById('tiny');
+  ['JS', 'JD', 'QC', 'KH', 'TD', '9S', '7H', 'AC'].forEach(function (cid) {
+    tiny.appendChild(cell(C.svg(cid), cid, 'one'));
+  });
+
+  var deck = document.getElementById('deck');
+  C.fullDeck().forEach(function (cid) { deck.appendChild(cell(C.svg(cid), cid)); });
+
+  var backs = document.getElementById('backs');
+  for (var b = 0; b < 6; b++) backs.appendChild(cell(C.backSvg(), 'back'));
+
+  var chips = document.getElementById('chips');
+  C.SUITS.forEach(function (s) {
+    var d = document.createElement('span');
+    d.className = 'chip';
+    d.innerHTML = C.suitGlyph(s, { size: 15 }) + '<span>' + C.parse('A' + s).suitName + '</span>';
+    chips.appendChild(d);
+  });
+
+  /* ---------- report ---------- */
+  var failed = results.filter(function (r) { return !r.ok; });
+  vbox.className = failed.length ? 'fail' : 'pass';
+  vbox.textContent = (failed.length ? 'FAIL' : 'PASS') + ' — ' +
+    (results.length - failed.length) + '/' + results.length + ' checks\n' +
+    results.map(function (r) {
+      return (r.ok ? '  ✓ ' : '  ✗ ') + r.name + r.detail;
+    }).join('\n');
+})();
+</script>
+</body>
+</html>

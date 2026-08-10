@@ -1,0 +1,1174 @@
+/* ==========================================================================
+   Sequentia
+   ========================================================================== */
+
+:root {
+  /* felt / surfaces */
+  --felt-1: #0d2a20;
+  --felt-2: #061410;
+  --felt-3: #030a08;
+  --panel: rgba(255, 255, 255, 0.045);
+  --panel-2: rgba(255, 255, 255, 0.075);
+  --hair: rgba(226, 199, 121, 0.16);
+  --hair-2: rgba(226, 199, 121, 0.3);
+
+  /* accents */
+  --gold: #d9b65c;
+  --gold-hi: #f6e3a6;
+  --gold-dim: rgba(217, 182, 92, 0.55);
+  --emerald: #4fd39b;
+
+  /* players */
+  --crimson: #d8232f;
+  --crimson-2: #7c0d16;
+  --azure: #2f8fdc;
+  --azure-2: #0e3d68;
+  --amber: #e79a2b;
+  --amber-2: #7d4a05;
+  --violet: #9b6cd8;
+  --violet-2: #472468;
+
+  /* type */
+  --sans: "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+  --serif: "Cinzel", "Trajan Pro", Georgia, "Times New Roman", serif;
+
+  /* geometry */
+  --tile-w: 82px;
+  --tile-r: 7px;
+  --board-gap: 5px;
+  --side-w: 330px;
+
+  --ink: #eef2f0;
+  --ink-2: rgba(238, 242, 240, 0.62);
+  --ink-3: rgba(238, 242, 240, 0.38);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0; height: 100%;
+  overflow: hidden;
+  background: var(--felt-3);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+
+  /* Nothing in the game is text to be selected, and a stray selection during a
+     drag both looks broken and steals the pointer. Fields opt back in below. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Anywhere real text is meant to be taken: form fields, and the invite codes,
+   which are useless if they cannot be selected and copied. */
+input, textarea, .codebox, [contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Card art must never start a native image drag — that hands the pointer to the
+   browser's own drag-and-drop and kills the game's drag mid-flight. */
+svg, img, .hand-card, .tile {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+body {
+  background:
+    radial-gradient(120% 90% at 50% -10%, rgba(90, 200, 160, 0.09), transparent 60%),
+    radial-gradient(100% 100% at 50% 50%, var(--felt-1) 0%, var(--felt-2) 55%, var(--felt-3) 100%);
+}
+
+button { font-family: inherit; font-size: inherit; color: inherit; }
+::selection { background: var(--gold); color: #10201a; }
+
+/* ------------------------------------------------------------------ layout */
+
+#app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr var(--side-w);
+  grid-template-rows: auto auto 1fr auto;
+  grid-template-areas:
+    "topbar topbar"
+    "tray   tray"
+    "stage  side"
+    "hand   hand";
+}
+
+/* ------------------------------------------------------------------ topbar */
+
+#topbar {
+  grid-area: topbar;
+  display: flex; align-items: center; gap: 18px;
+  padding: 10px 16px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.2));
+  border-bottom: 1px solid var(--hair);
+  backdrop-filter: blur(8px);
+  z-index: 40;
+}
+
+.brand { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+.brand-mark {
+  width: 26px; height: 26px; border-radius: 6px;
+  background: conic-gradient(from 45deg, var(--gold), #8a6a1f, var(--gold-hi), #7a5c17, var(--gold));
+  box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 2px 10px rgba(217,182,92,.35);
+  position: relative;
+}
+.brand-mark::after {
+  content: "S";
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  font-family: var(--serif); font-weight: 700; font-size: 15px;
+  color: #1a1206;
+}
+.brand-name {
+  font-family: var(--serif); font-size: 20px; letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold) 60%, #9c7c2c);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* find bar */
+#findbar {
+  flex: 1 1 auto; max-width: 620px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 12px; height: 38px;
+  background: rgba(0, 0, 0, 0.42);
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  transition: border-color .2s, box-shadow .2s, background .2s;
+}
+#findbar:focus-within {
+  border-color: var(--gold-dim);
+  box-shadow: 0 0 0 3px rgba(217, 182, 92, 0.13);
+  background: rgba(0, 0, 0, 0.6);
+}
+.find-icon {
+  width: 15px; height: 15px; flex: 0 0 auto; opacity: .6;
+  border: 1.8px solid currentColor; border-radius: 50%;
+  position: relative;
+}
+.find-icon::after {
+  content: ""; position: absolute; right: -5px; bottom: -4px;
+  width: 7px; height: 1.8px; background: currentColor;
+  transform: rotate(45deg); border-radius: 2px;
+}
+#find-input {
+  flex: 1 1 auto; min-width: 0;
+  background: none; border: 0; outline: 0;
+  color: var(--ink); font-size: 14px;
+}
+#find-input::placeholder { color: var(--ink-3); }
+.find-clear {
+  background: none; border: 0; cursor: pointer;
+  font-size: 20px; line-height: 1; color: var(--ink-2); padding: 0 2px;
+}
+.find-clear:hover { color: var(--ink); }
+.find-count {
+  flex: 0 0 auto; font-size: 12px; color: var(--gold);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
+.topbar-actions { display: flex; gap: 7px; flex: 0 0 auto; margin-left: auto; }
+
+.tb {
+  height: 32px; padding: 0 13px;
+  background: var(--panel); border: 1px solid var(--hair);
+  border-radius: 8px; cursor: pointer;
+  font-size: 12.5px; letter-spacing: .03em;
+  color: var(--ink-2);
+  transition: background .15s, color .15s, border-color .15s, transform .1s;
+  white-space: nowrap;
+}
+.tb:hover:not(:disabled) { background: var(--panel-2); color: var(--ink); border-color: var(--hair-2); }
+.tb:active:not(:disabled) { transform: translateY(1px); }
+.tb:disabled { opacity: .34; cursor: default; }
+.tb.on {
+  background: linear-gradient(180deg, rgba(217,182,92,.26), rgba(217,182,92,.13));
+  border-color: var(--gold-dim); color: var(--gold-hi);
+}
+.tb-strong {
+  background: linear-gradient(180deg, rgba(79,211,155,.2), rgba(79,211,155,.08));
+  border-color: rgba(79,211,155,.35); color: #b9f3da;
+}
+
+/* ------------------------------------------------------------ filter tray */
+
+#filter-tray {
+  grid-area: tray;
+  display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+  padding: 10px 16px;
+  background: rgba(0, 0, 0, 0.32);
+  border-bottom: 1px solid var(--hair);
+  z-index: 30;
+  animation: trayIn .22s var(--ease-out);
+}
+@keyframes trayIn { from { opacity: 0; transform: translateY(-8px); } }
+.ft-group { display: flex; align-items: center; gap: 9px; }
+.ft-label {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .14em;
+  color: var(--ink-3);
+}
+.ft-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.ft-chip {
+  min-width: 28px; height: 27px; padding: 0 7px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  background: rgba(255,255,255,.05); border: 1px solid var(--hair);
+  border-radius: 6px; cursor: pointer;
+  font-size: 12.5px; color: var(--ink-2);
+  transition: all .13s;
+}
+.ft-chip:hover { background: rgba(255,255,255,.1); color: var(--ink); }
+.ft-chip.on {
+  background: linear-gradient(180deg, rgba(217,182,92,.3), rgba(217,182,92,.14));
+  border-color: var(--gold); color: var(--gold-hi);
+}
+.ft-chip svg { width: 12px; height: 12px; display: block; }
+.ft-chip.suit-red svg { color: var(--crimson); }
+
+/* ------------------------------------------------------------------- stage */
+
+#stage {
+  grid-area: stage;
+  position: relative;
+  overflow: hidden;
+  outline: none;
+  cursor: default;
+  touch-action: none;
+  contain: layout paint;
+}
+#stage.panning { cursor: grabbing; }
+#stage.pannable { cursor: grab; }
+
+#world {
+  position: absolute; top: 0; left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+/* ------------------------------------------------------------------- board */
+
+#board {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(10, var(--tile-w));
+  grid-auto-rows: calc(var(--tile-w) * 1.382);
+  gap: var(--board-gap);
+  padding: 20px;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.035), rgba(0,0,0,.28)),
+    radial-gradient(120% 120% at 30% 0%, #174a37, #0a2419 60%, #061410);
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,.6),
+    0 0 0 8px rgba(217,182,92,.08),
+    0 0 0 9px rgba(0,0,0,.5),
+    0 40px 90px rgba(0,0,0,.7),
+    inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+/* ------------------------------------------------------------------- tiles */
+
+.tile {
+  position: relative;
+  border-radius: var(--tile-r);
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.55);
+  transition: opacity .22s var(--ease-out), filter .22s var(--ease-out),
+              transform .16s var(--ease-out);
+  contain: layout paint;
+}
+.tile-face {
+  position: absolute; inset: 0;
+  border-radius: var(--tile-r);
+  overflow: hidden;
+}
+.tile-face svg { width: 100%; height: 100%; display: block; }
+
+/* Readable rank+suit index. Opacity is driven by --idx-op, which SQ.App keeps in
+   sync with the zoom level so the real card art takes over as you zoom in. */
+.tile-index {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  gap: calc(var(--tile-w) * .05);
+  border-radius: var(--tile-r);
+  background:
+    linear-gradient(178deg, rgba(255,254,250,.93), rgba(244,240,230,.88));
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.8);
+  color: #15171c;
+  opacity: var(--idx-op, 1);
+  transition: opacity .16s linear;
+  pointer-events: none;
+  z-index: 2;
+}
+.tile-index.red { color: #b3111f; }
+.ti-rank {
+  font-family: var(--serif);
+  font-size: calc(var(--tile-w) * .46);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -.02em;
+}
+.ti-suit { display: block; line-height: 0; }
+.ti-suit svg {
+  width: calc(var(--tile-w) * .32);
+  height: calc(var(--tile-w) * .32);
+  display: block;
+}
+/* Under a chip, damp the veil so the chip is unmistakably the focus. */
+.tile.taken .tile-index { opacity: calc(var(--idx-op, 1) * .5); }
+
+/* free corners */
+.tile.free .tile-face {
+  background:
+    radial-gradient(90% 90% at 50% 30%, #6e5a1e, #38290a 70%, #201607);
+  box-shadow: inset 0 0 0 1px rgba(217,182,92,.5), inset 0 2px 8px rgba(0,0,0,.5);
+  display: grid; place-items: center;
+}
+.free-mark {
+  display: grid; place-items: center; gap: 2px;
+  font-family: var(--serif); text-align: center;
+}
+.free-mark .star { font-size: calc(var(--tile-w) * .34); line-height: 1; color: var(--gold-hi);
+  text-shadow: 0 0 12px rgba(246,227,166,.5); }
+.free-mark .word {
+  font-size: calc(var(--tile-w) * .13); letter-spacing: .18em;
+  color: var(--gold); text-transform: uppercase;
+}
+
+/* hover affordance */
+.tile:not(.free):hover { transform: translateY(-2px) scale(1.015); z-index: 3; }
+
+/* ---- chips ---- */
+.chip {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 62%; aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  z-index: 4;
+  pointer-events: none;
+  animation: chipDrop .42s var(--ease-spring) both;
+}
+.chip::before {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  background:
+    radial-gradient(70% 70% at 35% 28%, rgba(255,255,255,.55), rgba(255,255,255,0) 55%),
+    radial-gradient(100% 100% at 50% 50%, var(--c1), var(--c2) 75%);
+  box-shadow:
+    0 0 0 2px rgba(0,0,0,.42),
+    inset 0 0 0 3px rgba(255,255,255,.16),
+    0 6px 14px rgba(0,0,0,.6);
+}
+.chip::after {
+  content: ""; position: absolute; inset: 24%; border-radius: 50%;
+  border: 1.5px dashed rgba(255,255,255,.3);
+}
+.chip[data-color="crimson"] { --c1: var(--crimson); --c2: var(--crimson-2); }
+.chip[data-color="azure"]   { --c1: var(--azure);   --c2: var(--azure-2); }
+.chip[data-color="amber"]   { --c1: var(--amber);   --c2: var(--amber-2); }
+.chip[data-color="violet"]  { --c1: var(--violet);  --c2: var(--violet-2); }
+
+@keyframes chipDrop {
+  0%   { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
+  55%  { opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+.chip.leaving { animation: chipLeave .3s var(--ease-out) both; }
+@keyframes chipLeave {
+  to { transform: translate(-50%, -50%) scale(0) rotate(120deg); opacity: 0; }
+}
+
+/* dim the card art under a chip a touch so chips read clearly */
+.tile.taken .tile-face { filter: saturate(.75) brightness(.62); }
+
+/* ---- last move marker ---- */
+.tile.last-move::after {
+  content: ""; position: absolute; inset: -3px;
+  border-radius: calc(var(--tile-r) + 3px);
+  border: 2px solid var(--gold-hi);
+  box-shadow: 0 0 14px rgba(246,227,166,.55);
+  pointer-events: none;
+  animation: lastPulse 2.4s ease-in-out infinite;
+}
+@keyframes lastPulse { 50% { opacity: .35; } }
+
+/* ---- completed sequence ---- */
+.tile.in-seq .tile-face { box-shadow: inset 0 0 0 2px var(--gold-hi), inset 0 0 18px rgba(246,227,166,.3); }
+.tile.in-seq .chip::before { box-shadow: 0 0 0 2px var(--gold-hi), inset 0 0 0 3px rgba(255,255,255,.24), 0 0 18px rgba(246,227,166,.6); }
+.seq-layer {
+  position: absolute; inset: 0;
+  pointer-events: none; z-index: 6;
+}
+.seq-line {
+  position: absolute;
+  height: 6px; border-radius: 3px;
+  background: linear-gradient(90deg, rgba(246,227,166,.05), var(--gold-hi), rgba(246,227,166,.05));
+  box-shadow: 0 0 18px rgba(246,227,166,.8);
+  transform-origin: 0 50%;
+  pointer-events: none; z-index: 6;
+  animation: seqSweep .7s var(--ease-out) both;
+}
+@keyframes seqSweep { from { transform: scaleX(0); opacity: 0; } }
+
+/* ---- find / filter states ---- */
+#board.filtering .tile { opacity: .17; filter: grayscale(.85) brightness(.55); }
+#board.filtering .tile.hit { opacity: 1; filter: none; }
+.tile.hit::before {
+  content: ""; position: absolute; inset: -3px;
+  border-radius: calc(var(--tile-r) + 3px);
+  border: 2px solid var(--gold);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.6), 0 0 20px rgba(217,182,92,.75);
+  z-index: 5; pointer-events: none;
+  animation: hitPulse 1.5s ease-in-out infinite;
+}
+@keyframes hitPulse { 50% { box-shadow: 0 0 0 1px rgba(0,0,0,.6), 0 0 32px rgba(217,182,92,1); } }
+
+/* ---- playable target highlight (hover a hand card) ---- */
+.tile.target { z-index: 5; }
+.tile.target::before {
+  content: ""; position: absolute; inset: -4px;
+  border-radius: calc(var(--tile-r) + 4px);
+  border: 2.5px solid var(--emerald);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.6), 0 0 24px rgba(79,211,155,.7), inset 0 0 20px rgba(79,211,155,.18);
+  pointer-events: none;
+  animation: targetIn .28s var(--ease-spring) both;
+}
+@keyframes targetIn { from { transform: scale(1.14); opacity: 0; } }
+.tile.target-weak::before {
+  border-color: rgba(79,211,155,.4); border-style: dashed;
+  box-shadow: none; animation: none;
+}
+.tile.target-remove::before {
+  content: ""; position: absolute; inset: -4px;
+  border-radius: calc(var(--tile-r) + 4px);
+  border: 2.5px solid #ff5a5a;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.6), 0 0 22px rgba(255,90,90,.7);
+  pointer-events: none;
+}
+.tile.blocked::before {
+  content: ""; position: absolute; inset: -3px;
+  border-radius: calc(var(--tile-r) + 3px);
+  border: 2px dashed rgba(255,120,120,.55);
+  pointer-events: none;
+}
+#board.targeting .tile:not(.target):not(.target-remove):not(.blocked) { opacity: .38; }
+
+/* ---- drop candidate (the one the smart snapper picked) ---- */
+.tile.snap {
+  transform: scale(1.06);
+  z-index: 8;
+}
+.tile.snap::after {
+  content: ""; position: absolute; inset: -7px;
+  border-radius: calc(var(--tile-r) + 7px);
+  border: 3px solid var(--gold-hi);
+  background: radial-gradient(70% 70% at 50% 50%, rgba(246,227,166,.22), transparent 70%);
+  box-shadow: 0 0 34px rgba(246,227,166,.85);
+  pointer-events: none;
+  animation: snapIn .18s var(--ease-out) both;
+}
+@keyframes snapIn { from { transform: scale(1.2); opacity: 0; } }
+
+/* ---- placement flourish ---- */
+.tile.just-placed .tile-face { animation: placeFlash .55s var(--ease-out); }
+@keyframes placeFlash {
+  0% { box-shadow: inset 0 0 0 3px var(--gold-hi), inset 0 0 30px rgba(246,227,166,.7); }
+  100% { box-shadow: none; }
+}
+
+/* --------------------------------------------------------------- zoom hud */
+
+#zoom-hud {
+  position: absolute; right: 14px; bottom: 14px;
+  display: flex; align-items: center; gap: 2px;
+  padding: 4px;
+  background: rgba(4, 12, 9, 0.78);
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+  z-index: 20;
+}
+#zoom-hud button {
+  width: 30px; height: 28px;
+  background: none; border: 0; border-radius: 6px; cursor: pointer;
+  color: var(--ink-2); font-size: 16px; line-height: 1;
+  transition: background .13s, color .13s;
+}
+#zoom-hud button:hover { background: var(--panel-2); color: var(--ink); }
+#zoom-level {
+  min-width: 50px; text-align: center;
+  font-size: 11.5px; color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------- turn banner */
+
+#turn-banner {
+  position: absolute; left: 50%; top: 40%;
+  transform: translate(-50%, -50%);
+  padding: 16px 44px;
+  font-family: var(--serif); font-size: 30px; letter-spacing: .1em;
+  text-transform: uppercase;
+  border-radius: 14px;
+  background: rgba(3, 10, 8, 0.86);
+  border: 1px solid var(--hair-2);
+  box-shadow: 0 24px 70px rgba(0,0,0,.8);
+  pointer-events: none; z-index: 25;
+  animation: bannerIn .4s var(--ease-out);
+}
+#turn-banner.hidden { display: none; }
+#turn-banner.out { animation: bannerOut .35s var(--ease-out) both; }
+@keyframes bannerIn { from { opacity: 0; transform: translate(-50%,-50%) scale(.9); } }
+@keyframes bannerOut { to { opacity: 0; transform: translate(-50%,-50%) scale(1.06); } }
+
+/* ----------------------------------------------------------- rejections */
+
+/* The only way the game says "no". Whatever was aimed at — a board space, a
+   button, an empty field — pulses red twice and settles. There is no text.
+
+   Driven by SQ.View.reject(), which adds .rejected for 620ms. `outline` is used
+   rather than `border` so nothing reflows and no layout shifts under the cards. */
+:root { --reject: #ff4d4d; }
+
+.rejected {
+  animation: rejectPulse .62s var(--ease-out) both;
+  outline: 3px solid var(--reject);
+  outline-offset: 2px;
+  border-radius: inherit;
+  position: relative;
+  z-index: 7;
+}
+@keyframes rejectPulse {
+  0%   { outline-color: rgba(255,77,77,0);   box-shadow: 0 0 0 0 rgba(255,77,77,0); }
+  15%  { outline-color: rgba(255,77,77,1);   box-shadow: 0 0 22px 6px rgba(255,77,77,.75); }
+  42%  { outline-color: rgba(255,77,77,.3);  box-shadow: 0 0 8px 1px rgba(255,77,77,.2); }
+  64%  { outline-color: rgba(255,77,77,1);   box-shadow: 0 0 20px 5px rgba(255,77,77,.65); }
+  100% { outline-color: rgba(255,77,77,0);   box-shadow: 0 0 0 0 rgba(255,77,77,0); }
+}
+
+/* A refused board space also shakes, and washes red over the card art — an
+   outline alone gets lost against a busy tile at low zoom. */
+.tile.rejected {
+  animation: rejectPulse .62s var(--ease-out) both,
+             rejectShake .42s var(--ease-out) both;
+  outline-offset: 0;
+}
+.tile.rejected::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: var(--tile-r);
+  background: var(--reject);
+  animation: rejectWash .62s var(--ease-out) both;
+  pointer-events: none;
+  z-index: 4;
+}
+@keyframes rejectWash {
+  0%   { opacity: 0; }
+  15%  { opacity: .42; }
+  42%  { opacity: .1; }
+  64%  { opacity: .36; }
+  100% { opacity: 0; }
+}
+.tile.rejected:hover { transform: none; }
+@keyframes rejectShake {
+  0%, 100% { translate: 0 0; }
+  20%      { translate: -3px 0; }
+  40%      { translate: 3px 0; }
+  60%      { translate: -2px 0; }
+  80%      { translate: 1px 0; }
+}
+
+/* Refusing something with no single square to blame flashes the board's edge. */
+#board.rejected { outline-width: 3px; outline-offset: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rejected, .tile.rejected {
+    animation: rejectFade .62s linear both;
+  }
+  @keyframes rejectFade {
+    0%, 70% { outline-color: rgba(255,77,77,1); }
+    100%    { outline-color: rgba(255,77,77,0); }
+  }
+}
+
+/* --------------------------------------------------------------- sidebar */
+
+#side {
+  grid-area: side;
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 14px;
+  background: linear-gradient(180deg, rgba(0,0,0,.4), rgba(0,0,0,.62));
+  border-left: 1px solid var(--hair);
+  overflow: hidden;
+}
+
+#players { display: flex; flex-direction: column; gap: 9px; }
+
+.pcard {
+  position: relative;
+  /* Keep the natural height. Without this a big team roster gets shrunk by the
+     flex column and then clipped by overflow:hidden below — #players scrolls
+     instead, which is the honest answer for a twelve-seat table. */
+  flex: 0 0 auto;
+  padding: 11px 12px;
+  border-radius: 11px;
+  background: var(--panel);
+  border: 1px solid var(--hair);
+  transition: background .2s, border-color .2s, box-shadow .2s;
+  overflow: hidden;
+}
+.pcard.active {
+  background: linear-gradient(100deg, rgba(255,255,255,.1), rgba(255,255,255,.045));
+  border-color: var(--gold-dim);
+  box-shadow: 0 0 0 1px rgba(217,182,92,.2), 0 6px 22px rgba(0,0,0,.45);
+}
+.pcard.active::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+}
+.pcard-top { display: flex; align-items: center; gap: 9px; }
+.pdisc {
+  width: 20px; height: 20px; border-radius: 50%; flex: 0 0 auto;
+  background: radial-gradient(70% 70% at 35% 28%, rgba(255,255,255,.5), transparent 55%),
+              radial-gradient(100% 100% at 50% 50%, var(--c1), var(--c2));
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.18), 0 0 0 1px rgba(0,0,0,.5);
+}
+.pdisc[data-color="crimson"] { --c1: var(--crimson); --c2: var(--crimson-2); }
+.pdisc[data-color="azure"]   { --c1: var(--azure);   --c2: var(--azure-2); }
+.pdisc[data-color="amber"]   { --c1: var(--amber);   --c2: var(--amber-2); }
+.pdisc[data-color="violet"]  { --c1: var(--violet);  --c2: var(--violet-2); }
+.pname { font-size: 14px; font-weight: 600; letter-spacing: .01em; }
+.pturn {
+  margin-left: auto; font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--gold-hi);
+}
+.pmeta { display: flex; align-items: center; gap: 12px; margin-top: 9px; }
+.pips { display: flex; gap: 5px; }
+.pip {
+  width: 26px; height: 7px; border-radius: 4px;
+  background: rgba(255,255,255,.1);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+  transition: background .3s, box-shadow .3s;
+}
+.pip.on {
+  background: linear-gradient(90deg, var(--gold-hi), var(--gold));
+  box-shadow: 0 0 12px rgba(246,227,166,.7);
+}
+.pmeta-num { font-size: 11.5px; color: var(--ink-3); margin-left: auto; }
+
+/* A twelve-player game has to fit the same sidebar as a two-player one, so the
+   scoreboard tightens up past four players and scrolls if it still runs long. */
+/* Never let the seat list be squeezed by the move log: it holds fixed, meaningful
+   content. It scrolls on its own once a big table needs more than its share. */
+#players { flex: 0 0 auto; max-height: 45%; overflow-y: auto; overflow-x: hidden; }
+#players.crowded { gap: 6px; }
+#players.crowded .pcard { padding: 8px 10px; border-radius: 9px; }
+#players.crowded .pmeta { margin-top: 6px; }
+#players.crowded .pdisc { width: 16px; height: 16px; }
+#players.crowded .pname { font-size: 13px; }
+#players.crowded .pip { width: 20px; height: 6px; }
+
+/* Marks a non-human seat: an AI or a remote player. */
+.ptag {
+  font-size: 9px; letter-spacing: .14em; text-transform: uppercase;
+  padding: 2px 5px; border-radius: 4px;
+  color: var(--ink-2);
+  background: rgba(255,255,255,.08);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.09);
+  flex: 0 0 auto;
+}
+
+/* Team roster inside a team's scoreboard card. */
+.proster {
+  margin-top: 8px; padding-top: 7px;
+  border-top: 1px solid var(--hair);
+  display: flex; flex-direction: column; gap: 3px;
+}
+.prow {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12px; color: var(--ink-3);
+  padding: 2px 4px; border-radius: 5px;
+}
+/* Whose turn it is inside the team — the team card itself is already lit. */
+.prow.now {
+  color: var(--ink);
+  background: rgba(246,227,166,.09);
+  box-shadow: inset 0 0 0 1px rgba(217,182,92,.2);
+}
+.prow.now .prow-name { font-weight: 600; }
+.prow-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prow-cards {
+  margin-left: auto; flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px; color: var(--ink-3);
+  min-width: 1.4em; text-align: right;
+}
+.prow.now .prow-cards { color: var(--gold-hi); }
+
+.side-block {
+  background: var(--panel);
+  border: 1px solid var(--hair);
+  border-radius: 11px;
+  padding: 10px 12px;
+  display: flex; flex-direction: column; min-height: 0;
+  flex: 0 0 auto;
+}
+/* flex-basis 0, not auto: the log takes exactly the space left over instead of
+   demanding its full content height and shrinking everything else away. */
+.side-grow { flex: 1 1 0; min-height: 140px; }
+.side-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .15em;
+  color: var(--ink-3); margin-bottom: 8px;
+}
+.side-num { color: var(--gold); font-size: 13px; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+
+/* The stacked card back inside is absolutely positioned, so this box has no
+   content height of its own — it must be told not to shrink, or the back escapes
+   and lands on top of the move log. */
+#deck-visual { position: relative; height: 62px; flex: 0 0 62px; }
+#deck-back {
+  position: absolute; left: 0; top: 0;
+  width: 45px; aspect-ratio: 240/336;
+  border-radius: 5px; overflow: hidden;
+  box-shadow: 3px 3px 0 -1px rgba(255,255,255,.09), 6px 6px 0 -2px rgba(255,255,255,.06),
+              0 8px 20px rgba(0,0,0,.6);
+}
+#deck-back svg { width: 100%; height: 100%; display: block; }
+
+#log {
+  list-style: none; margin: 0; padding: 0 6px 0 0;
+  overflow-y: auto; flex: 1 1 auto;
+  font-size: 12.5px; line-height: 1.45;
+  scrollbar-width: thin; scrollbar-color: rgba(217,182,92,.3) transparent;
+}
+#log::-webkit-scrollbar { width: 7px; }
+#log::-webkit-scrollbar-thumb { background: rgba(217,182,92,.28); border-radius: 4px; }
+#log li {
+  padding: 5px 0 5px 10px;
+  border-left: 2px solid rgba(255,255,255,.08);
+  color: var(--ink-2);
+  animation: logIn .3s var(--ease-out);
+}
+@keyframes logIn { from { opacity: 0; transform: translateX(-6px); } }
+#log li.k-sequence { color: var(--gold-hi); border-left-color: var(--gold); font-weight: 600; }
+#log li.k-remove { border-left-color: #ff5a5a; }
+#log li.k-dead { border-left-color: #8a8a8a; font-style: italic; }
+#log li.k-win { color: var(--emerald); border-left-color: var(--emerald); font-weight: 700; }
+#log li.k-system { color: var(--ink-3); font-style: italic; }
+
+/* ------------------------------------------------------------------- hand */
+
+#handbar {
+  grid-area: hand;
+  display: grid;
+  grid-template-columns: 190px 1fr auto;
+  align-items: center; gap: 16px;
+  padding: 12px 18px 16px;
+  background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.7));
+  border-top: 1px solid var(--hair);
+  min-height: 176px;
+  z-index: 35;
+}
+#hand-meta { display: flex; flex-direction: column; gap: 4px; }
+#hand-owner { font-family: var(--serif); font-size: 17px; letter-spacing: .07em; color: var(--gold-hi); }
+.hint { font-size: 11.5px; color: var(--ink-3); line-height: 1.4; }
+
+#hand {
+  display: flex; align-items: flex-end; justify-content: center;
+  gap: clamp(3px, 1vw, 10px); min-height: 148px;
+  min-width: 0;
+  perspective: 1100px;
+}
+
+.hand-card {
+  position: relative;
+  /* Shrink rather than overflow when the bar is narrow — a card pushed off the
+     edge is worse than a slightly smaller hand. */
+  width: 100px; aspect-ratio: 240/336;
+  border-radius: 8px;
+  cursor: grab;
+  flex: 0 1 100px;
+  min-width: 52px;
+  transition: transform .22s var(--ease-out), box-shadow .22s var(--ease-out), filter .22s;
+  box-shadow: 0 6px 18px rgba(0,0,0,.6), 0 0 0 1px rgba(0,0,0,.5);
+  animation: dealIn .45s var(--ease-out) both;
+  transform-style: preserve-3d;
+}
+.hand-card svg { width: 100%; height: 100%; display: block; border-radius: 8px; }
+@keyframes dealIn {
+  from { opacity: 0; transform: translateY(60px) rotate(-8deg) scale(.85); }
+}
+.hand-card:hover {
+  transform: translateY(-22px) scale(1.06);
+  box-shadow: 0 22px 44px rgba(0,0,0,.75), 0 0 0 1px var(--gold-dim), 0 0 30px rgba(217,182,92,.3);
+  z-index: 10;
+}
+.hand-card.dragging { opacity: .22; cursor: grabbing; }
+.hand-card.selected {
+  transform: translateY(-18px) scale(1.04);
+  box-shadow: 0 20px 40px rgba(0,0,0,.7), 0 0 0 2px var(--gold-hi), 0 0 34px rgba(246,227,166,.45);
+  z-index: 9;
+}
+body.dragging-card { cursor: grabbing; }
+body.dragging-card .hand-card:hover { transform: none; box-shadow: 0 6px 18px rgba(0,0,0,.6); }
+body.dragging-card .tile:not(.free):hover { transform: none; }
+.hand-card.dead { filter: grayscale(.8) brightness(.62); }
+.hand-card.dead::after {
+  content: "DEAD"; position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%,-50%) rotate(-16deg);
+  font-family: var(--serif); font-size: 15px; letter-spacing: .1em;
+  color: #ff8080; border: 2px solid #ff8080; border-radius: 4px;
+  padding: 2px 7px; background: rgba(0,0,0,.55);
+  pointer-events: none;
+}
+.hand-card.unplayable { filter: brightness(.72) saturate(.8); }
+.hand-card .badge {
+  position: absolute; top: -8px; right: -8px;
+  min-width: 22px; height: 22px; padding: 0 5px;
+  display: grid; place-items: center;
+  border-radius: 11px;
+  font-size: 11px; font-weight: 700;
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+  color: #241a06;
+  box-shadow: 0 3px 10px rgba(0,0,0,.6);
+  pointer-events: none; z-index: 3;
+}
+.hand-card .badge.jack {
+  background: linear-gradient(180deg, #b8e6ff, #4aa8e0); color: #06253a;
+}
+.hand-card .badge.none { background: linear-gradient(180deg, #ff9a9a, #d84040); color: #3a0606; }
+.hand-card .zoombtn {
+  position: absolute; bottom: 5px; right: 5px;
+  width: 24px; height: 24px; border-radius: 6px;
+  border: 1px solid rgba(0,0,0,.4);
+  background: rgba(8,16,12,.8);
+  color: var(--gold-hi); cursor: zoom-in;
+  display: grid; place-items: center;
+  opacity: 0; transition: opacity .18s;
+  z-index: 4; font-size: 13px; line-height: 1;
+}
+.hand-card:hover .zoombtn { opacity: 1; }
+.hand-card .zoombtn:hover { background: rgba(20,36,28,.95); }
+
+#hand.hidden-hand .hand-card { pointer-events: none; }
+#hand-tools { display: flex; flex-direction: column; gap: 6px; }
+
+/* Picking which dead card to swap. The hand says which cards are eligible by
+   dimming the rest, instead of a popup asking you to choose one. */
+#hand.picking-dead .hand-card:not(.dead) {
+  opacity: .28;
+  pointer-events: none;
+  filter: grayscale(.5);
+}
+#hand.picking-dead .hand-card.dead {
+  filter: none;
+  cursor: pointer;
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  animation: deadPick 1.5s ease-in-out infinite;
+}
+@keyframes deadPick {
+  0%, 100% { box-shadow: 0 6px 18px rgba(0,0,0,.6), 0 0 0 0 rgba(217,182,92,.5); }
+  50%      { box-shadow: 0 6px 18px rgba(0,0,0,.6), 0 0 16px 3px rgba(217,182,92,.45); }
+}
+
+/* Nothing legal left to play: the Pass button draws attention to itself rather
+   than a popup instructing you to press it. */
+#btn-pass.needed {
+  color: var(--gold-hi);
+  border-color: var(--gold-dim);
+  background: rgba(217,182,92,.14);
+  animation: passNeeded 1.6s ease-in-out infinite;
+}
+@keyframes passNeeded {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217,182,92,.45); }
+  50%      { box-shadow: 0 0 14px 3px rgba(217,182,92,.35); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #btn-pass.needed, #hand.picking-dead .hand-card.dead { animation: none; }
+}
+
+/* -------------------------------------------------------------- drag layer */
+
+#drag-layer {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 900;
+}
+.drag-ghost {
+  position: absolute; left: 0; top: 0;
+  width: 100px; aspect-ratio: 240/336;
+  border-radius: 8px;
+  will-change: transform;
+  filter: drop-shadow(0 22px 34px rgba(0,0,0,.75));
+  transform-origin: 50% 50%;
+}
+.drag-ghost svg { width: 100%; height: 100%; display: block; border-radius: 8px; }
+.drag-ghost.settling { transition: transform .3s var(--ease-out), width .3s var(--ease-out), opacity .2s; }
+.drag-ghost.landing { transition: transform .26s cubic-bezier(.5,-0.3,.4,1.4), width .26s var(--ease-out), opacity .18s ease-in .12s; }
+.drag-ghost.returning { transition: transform .34s var(--ease-out), opacity .3s; }
+
+/* ---------------------------------------------------------- card inspector */
+
+#inspector {
+  position: fixed; inset: 0; z-index: 1000;
+  display: grid; place-items: center;
+}
+#inspector.hidden { display: none; }
+#inspector-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(2, 8, 6, 0.86);
+  backdrop-filter: blur(14px);
+  animation: fadeIn .22s ease both;
+}
+@keyframes fadeIn { from { opacity: 0; } }
+#inspector-figure {
+  position: relative; margin: 0; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  animation: inspectIn .34s var(--ease-spring) both;
+}
+@keyframes inspectIn { from { opacity: 0; transform: scale(.86) translateY(20px); } }
+#inspector-card {
+  width: min(46vw, 58vh * 0.714);
+  aspect-ratio: 240/336;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 40px 100px rgba(0,0,0,.85), 0 0 0 1px rgba(217,182,92,.3), 0 0 70px rgba(217,182,92,.12);
+}
+#inspector-card svg { width: 100%; height: 100%; display: block; }
+#inspector-figure figcaption {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  text-align: center;
+}
+#inspector-title { font-family: var(--serif); font-size: 25px; letter-spacing: .09em; color: var(--gold-hi); }
+#inspector-sub { font-size: 13px; color: var(--ink-2); max-width: 52ch; line-height: 1.5; }
+#inspector-close {
+  position: absolute; top: 20px; right: 26px; z-index: 3;
+  width: 42px; height: 42px; border-radius: 50%;
+  background: var(--panel); border: 1px solid var(--hair);
+  color: var(--ink); font-size: 24px; line-height: 1; cursor: pointer;
+}
+#inspector-close:hover { background: var(--panel-2); }
+
+/* ----------------------------------------------------------------- screens */
+
+#screen {
+  position: fixed; inset: 0; z-index: 1100;
+  display: grid; place-items: center;
+  background: rgba(2, 8, 6, 0.9);
+  backdrop-filter: blur(16px);
+  animation: fadeIn .25s ease both;
+  overflow: auto;
+  padding: 30px;
+}
+#screen.hidden { display: none; }
+#screen-panel {
+  max-width: 760px; width: 100%;
+  padding: 34px 40px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(23,52,40,.95), rgba(6,20,16,.97));
+  border: 1px solid var(--hair-2);
+  box-shadow: 0 40px 110px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.07);
+  animation: inspectIn .35s var(--ease-spring) both;
+}
+#screen-panel h1 {
+  font-family: var(--serif); font-size: 40px; letter-spacing: .12em;
+  text-transform: uppercase; margin: 0 0 4px;
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold) 60%, #9c7c2c);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+#screen-panel h2 {
+  font-family: var(--serif); font-size: 15px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--gold); margin: 24px 0 8px;
+}
+#screen-panel p, #screen-panel li { color: var(--ink-2); line-height: 1.62; }
+#screen-panel .lede { font-size: 15px; color: var(--ink); margin: 0 0 6px; }
+#screen-panel ul { margin: 6px 0; padding-left: 20px; }
+#screen-panel li { margin: 5px 0; }
+#screen-panel kbd {
+  display: inline-block; min-width: 20px; text-align: center;
+  padding: 1px 6px; margin: 0 1px;
+  border-radius: 5px; border: 1px solid var(--hair-2);
+  background: rgba(0,0,0,.45); color: var(--gold-hi);
+  font-family: var(--sans); font-size: 11.5px;
+}
+.screen-actions { display: flex; gap: 10px; margin-top: 26px; flex-wrap: wrap; }
+.btn-big {
+  padding: 12px 26px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--hair-2);
+  background: var(--panel);
+  font-family: var(--serif); font-size: 14px; letter-spacing: .1em; text-transform: uppercase;
+  transition: transform .12s, background .15s;
+}
+.btn-big:hover { background: var(--panel-2); transform: translateY(-1px); }
+/* Momentary "Copied" state on a button that just did something. */
+.btn-big.flashed {
+  color: var(--emerald);
+  border-color: rgba(79,211,155,.5);
+  background: rgba(79,211,155,.12);
+}
+.btn-big.primary {
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+  color: #241a06; border-color: var(--gold-hi);
+  box-shadow: 0 8px 26px rgba(217,182,92,.32);
+}
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 10px 0; }
+.kv dt { color: var(--gold); font-size: 12px; text-transform: uppercase; letter-spacing: .1em; }
+.kv dd { margin: 0; color: var(--ink-2); }
+
+/* setup form */
+.setup-row { display: flex; align-items: center; gap: 11px; margin: 9px 0; }
+.setup-disc, .win-disc {
+  width: 22px; height: 22px; border-radius: 50%; flex: 0 0 auto;
+  background: radial-gradient(70% 70% at 35% 28%, rgba(255,255,255,.5), transparent 55%),
+              radial-gradient(100% 100% at 50% 50%, var(--c1, var(--crimson)), var(--c2, var(--crimson-2)));
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.18), 0 0 0 1px rgba(0,0,0,.5);
+}
+.setup-disc[data-color="crimson"], .win-disc[data-color="crimson"] { --c1: var(--crimson); --c2: var(--crimson-2); }
+.setup-disc[data-color="azure"],   .win-disc[data-color="azure"]   { --c1: var(--azure);   --c2: var(--azure-2); }
+.setup-disc[data-color="amber"],   .win-disc[data-color="amber"]   { --c1: var(--amber);   --c2: var(--amber-2); }
+.setup-disc[data-color="violet"],  .win-disc[data-color="violet"]  { --c1: var(--violet);  --c2: var(--violet-2); }
+.win-disc { width: 46px; height: 46px; box-shadow: inset 0 0 0 4px rgba(255,255,255,.18), 0 0 30px rgba(0,0,0,.6); }
+.setup-input {
+  flex: 1 1 auto; max-width: 300px;
+  height: 36px; padding: 0 12px;
+  background: rgba(0,0,0,.4); border: 1px solid var(--hair);
+  border-radius: 8px; color: var(--ink); outline: none;
+  font-family: inherit; font-size: 14px;
+}
+.setup-input:focus { border-color: var(--gold-dim); box-shadow: 0 0 0 3px rgba(217,182,92,.12); }
+/* Option pills — player count and team layout in the setup screen. */
+.pill-row { display: flex; gap: 7px; flex-wrap: wrap; margin: 8px 0 4px; }
+.pillbtn {
+  min-width: 42px;
+  padding: 8px 13px;
+  font: 600 13px/1 var(--sans);
+  color: var(--ink-2);
+  background: var(--panel);
+  border: 1px solid var(--hair);
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background .18s, border-color .18s, color .18s, transform .18s;
+}
+.pillbtn.wide { min-width: 0; font-weight: 500; }
+.pillbtn:hover { background: var(--panel-2); color: var(--ink); transform: translateY(-1px); }
+.pillbtn.on {
+  color: #1a1508;
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+  border-color: var(--gold);
+  box-shadow: 0 3px 14px rgba(217,182,92,.28);
+}
+
+.setup-note {
+  font-size: 12.5px; color: var(--ink-3);
+  margin: 10px 0 0;
+  padding: 8px 11px;
+  border-radius: 8px;
+  background: rgba(255,255,255,.035);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.setup-note strong { color: var(--gold-hi); font-weight: 600; }
+
+/* Name rows go two-up once the table gets big, so twelve seats still fit. */
+.setup-names.tight {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px;
+}
+.setup-names.tight .setup-row { margin: 6px 0; }
+.setup-team {
+  font-size: 10px; letter-spacing: .1em; color: var(--ink-3);
+  flex: 0 0 auto; min-width: 1.6em;
+}
+
+/* Per-seat human/computer toggle. Fixed width so the rows stay aligned as the
+   label flips between the two words. */
+.seatkind {
+  flex: 0 0 auto;
+  width: 76px;
+  padding: 7px 0;
+  font: 600 10.5px/1 var(--sans);
+  letter-spacing: .07em; text-transform: uppercase;
+  color: var(--ink-3);
+  background: var(--panel);
+  border: 1px solid var(--hair);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background .18s, color .18s, border-color .18s;
+}
+.seatkind:hover { background: var(--panel-2); color: var(--ink); }
+.seatkind.ai {
+  color: var(--emerald);
+  border-color: rgba(79, 211, 155, .4);
+  background: rgba(79, 211, 155, .1);
+}
+.setup-names.tight .seatkind { width: 62px; padding: 6px 0; font-size: 9.5px; }
+.setup-names.tight .setup-input { min-width: 0; }
+
+/* Invite / reply codes. Monospaced and selectable — long enough that nobody
+   should retype one, so it has to be easy to select and copy in one go. */
+.codebox {
+  display: block; width: 100%;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  font: 400 11.5px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color: var(--ink-2);
+  background: rgba(0,0,0,.35);
+  border: 1px solid var(--hair);
+  border-radius: 9px;
+  resize: vertical;
+  word-break: break-all;
+}
+.codebox:focus { outline: none; border-color: var(--gold-dim); box-shadow: 0 0 0 3px rgba(217,182,92,.12); }
+.codebox[readonly] { color: var(--gold-hi); }
+
+.setup-check {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  color: var(--ink-2); margin: 10px 0;
+}
+.setup-check input { width: 17px; height: 17px; accent-color: var(--gold); cursor: pointer; }
+
+.win-banner {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 10px;
+}
+.win-disc { width: 46px; height: 46px; border-radius: 50%;
+  background: radial-gradient(70% 70% at 35% 28%, rgba(255,255,255,.5), transparent 55%),
+              radial-gradient(100% 100% at 50% 50%, var(--c1), var(--c2));
+  box-shadow: inset 0 0 0 4px rgba(255,255,255,.18), 0 0 30px rgba(0,0,0,.6); }
+
+/* confetti-ish sparks for the win screen */
+.spark {
+  position: fixed; width: 9px; height: 9px; border-radius: 2px;
+  pointer-events: none; z-index: 1090;
+  animation: sparkFall linear forwards;
+}
+@keyframes sparkFall {
+  to { transform: translateY(105vh) rotate(720deg); opacity: 0; }
+}
+
+/* ------------------------------------------------------------ utilities */
+
+.hidden { display: none !important; }
+[hidden] { display: none !important; }
+
+/* narrow screens: collapse the sidebar under the board */
+@media (max-width: 1180px) {
+  :root { --side-w: 260px; --tile-w: 68px; }
+}
+@media (max-width: 900px) {
+  #app {
+    grid-template-columns: 1fr;
+    grid-template-areas: "topbar" "tray" "stage" "hand";
+  }
+  #side { display: none; }
+  #topbar { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

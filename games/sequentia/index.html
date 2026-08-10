@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Sequentia</title>
+<link rel="stylesheet" href="css/sequentia.css">
+<link rel="stylesheet" href="css/find.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ------------------------------------------------------------ topbar -->
+  <header id="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">Sequentia</span>
+    </div>
+
+    <div id="findbar" role="search">
+      <span class="find-icon" aria-hidden="true"></span>
+      <input id="find-input" type="text" autocomplete="off" spellcheck="false"
+             placeholder="Find a card…  try “6s”, “queen of hearts”, “aces”, “spades”">
+      <button id="find-clear" class="find-clear" title="Clear (Esc)" hidden>&times;</button>
+      <div id="find-count" class="find-count"></div>
+    </div>
+
+    <div class="topbar-actions">
+      <button id="btn-suits" class="tb" title="Filter by suit / rank">Filters</button>
+      <button id="btn-legal" class="tb" title="Highlight every space you can play right now (L)">My moves</button>
+      <button id="btn-fit" class="tb" title="Fit board to screen (F)">Fit</button>
+      <button id="btn-help" class="tb" title="Rules &amp; shortcuts (?)">Rules</button>
+      <button id="btn-new" class="tb tb-strong" title="New game">New game</button>
+    </div>
+  </header>
+
+  <!-- filter tray, toggled by the Filters button -->
+  <div id="filter-tray" hidden>
+    <div class="ft-group" data-group="rank">
+      <span class="ft-label">Rank</span>
+      <div class="ft-chips" id="ft-ranks"></div>
+    </div>
+    <div class="ft-group" data-group="suit">
+      <span class="ft-label">Suit</span>
+      <div class="ft-chips" id="ft-suits"></div>
+    </div>
+    <div class="ft-group">
+      <span class="ft-label">Show</span>
+      <div class="ft-chips" id="ft-state"></div>
+    </div>
+    <button id="ft-reset" class="tb">Reset</button>
+  </div>
+
+  <!-- -------------------------------------------------------------- stage -->
+  <main id="stage" tabindex="0" aria-label="Game board">
+    <div id="world">
+      <div id="board" role="grid" aria-label="Sequence board"></div>
+    </div>
+
+    <!-- fixed-position UI that floats over the stage -->
+    <div id="zoom-hud">
+      <button id="zoom-out" title="Zoom out (−)">&minus;</button>
+      <div id="zoom-level" title="Zoom level">100%</div>
+      <button id="zoom-in" title="Zoom in (+)">+</button>
+      <button id="zoom-reset" title="Reset view (0)">⟲</button>
+    </div>
+
+    <div id="turn-banner" class="hidden"><span></span></div>
+  </main>
+
+  <!-- --------------------------------------------------------------- side -->
+  <aside id="side">
+    <div id="players"></div>
+
+    <div class="side-block">
+      <div class="side-head">
+        <span>Draw pile</span>
+        <span id="deck-count" class="side-num">—</span>
+      </div>
+      <div id="deck-visual"><div id="deck-back"></div></div>
+    </div>
+
+    <div class="side-block side-grow">
+      <div class="side-head"><span>Move log</span></div>
+      <ol id="log"></ol>
+    </div>
+  </aside>
+
+  <!-- --------------------------------------------------------------- hand -->
+  <footer id="handbar">
+    <div id="hand-meta">
+      <div id="hand-owner">—</div>
+      <div id="hand-hint" class="hint"></div>
+    </div>
+    <div id="hand" role="list" aria-label="Your hand"></div>
+    <div id="hand-tools">
+      <button id="btn-dead" class="tb" title="Discard a dead card and draw a replacement (D)" disabled>Dead card</button>
+      <button id="btn-pass" class="tb" title="Pass (only when you have no legal move)" hidden>Pass</button>
+      <button id="btn-peek" class="tb" title="Hide/show your hand when passing the device (H)">Hide hand</button>
+    </div>
+  </footer>
+</div>
+
+<!-- ---------------------------------------------------------- drag layer -->
+<div id="drag-layer"></div>
+
+<!-- ------------------------------------------------------- card inspector -->
+<div id="inspector" class="hidden" role="dialog" aria-modal="true" aria-label="Card inspector">
+  <div id="inspector-backdrop"></div>
+  <figure id="inspector-figure">
+    <div id="inspector-card"></div>
+    <figcaption>
+      <strong id="inspector-title"></strong>
+      <span id="inspector-sub"></span>
+    </figcaption>
+  </figure>
+  <button id="inspector-close" title="Close (Esc)">&times;</button>
+</div>
+
+<!-- ------------------------------------------------------------- screens -->
+<div id="screen" class="hidden">
+  <div id="screen-panel"></div>
+</div>
+
+<script src="js/cards.js"></script>
+<script src="js/board.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/view.js"></script>
+<script src="js/zoom.js"></script>
+<script src="js/find.js"></script>
+<script src="js/drag.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/net.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
