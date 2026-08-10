@@ -413,8 +413,16 @@
   function screenOpen() { return !el.screen.classList.contains('hidden'); }
 
   function sparks(colorPair) {
-    var colors = colorPair || ['#f6e3a6', '#d9b65c', '#4fd39b', '#ffffff'];
-    for (var i = 0; i < 90; i++) {
+    var fx = document.documentElement.dataset.sqVictory || 'classic';
+    var presets = {
+      classic: { colors: ['#f6e3a6', '#d9b65c', '#4fd39b', '#ffffff'], count: 90 },
+      fireworks: { colors: ['#fff4ad', '#ffd15c', '#ff7a9f', '#78e8ff'], count: 150 },
+      crown: { colors: ['#fff7c7', '#f6e3a6', '#d9b65c', '#ffffff'], count: 115 },
+      confetti: { colors: ['#ff6fae', '#70e7ff', '#ffe36d', '#9dff9a'], count: 135 }
+    };
+    var preset = presets[fx] || presets.classic;
+    var colors = colorPair || preset.colors;
+    for (var i = 0; i < (colorPair ? 90 : preset.count); i++) {
       var s = mk('div', 'spark');
       s.style.left = (Math.random() * 100) + 'vw';
       s.style.top = (-10 - Math.random() * 20) + 'vh';
