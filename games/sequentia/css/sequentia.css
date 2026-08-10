@@ -1154,6 +1154,19 @@ body.dragging-card .tile:not(.free):hover { transform: none; }
 
 /* ------------------------------------------------------------ utilities */
 
+.sq-wallet {
+  display: inline-flex; align-items: center; gap: 4px; padding: 6px 9px;
+  border: 1px solid rgba(215,171,75,.45); border-radius: 999px;
+  color: var(--gold); font-weight: 800; white-space: nowrap;
+}
+.sq-wallet strong { color: var(--ink); }
+.sq-toast {
+  position: fixed; left: 50%; bottom: 86px; transform: translateX(-50%);
+  z-index: 1200; padding: 10px 14px; border: 1px solid var(--gold);
+  border-radius: 999px; background: rgba(20,22,30,.94); color: var(--gold);
+  box-shadow: 0 12px 30px rgba(0,0,0,.35); font-weight: 800;
+}
+
 .hidden { display: none !important; }
 [hidden] { display: none !important; }
 

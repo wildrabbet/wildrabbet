@@ -606,9 +606,9 @@
     }
     View.showScreen(
       '<h1>Play online</h1>' +
-      '<p class="lede">Two players, two computers, no server in between. You swap one ' +
-      'block of text to introduce the browsers to each other, and after that the game ' +
-      'talks peer to peer.</p>' +
+        '<p class="lede">Two players, two computers, no server in between. The same Wi-Fi ' +
+        'works perfectly. Swap one block of text to introduce the browsers to each other, ' +
+        'and after that the game talks peer to peer.</p>' +
       '<div class="screen-actions">' +
       '<button class="btn-big primary" data-act="net-host">Invite someone</button>' +
       '<button class="btn-big" data-act="net-join">I have an invite code</button>' +
