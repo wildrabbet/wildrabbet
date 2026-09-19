@@ -1,10 +1,10 @@
 {
-  "version": "2026.9.19.5",
-  "display_version": "2026.9.19.5",
-  "version_code": 202609195,
+  "version": "2026.9.19.6",
+  "display_version": "2026.9.19.6",
+  "version_code": 202609196,
   "paused": false,
   "url": "https://www.rabbet.lol/apk/download/RabbitKit-Android.apk",
-  "sha256": "5bc18d8cb58d1f2aba5be06e65089ff81e293fc4a38f7fc2971a825b1f4b7b8c",
-  "size": 90821,
-  "published": "2026-09-18T23:54:53.5557579Z"
+  "sha256": "e5fae7af0ef4ee0269b60d4a9a2584f7047543165a4f002e6b14a82c057b3342",
+  "size": 90818,
+  "published": "2026-09-19T00:14:52.2491658Z"
 }
