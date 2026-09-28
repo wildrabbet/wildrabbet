@@ -30,8 +30,8 @@
     <div class="notice">This is a casual password gate, not strong private hosting: the encrypted file is on a public static site, so someone could try password guesses offline. Don’t use this for sensitive files.</div>
   </main>
   <script>
-    const SALT = '0WCRKlllT7NTP/byvqe+3A==';
-    const IV = '68TiZ12IKzIzi2az';
+    const SALT = 'PDnBjFxaM654ey/CYtfpIQ==';
+    const IV = 'pedBRbxf1OgsxJgL';
     const ITERATIONS = 600000;
     const decode64 = value => Uint8Array.from(atob(value), c => c.charCodeAt(0));
     const form = document.querySelector('#unlock-form');
@@ -43,7 +43,7 @@
       button.disabled = true;
       status.textContent = 'Unlocking the download…';
       try {
-        const response = await fetch('./ALARM-2026-09-28.enc', { cache: 'no-store' });
+        const response = await fetch('./ALARM-2026.09.28-1902.enc', { cache: 'no-store' });
         if (!response.ok) throw new Error('Unavailable');
         const ciphertext = await response.arrayBuffer();
         const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);

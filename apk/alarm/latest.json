@@ -1,0 +1,10 @@
+{
+  "versionCode": 389342,
+  "versionName": "2026.09.28-1902",
+  "file": "ALARM-2026.09.28-1902.enc",
+  "salt": "PDnBjFxaM654ey/CYtfpIQ==",
+  "iv": "pedBRbxf1OgsxJgL",
+  "iterations": 600000,
+  "sha256": "37aa8519df397343ef8065a65402229eddc4fb27f06c2f0474fef68c40dc11aa",
+  "notes": "Silent Night default, songs fixed, Batemans Bay weather, Test lab, always-wakes checklist, in-app updates"
+}
