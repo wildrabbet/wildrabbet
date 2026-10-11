@@ -1,0 +1,61 @@
+.shed-wrap{max-width:1060px;padding-top:16px}
+.shed-welcome{display:flex;align-items:center;gap:11px;margin:8px 0 3px;padding:9px 13px;border:1px solid color-mix(in srgb,var(--ink) 22%,transparent);border-radius:9px;background:linear-gradient(180deg,color-mix(in srgb,#fff 76%,var(--accent) 24%),var(--card));box-shadow:0 3px 0 color-mix(in srgb,var(--ink) 14%,transparent);font-size:13px;color:var(--ink)}
+.pixel-sprout{color:#447d3c;font-size:19px;text-shadow:1px 1px #e9d9a8}.welcome-id{margin-left:auto;white-space:nowrap;font:800 10px/1.3 ui-monospace,Consolas,monospace;letter-spacing:.08em;color:var(--muted)}
+.shed-hero{grid-template-columns:minmax(0,1.08fr) minmax(310px,.92fr);gap:20px;padding:20px 0 18px;align-items:stretch}
+.shed-copy{position:relative;overflow:hidden;padding:clamp(21px,4vw,38px);border:2px solid color-mix(in srgb,var(--ink) 23%,transparent);border-radius:11px;background:linear-gradient(160deg,var(--card),color-mix(in srgb,var(--accent) 9%,var(--card)));box-shadow:0 5px 0 color-mix(in srgb,var(--ink) 13%,transparent),var(--shadow)}
+.shed-copy::after{content:"";position:absolute;right:-20px;bottom:-22px;width:110px;height:92px;opacity:.17;background:linear-gradient(90deg,transparent 25%,var(--accent) 25% 75%,transparent 75%),linear-gradient(transparent 25%,var(--accent) 25% 75%,transparent 75%);background-size:22px 22px;pointer-events:none}
+.shed-kicker{display:flex;align-items:center;gap:8px;margin:0 0 13px;font:900 11px/1.4 ui-monospace,Consolas,monospace;letter-spacing:.1em;color:color-mix(in srgb,var(--accent) 75%,var(--ink))}
+.tiny-block{width:13px;height:13px;border:2px solid #3c6a37;background:linear-gradient(#83bb51 0 35%,#725535 35% 100%);box-shadow:2px 2px 0 #342b1c}
+.shed-copy h1{font-size:clamp(41px,6vw,68px);line-height:.98;letter-spacing:-1.2px;text-shadow:2px 2px 0 color-mix(in srgb,var(--accent) 18%,transparent)}
+.shed-copy .lede{max-width:55ch;line-height:1.65}
+.shed-actions{gap:11px;flex-wrap:wrap;margin-top:21px}
+.shed-button{min-height:43px;padding:11px 15px!important;border:2px solid color-mix(in srgb,var(--ink) 58%,transparent)!important;border-radius:7px!important;box-shadow:0 4px 0 color-mix(in srgb,var(--ink) 22%,transparent)!important;font-weight:900!important;transition:transform .12s ease,box-shadow .12s ease!important}
+.shed-button:hover{transform:translateY(2px);box-shadow:0 2px 0 color-mix(in srgb,var(--ink) 22%,transparent)!important}
+.shed-button-quiet{background:var(--gloss)!important;color:var(--ink)!important}
+.shed-stamps{display:flex;gap:7px;flex-wrap:wrap;margin-top:22px}
+.shed-stamps span{padding:6px 8px;border:1px dashed var(--line);border-radius:5px;background:var(--tint);font:700 10px/1.25 ui-monospace,Consolas,monospace;color:var(--muted)}
+.shed-map-card{align-self:stretch;display:flex;flex-direction:column;overflow:hidden;padding:10px;border:2px solid #57432e;border-radius:9px;background:#ddc999;box-shadow:0 5px 0 #493925,0 12px 26px rgba(54,40,21,.15);color:#30291e}
+.map-window-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:-1px -1px 8px;padding:8px 10px;border:1px solid #68533a;background:linear-gradient(#f1e4bb,#d6c08d);font:900 10px/1 ui-monospace,Consolas,monospace;letter-spacing:.1em}
+.map-window-buttons{font:900 12px/1 Tahoma,Verdana,sans-serif;letter-spacing:0}
+.pixel-map{display:block;width:100%;height:auto;aspect-ratio:420/260;border:3px ridge #fff1c3;background:#9bd2dc;image-rendering:pixelated}
+.map-caption{display:flex;justify-content:space-between;margin-top:7px;font:900 10px/1.2 ui-monospace,Consolas,monospace;letter-spacing:.08em;color:#493925}
+.map-note{margin:7px 0 0;font-size:11px;line-height:1.4;color:#55432d}.map-note b{color:#3d2f20}
+.shed-rule{display:flex;justify-content:center;align-items:center;gap:13px;margin:2px 0 12px;padding:10px 12px;border-block:1px dashed color-mix(in srgb,var(--ink) 26%,transparent);font:900 10px/1.6 ui-monospace,Consolas,monospace;letter-spacing:.08em;text-align:center;color:var(--muted)}
+.shed-rule span{color:var(--accent)}
+.shed-section{padding-top:22px}
+.shed-section-head{align-items:flex-end;gap:16px;margin-bottom:14px}
+.shed-section-head .shed-kicker{margin:0 0 5px}
+.shed-section-head h2{margin:0;font-size:clamp(25px,4vw,35px);letter-spacing:-.5px}
+.stock-badge{display:inline-flex;align-items:center;gap:8px;margin-bottom:4px;padding:7px 10px;border:1px solid var(--line);border-radius:5px;background:var(--card);font:800 11px/1.25 ui-monospace,Consolas,monospace;color:var(--muted)}
+.stock-badge i{width:8px;height:8px;border-radius:50%;background:#d3a43e;box-shadow:0 0 0 3px color-mix(in srgb,#d3a43e 19%,transparent)}
+.shelf-card{position:relative;display:grid;grid-template-columns:130px minmax(0,1fr);gap:22px;align-items:center;overflow:hidden;padding:23px;border:2px solid color-mix(in srgb,var(--ink) 25%,transparent);border-radius:10px;background:linear-gradient(120deg,color-mix(in srgb,#d2bb83 28%,var(--card)),var(--card) 55%);box-shadow:0 4px 0 color-mix(in srgb,var(--ink) 13%,transparent),var(--shadow)}
+.shelf-chest{position:relative;width:103px;height:84px;margin:auto;filter:drop-shadow(3px 5px 0 rgba(45,31,16,.2));image-rendering:pixelated}
+.chest-lid{position:absolute;left:7px;top:10px;width:88px;height:31px;border:4px solid #4b321c;border-bottom:3px solid #392713;border-radius:9px 9px 3px 3px;background:repeating-linear-gradient(90deg,#9a6636 0 15px,#a9763c 15px 19px);box-shadow:inset 0 5px #c08a4c}
+.chest-body{position:absolute;left:7px;top:39px;width:88px;height:38px;border:4px solid #4b321c;border-radius:2px 2px 8px 8px;background:repeating-linear-gradient(90deg,#81542e 0 15px,#986336 15px 20px);box-shadow:inset 0 4px #ae7740,inset 0 -5px #5e3d23}
+.chest-body i{position:absolute;left:33px;top:-8px;width:16px;height:21px;border:3px solid #46351f;background:#d5ae4f;box-shadow:inset 0 -6px #9e7738}
+.shelf-copy{position:relative;z-index:1;max-width:720px}.shelf-copy h3,.desk-intro h3{margin:0 0 7px;font-size:21px}.shelf-copy p,.desk-intro p{margin:6px 0;max-width:75ch;line-height:1.58;color:var(--muted)}
+.shelf-copy .small-print{font-size:12px}.text-link{display:inline-block;margin-top:7px;font-weight:900;color:color-mix(in srgb,var(--accent) 76%,var(--ink));text-decoration:underline;text-decoration-style:dotted;text-underline-offset:4px}
+.shelf-wood{position:absolute;right:0;bottom:0;left:0;height:8px;background:repeating-linear-gradient(90deg,#76532f 0 30px,#89623a 30px 33px);opacity:.8}
+.listing-promises{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}
+.promise-card{padding:16px;border:1px solid var(--line);border-radius:8px;background:var(--card);box-shadow:0 3px 0 color-mix(in srgb,var(--ink) 10%,transparent)}
+.promise-number{display:inline-grid;place-items:center;width:28px;height:24px;margin-bottom:8px;border:1px solid color-mix(in srgb,var(--accent) 38%,var(--line));background:color-mix(in srgb,var(--accent) 12%,var(--card));font:900 11px/1 ui-monospace,Consolas,monospace;color:color-mix(in srgb,var(--accent) 80%,var(--ink))}
+.promise-card h3{margin:0 0 6px;font-size:15px}.promise-card p{margin:0;font-size:13px;line-height:1.52;color:var(--muted)}
+.cartography{margin-top:8px}
+.desk-sign{display:inline-block;margin-bottom:4px;padding:5px 9px;border:2px solid #557346;background:#d8e4b8;color:#354927;font:900 11px/1.2 ui-monospace,Consolas,monospace;letter-spacing:.08em;box-shadow:2px 2px 0 #7c805f}
+.desk-card{padding:20px;border:2px solid color-mix(in srgb,var(--ink) 22%,transparent);border-radius:9px;background:var(--card);box-shadow:0 4px 0 color-mix(in srgb,var(--ink) 11%,transparent),var(--shadow)}
+.desk-intro{display:grid;grid-template-columns:46px 1fr;gap:13px;align-items:start;margin-bottom:16px}
+.desk-map-icon{display:grid;place-items:center;width:44px;height:44px;border:2px solid #61503a;border-radius:7px;background:linear-gradient(135deg,#a5ce88 0 48%,#83b5bd 48% 100%);font:900 25px/1 Tahoma,Verdana,sans-serif;color:#354a39;box-shadow:2px 3px 0 #8b7856}
+.desk-intro h3{font-size:19px}.desk-intro p{font-size:13px}
+.hunt-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.hunt-form label{display:grid;gap:6px;font-size:12px;font-weight:850;color:var(--ink)}
+.hunt-form input,.hunt-form select,.hunt-form textarea{width:100%;min-height:40px;padding:10px 11px;border:1px solid color-mix(in srgb,var(--ink) 23%,transparent);border-radius:5px;background:var(--bg);color:var(--ink);font:500 14px/1.4 Tahoma,Verdana,sans-serif;box-shadow:inset 0 1px 2px rgba(25,20,13,.07)}
+.hunt-form textarea{resize:vertical;min-height:96px}.hunt-form input:focus,.hunt-form select:focus,.hunt-form textarea:focus{outline:3px solid color-mix(in srgb,var(--accent) 42%,transparent);outline-offset:1px}
+.hunt-wide{grid-column:1/-1}.hunt-submit{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.hunt-status{font-size:12px;color:var(--muted)}
+.privacy-note{margin:14px 0 0;padding-top:11px;border-top:1px dashed var(--line);font-size:11px;line-height:1.45;color:var(--muted)}
+.shed-bottom-note{display:flex;align-items:center;gap:12px;margin:24px 0 5px;padding:13px 15px;border:1px dashed var(--line);border-radius:8px;background:var(--tint);color:var(--muted)}
+.shed-bottom-note p{margin:0;font-size:12px;line-height:1.5}.shed-bottom-note b{color:var(--ink)}
+.pixel-pick{font-size:23px;color:#557d43;text-shadow:2px 2px #d1be86}
+.shed-foot{gap:10px;flex-wrap:wrap}.shed-foot a{text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
+@media(max-width:760px){.shed-hero{grid-template-columns:1fr}.shed-map-card{max-width:560px}.listing-promises{grid-template-columns:1fr}.shelf-card{grid-template-columns:92px 1fr;gap:13px;padding:17px}.shelf-chest{transform:scale(.82);transform-origin:center}.shed-section-head{align-items:flex-start;flex-direction:column}.stock-badge{margin:0}}
+@media(max-width:520px){.shed-welcome{align-items:flex-start;font-size:12px}.welcome-id{font-size:9px}.shelf-card{grid-template-columns:1fr}.shelf-chest{margin:0 auto 4px}.hunt-form{grid-template-columns:1fr}.hunt-wide{grid-column:auto}.desk-card{padding:15px}.shed-rule{font-size:9px;gap:7px}.shed-stamps span{font-size:9px}}
+@media(prefers-reduced-motion:reduce){.shed-button{transition:none!important}}
