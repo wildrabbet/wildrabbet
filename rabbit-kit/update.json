@@ -1,9 +1,7 @@
 {
   "version": "2026.9.19.7",
   "display_version": "2026.9.19.7",
-  "paused": false,
-  "url": "https://www.rabbet.lol/rabbit-kit/download/RabbitKit-Setup.exe",
-  "sha256": "94d69cb82d00d2f2a3cb3a6bcf0f42f0360999f131d8a583b34e5d63234db7cf",
-  "size": 25594934,
+  "paused": true,
+  "message": "Rabbit Kit is in development. Public Windows downloads are temporarily paused.",
   "published": "2026-09-19T02:09:55.0774042Z"
 }

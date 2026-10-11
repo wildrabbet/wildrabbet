@@ -24,7 +24,7 @@
       <a href="#features">Features</a>
       <a href="#feature-index">Index</a>
       <a class="mobileApkLink" href="../apk/">Android app</a>
-      <a class="navCta" href="#get">Get Rabbit Kit</a>
+      <a class="navCta" href="#get">Development status</a>
     </nav>
   </header>
 
@@ -38,11 +38,11 @@
           <h1 class="brand">Rabbit Kit</h1>
           <p class="lede">Capture, create, search, and move work between your PCs. Save Cloud notes and links, send complete folders at LAN speed, and keep every optional tool out of the way until you need it.</p>
           <div class="ctaRow">
-            <a class="btn primary" href="./download/RabbitKit-Setup.exe">Download</a>
+            <span class="btn primary" aria-disabled="true">In development · downloads paused</span>
             <a class="btn ghost" href="#features">See features</a>
             <a class="btn ghost mobileApkCta" href="../apk/">Get Android app</a>
           </div>
-          <p class="releaseMeta">Latest: <strong id="releaseVersion">checking...</strong> <span aria-hidden="true">&middot;</span> Windows 10/11</p>
+          <p class="releaseMeta">Windows 10/11 <span aria-hidden="true">&middot;</span> Public builds return after development.</p>
         </div>
       </div>
     </section>
@@ -157,7 +157,7 @@
     <section class="featureAtlas" aria-label="Rabbit Kit feature details">
       <div class="atlasGroup"><div class="atlasTitle"><span>Connect</span><h2>Your devices, working together</h2></div><div class="atlasGrid">
         <article class="miniFeature" id="feat-transfer"><b>LAN file transfer</b><p>Send individual files or complete folders directly between paired PCs over your own network, preserving structure and verifying every file.</p></article>
-        <article class="miniFeature" id="feat-android"><b>Rabbit Kit for Android</b><p>Use notes, files, image tools, app management, device diagnostics, Vibration Lab, torch and Morse locally. Remote control stays optional.</p><a href="../apk/">Download the Android app →</a></article>
+        <article class="miniFeature" id="feat-android"><b>Rabbit Kit for Android</b><p>Use notes, files, image tools, app management, device diagnostics, Vibration Lab, torch and Morse locally. Remote control stays optional.</p><a href="../apk/">Android project status →</a></article>
         <article class="miniFeature" id="feat-remote"><b>Remote control</b><p>Control the complete PC from Android with HD streaming, keyboard input, clipboard, Explorer, fullscreen games and a custom touch gamepad.</p></article>
       </div></div>
       <div class="atlasGroup"><div class="atlasTitle"><span>Capture</span><h2>Fast capture without clutter</h2></div><div class="atlasGrid">
@@ -204,21 +204,15 @@
 
     <section class="strip">
       <div class="stripInner">
-        <h2>A normal Windows install</h2>
-        <p>One installer puts Rabbit Kit in Program Files, adds the shortcuts, and includes everything the app needs.</p>
+        <h2>A normal Windows install is planned</h2>
+        <p>When development is ready for public builds, the planned installer will set up Rabbit Kit and its shortcuts. Downloads are paused for now.</p>
       </div>
     </section>
 
     <section id="get" class="get">
-      <h2>Get Rabbit Kit</h2>
-      <p>Windows app. Download size: <span id="releaseSize">about 22 MB</span>.</p>
-      <a class="btn primary" href="./download/RabbitKit-Setup.exe">Download</a>
-      <ol class="steps">
-        <li>Open <code>RabbitKit-Setup.exe</code></li>
-        <li>Click Install and accept the Windows prompt</li>
-        <li>Rabbit Kit opens as a desktop window (Start Menu + Desktop shortcuts too)</li>
-      </ol>
-      <p class="muted">Download, open, and run. Rabbit Kit handles the rest.</p>
+      <h2>Rabbit Kit is in development</h2>
+      <p>Public Windows downloads are temporarily paused while the app is being worked on. No installer is available from this site right now.</p>
+      <span class="btn primary" aria-disabled="true">Downloads paused</span>
     </section>
   </main>
 
@@ -227,19 +221,5 @@
     <span class="dot">·</span>
     <span>Rabbit Kit</span>
   </footer>
-  <script>
-    fetch("./update.json", {cache: "no-store"})
-      .then(function (response) { return response.ok ? response.json() : Promise.reject(); })
-      .then(function (release) {
-        var version = document.getElementById("releaseVersion");
-        var size = document.getElementById("releaseSize");
-        if (version) version.textContent = "v" + (release.display_version || release.version);
-        if (size && release.size) size.textContent = (release.size / 1048576).toFixed(1) + " MB";
-      })
-      .catch(function () {
-        var version = document.getElementById("releaseVersion");
-        if (version) version.textContent = "current release";
-      });
-  </script>
 </body>
 </html>

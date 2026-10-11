@@ -65,7 +65,7 @@
 <body>
   <header class="top">
     <a class="logo" href="../">wild<span>rabbet</span></a>
-    <nav><a href="#features">Features</a><a href="#setup">Setup</a><a class="keep" href="../rabbit-kit/">Rabbit Kit for PC</a></nav>
+    <nav><a href="#features">Features</a><a href="#setup">Status</a><a class="keep" href="../rabbit-kit/">Rabbit Kit for PC</a></nav>
   </header>
   <main>
     <section class="hero">
@@ -75,10 +75,10 @@
           <h1>Rabbit Kit.<br>Now on Android.</h1>
           <p class="lede">Use Rabbit Kit directly on your phone for notes, files, images, apps, conversions, hardware tools, vibration, torch and Morse. Link your PC only when you want its Windows tools, files, games, or full remote control.</p>
           <div class="actions">
-            <a class="button primary" href="./download/RabbitKit-Android-2026.9.19.8.apk" download>Download</a>
-            <a class="button secondary" href="#setup">How to install</a>
+            <span class="button primary" aria-disabled="true">In development · downloads paused</span>
+            <a class="button secondary" href="#setup">Development status</a>
           </div>
-          <div class="meta"><span id="version">Rabbit Kit</span> · Android 8.0 or newer · <span id="size">tiny download</span></div>
+          <div class="meta">Android project · public builds return after development</div>
         </div>
         <div class="phone" aria-hidden="true"><div class="screen">
           <div class="screenTop"><span class="rabbit">R</span><div><b>Rabbit Kit</b><div style="font-size:9px;color:#8f95aa">This phone</div></div></div>
@@ -100,29 +100,15 @@
     </div></section>
 
     <section id="setup" class="section setup"><div class="wrap">
-      <div class="sectionHead"><p class="eyebrow">Three steps</p><h2>Install and start locally.</h2></div>
-      <div class="steps">
-        <div class="step"><b>Download</b><span>Tap Download above, then open RabbitKit-Android.apk from your browser's Downloads list.</span></div>
-        <div class="step"><b>Allow this source</b><span>If Android asks, allow your browser to install this one downloaded app, then press Install or Update.</span></div>
-        <div class="step"><b>Open Rabbit Kit</b><span>Choose This phone immediately. Linked PC remains optional and can be paired later from inside the app.</span></div>
-      </div>
-      <div class="trust"><b>Local by default.</b> Phone notes and preferences remain on the device until you share them. If you enable Linked PC, its picture, input, and clipboard stay between paired devices on trusted Wi-Fi or USB. Do not forward the PC remote ports or use them on an untrusted public network.</div>
+      <div class="sectionHead"><p class="eyebrow">Development status</p><h2>Android builds are temporarily unavailable.</h2><p>Rabbit Kit is in development. Public APK downloads and update links are paused until a new build is ready.</p></div>
+      <div class="trust"><b>No public installer right now.</b> This page is informational only; it does not offer an APK or install flow.</div>
     </div></section>
 
     <section class="download">
-      <p class="eyebrow">Rabbit Kit for Android</p><h2>Useful before you connect anything.</h2>
-      <p>Download, install, and choose This phone. Link a PC later only if you want to.</p>
-      <a class="button primary" href="./download/RabbitKit-Android-2026.9.19.8.apk" download>Download</a>
-      <div class="hash" id="hash"></div>
+      <p class="eyebrow">Rabbit Kit for Android</p><h2>Builds paused while we work on the app.</h2>
+      <p>There is no downloadable APK on the website right now.</p>
     </section>
   </main>
   <footer class="foot"><a href="../">← wildrabbet</a><span><a href="../rabbit-kit/">Rabbit Kit for PC</a></span></footer>
-  <script>
-    fetch('./update.json',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error();return r.json()}).then(function(x){
-      document.getElementById('version').textContent='Version '+x.version;
-      document.getElementById('size').textContent=(x.size/1024).toFixed(0)+' KB';
-      document.getElementById('hash').textContent='SHA-256 '+x.sha256;
-    }).catch(function(){});
-  </script>
 </body>
 </html>

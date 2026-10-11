@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="The Seed Shed is a hand-checked Minecraft seed shop for memorable worlds, real screenshots, exact versions, and custom world searches.">
+  <meta name="description" content="The Seed Shed is a planning-stage Minecraft seed-finder and future shop. No seed searches or verified listings are live yet.">
   <meta name="theme-color" content="#f7f5f1">
   <title>The Seed Shed — wildrabbet</title>
   <link rel="stylesheet" href="../style.css">
@@ -28,7 +28,7 @@
   <main class="wrap shed-wrap">
     <div class="shed-welcome" role="note">
       <span class="pixel-sprout" aria-hidden="true">✿</span>
-      <span><b>HELLO, TRAVELLER!</b> The Seed Shed is open for browsing; the first seed cards are being checked by hand.</span>
+      <span><b>HELLO, TRAVELLER!</b> The Seed Shed is a blueprint for a future seed-finding shop. No searches are running yet.</span>
       <span class="welcome-id">ISSUE 001</span>
     </div>
 
@@ -79,14 +79,14 @@
     <section id="shelf" class="section shed-section" aria-labelledby="shelf-title">
       <div class="sectionHead shed-section-head">
         <div><p class="shed-kicker">THE STOCKROOM</p><h2 id="shelf-title">A few empty hooks. For now.</h2></div>
-        <span class="stock-badge"><i aria-hidden="true"></i> First drop in progress</span>
+        <span class="stock-badge"><i aria-hidden="true"></i> Blueprint stage</span>
       </div>
       <div class="shelf-card">
         <div class="shelf-chest" aria-hidden="true"><span class="chest-lid"></span><span class="chest-body"><i></i></span></div>
         <div class="shelf-copy">
           <h3>The chest is empty—for now.</h3>
-          <p>We’re checking the first worlds in-game and making proper screenshots before anything goes on sale. Every card will show its Java or Bedrock edition, exact version, seed, notable coordinates and what you actually receive.</p>
-          <p class="small-print">Nothing is for sale yet, and this page won’t take payment. We’ll only mark a seed as exclusive when we can keep it off the shelf after it sells.</p>
+          <p>No seed search has run, no world has been verified, and there are no listings. The plan is to test a version-pinned finder, verify candidates in the real game, and capture genuine screenshots before a single card appears.</p>
+          <p class="small-print">This is a planning page: there is no checkout or payment. A future sold-once listing could be removed from our shop after purchase, but nobody can promise a seed will not be independently rediscovered or copied elsewhere.</p>
           <a class="text-link" href="#cartography">Have a world in mind? Ask the cartographer <span aria-hidden="true">→</span></a>
         </div>
         <div class="shelf-wood" aria-hidden="true"></div>
@@ -94,7 +94,7 @@
       <div class="listing-promises">
         <article class="promise-card"><span class="promise-number">01</span><h3>Played, then pictured</h3><p>Listing images will be captured from the named game version, with no borrowed screenshots.</p></article>
         <article class="promise-card"><span class="promise-number">02</span><h3>Know what you’re buying</h3><p>Edition, version, seed and useful coordinates belong on the card, in plain sight.</p></article>
-        <article class="promise-card"><span class="promise-number">03</span><h3>A real-world hunt</h3><p>Got an old screenshot or video? We can look for a matching world and tell you how close we got.</p></article>
+        <article class="promise-card"><span class="promise-number">03</span><h3>A careful world hunt</h3><p>Reference matching is a separate future research mode. A submitted idea does not start a search today.</p></article>
       </div>
     </section>
 
@@ -106,10 +106,10 @@
       <div class="desk-card">
         <div class="desk-intro">
           <div class="desk-map-icon" aria-hidden="true">⌖</div>
-          <div><h3>Tell us what you remember.</h3><p>Describe a seed you’d love to find, or share a reference link to an old video or screenshot. This opens a draft email in your own mail app; the website does not store your request.</p></div>
+          <div><h3>Leave a note for the cartographer.</h3><p>Share what you would want searched, or a reference link for a future investigation. This only opens a draft email in your mail app; it does not submit a request or start a search.</p></div>
         </div>
         <form id="world-hunt-form" class="hunt-form">
-          <label>What are we searching for?
+          <label>What would you want us to search for?
             <select name="huntType" required>
               <option value="Find a world with these features">A new seed with certain features</option>
               <option value="Try to identify the world in my reference">A world from an old screenshot or video</option>
@@ -125,7 +125,7 @@
           <label class="hunt-wide">Reference link (optional)
             <input name="reference" type="url" maxlength="500" placeholder="https://…">
           </label>
-          <div class="hunt-submit hunt-wide"><button class="btn primary shed-button" type="submit">Write the cartographer <span aria-hidden="true">✉</span></button><span id="hunt-status" class="hunt-status" role="status" aria-live="polite">Your mail app opens with the details filled in.</span></div>
+          <div class="hunt-submit hunt-wide"><button class="btn primary shed-button" type="submit">Draft a note <span aria-hidden="true">✉</span></button><span id="hunt-status" class="hunt-status" role="status" aria-live="polite">Opens a draft only. No search starts.</span></div>
         </form>
         <p class="privacy-note">No account needed. No form database. Your email app sends only when you press Send there.</p>
       </div>
